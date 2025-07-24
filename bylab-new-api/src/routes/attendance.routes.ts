@@ -5,6 +5,7 @@ const router = Router();
 
 router.get('/', AttendanceController.getAll);
 router.get('/:id', AttendanceController.getById);
+router.get('/lesson/:lessonId', AttendanceController.getByLesson);
 router.post('/', AttendanceController.create);
 router.post('/bulk', AttendanceController.createBulk);
 router.put('/:id', AttendanceController.update);

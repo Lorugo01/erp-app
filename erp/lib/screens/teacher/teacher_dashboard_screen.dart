@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/teacher_service.dart';
 import 'dart:async';
 import 'teacher_class_detail_screen.dart';
+import 'teacher_attendance_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -28,7 +29,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _fetchTeacherClasses();
     _searchController.addListener(_onSearchChanged);
     _tabController.addListener(() {
@@ -205,6 +206,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   selected: _tabController.index == 1,
                   onTap: () => setState(() => _tabController.animateTo(1)),
                 ),
+                _SidebarButton(
+                  icon: Icons.how_to_reg,
+                  label: 'Chamadas',
+                  selected: _tabController.index == 2,
+                  onTap: () => setState(() => _tabController.animateTo(2)),
+                ),
                 const Spacer(),
                 const Divider(color: Colors.white54, indent: 16, endIndent: 16),
                 _SidebarButton(
@@ -246,7 +253,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                         child: Text(
                           _tabController.index == 0
                               ? 'Minhas Turmas'
-                              : 'Meus Alunos',
+                              : _tabController.index == 1
+                              ? 'Meus Alunos'
+                              : 'Chamadas',
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -310,7 +319,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
-                      children: [_buildClassesTab(), _buildStudentsTab()],
+                      children: [
+                        _buildClassesTab(),
+                        _buildStudentsTab(),
+                        const TeacherAttendanceScreen(),
+                      ],
                     ),
                   ),
                 ],

@@ -24,12 +24,18 @@ export const getAttendanceById = async (id: string) => {
     where: { id },
     include: {
       student: true,
-      lesson: true,
+      lesson: {
+        include: {
+          subject: true,
+          class: true,
+          teacher: true
+        }
+      },
     },
   });
 
   if (!attendance) {
-    throw new Error('Presença não encontrada');
+    throw new Error('Frequência não encontrada');
   }
 
   return attendance;
@@ -108,18 +114,60 @@ export const createBulkAttendance = async (data: {
   return created;
 };
 
-
-export const updateAttendance = (id: string, data: {
-  present?: boolean;
-}) => {
+export const updateAttendance = async (id: string, data: Partial<{
+  present: boolean;
+}>) => {
   return prisma.attendance.update({
     where: { id },
     data,
+    include: {
+      student: true,
+      lesson: {
+        include: {
+          subject: true,
+          class: true,
+          teacher: true
+        }
+      },
+    },
   });
 };
 
-export const deleteAttendance = (id: string) => {
+export const deleteAttendance = async (id: string) => {
   return prisma.attendance.delete({
     where: { id },
+  });
+};
+
+// Novo método para buscar attendance por lesson ID
+export const getAttendanceByLesson = async (lessonId: string) => {
+  if (!lessonId || typeof lessonId !== 'string' || lessonId.length < 10) {
+    throw new Error('ID da aula inválido');
+  }
+
+  return prisma.attendance.findMany({
+    where: { lessonId },
+    include: {
+      student: {
+        select: {
+          id: true,
+          name: true,
+          registrationNumber: true,
+          profilePicture: true
+        }
+      },
+      lesson: {
+        include: {
+          subject: true,
+          class: true,
+          teacher: true
+        }
+      },
+    },
+    orderBy: {
+      student: {
+        name: 'asc'
+      }
+    }
   });
 };

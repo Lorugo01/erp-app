@@ -40,7 +40,12 @@ export const createLesson = (data: {
   subjectId: string;
   teacherId: string;
 }) => {
-  return prisma.lesson.create({ data });
+  return prisma.lesson.create({ 
+    data: {
+      ...data,
+      date: new Date(data.date)
+    }
+  });
 };
 
 export const updateLesson = (id: string, data: {
@@ -51,7 +56,10 @@ export const updateLesson = (id: string, data: {
 }) => {
   return prisma.lesson.update({
     where: { id },
-    data,
+    data: {
+      ...data,
+      date: data.date ? new Date(data.date) : undefined
+    },
   });
 };
 
@@ -67,17 +75,28 @@ export const getOrCreateLessonByClassDate = async (data: {
   subjectId: string;
   teacherId: string;
 }) => {
+  const lessonDate = new Date(data.date);
+  
   // Busca uma lesson existente para a turma, data, disciplina e professor
   let lesson = await prisma.lesson.findFirst({
     where: {
       classId: data.classId,
       subjectId: data.subjectId,
       teacherId: data.teacherId,
-      date: new Date(data.date),
+      date: lessonDate,
     },
   });
+  
   if (!lesson) {
-    lesson = await prisma.lesson.create({ data });
+    lesson = await prisma.lesson.create({ 
+      data: {
+        classId: data.classId,
+        subjectId: data.subjectId,
+        teacherId: data.teacherId,
+        date: lessonDate
+      }
+    });
   }
+  
   return lesson;
 };

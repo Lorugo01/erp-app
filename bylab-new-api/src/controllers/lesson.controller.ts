@@ -20,25 +20,45 @@ export const create = async (req: Request, res: Response) => {
   res.status(201).json(lesson);
 };
 
-export const update = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const lesson = await LessonService.updateLesson(id, req.body);
-  res.json(lesson);
+export const update = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const lesson = await LessonService.updateLesson(id, req.body);
+    res.json(lesson);
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const remove = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  await LessonService.deleteLesson(id);
-  res.status(204).send();
+export const remove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await LessonService.deleteLesson(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const getOrCreateByClassDate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { classId, date, subjectId, teacherId } = req.body;
+    
     if (!classId || !date || !subjectId || !teacherId) {
       return res.status(400).json({ error: 'classId, date, subjectId e teacherId são obrigatórios' });
     }
-    const lesson = await LessonService.getOrCreateLessonByClassDate({ classId, date, subjectId, teacherId });
+
+    // Valida e converte a data
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Formato de data inválido. Use ISO-8601.' });
+    }
+
+    const lesson = await LessonService.getOrCreateLessonByClassDate({ 
+      classId, 
+      date: parsedDate, 
+      subjectId, 
+      teacherId 
+    });
     res.json(lesson);
   } catch (error) {
     next(error);

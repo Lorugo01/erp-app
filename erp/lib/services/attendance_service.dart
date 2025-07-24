@@ -62,4 +62,61 @@ class AttendanceService {
       throw Exception('Erro ao buscar frequência');
     }
   }
+
+  // Novo método para buscar ou criar uma aula
+  static Future<Map<String, dynamic>> getOrCreateLesson({
+    required String classId,
+    required String subjectId,
+    required String teacherId,
+    required DateTime date,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/lessons/get-or-create'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'classId': classId,
+        'subjectId': subjectId,
+        'teacherId': teacherId,
+        'date': date.toIso8601String(),
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Erro ao buscar/criar aula: ${response.body}');
+    }
+  }
+
+  // Novo método para registrar frequência por aula
+  static Future<void> markAttendanceByLesson({
+    required String lessonId,
+    required List<Map<String, dynamic>> presences,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/attendances/bulk'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'lessonId': lessonId,
+        'presences': presences,
+      }),
+    );
+    if (response.statusCode != 201) {
+      throw Exception('Erro ao registrar frequência: ${response.body}');
+    }
+  }
+
+  // Novo método para buscar frequência de uma aula específica
+  static Future<List<Map<String, dynamic>>> getAttendanceByLesson(
+    String lessonId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/attendances/lesson/$lessonId'),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar frequência da aula');
+    }
+  }
 }

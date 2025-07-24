@@ -31,14 +31,32 @@ export const createBulk = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-export const update = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const attendance = await AttendanceService.updateAttendance(id, req.body);
-  res.json(attendance);
+export const update = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const attendance = await AttendanceService.updateAttendance(id, req.body);
+    res.json(attendance);
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const remove = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  await AttendanceService.deleteAttendance(id);
-  res.status(204).send();
+export const remove = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await AttendanceService.deleteAttendance(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Novo método para buscar attendance por lesson ID
+export const getByLesson = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lessonId } = req.params;
+    const attendances = await AttendanceService.getAttendanceByLesson(lessonId);
+    res.json(attendances);
+  } catch (error) {
+    next(error);
+  }
 };
