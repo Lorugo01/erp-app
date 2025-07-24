@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import '../../services/assignment_service.dart';
 import '../../services/teacher_service.dart';
 import '../../services/attendance_service.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class TeacherClassDetailScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -13,42 +18,21 @@ class TeacherClassDetailScreen extends StatefulWidget {
 }
 
 class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
-  List<Map<String, dynamic>> _assignments = [];
   List<Map<String, dynamic>> _students = [];
-  bool _loading = false;
   bool _loadingStudents = false;
-  String? _error;
   String? _errorStudents;
   int _selectedTabIndex = 0;
+
+  // Nova implementação da aba de atividades
+  List<Map<String, dynamic>> _assignments = [];
+  bool _loadingAssignments = false;
+  String? _errorAssignments;
 
   @override
   void initState() {
     super.initState();
     _fetchAssignments();
     _fetchStudents();
-  }
-
-  Future<void> _fetchAssignments() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final assignments = await AssignmentService.getAssignmentsByClass(
-        widget.classData['id'],
-      );
-      setState(() {
-        _assignments = assignments;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
-    } finally {
-      setState(() {
-        _loading = false;
-      });
-    }
   }
 
   Future<void> _fetchStudents() async {
@@ -71,6 +55,169 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
       setState(() {
         _loadingStudents = false;
       });
+    }
+  }
+
+  Future<void> _fetchAssignments() async {
+    setState(() {
+      _loadingAssignments = true;
+      _errorAssignments = null;
+    });
+    try {
+      final assignments = await AssignmentService.getAssignmentsByClass(
+        widget.classData['id'],
+      );
+      setState(() {
+        _assignments = assignments;
+      });
+    } catch (e) {
+      setState(() {
+        _errorAssignments = e.toString();
+      });
+    } finally {
+      setState(() {
+        _loadingAssignments = false;
+      });
+    }
+  }
+
+  Future<void> _deleteAssignment(String assignmentId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Excluir Atividade'),
+            content: const Text(
+              'Tem certeza que deseja excluir esta atividade?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Excluir'),
+              ),
+            ],
+          ),
+    );
+    if (confirm == true) {
+      setState(() => _loadingAssignments = true);
+      try {
+        await AssignmentService.deleteAssignment(assignmentId);
+        await _fetchAssignments();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Atividade excluída com sucesso!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Erro ao excluir assignment: ' + e.toString());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao excluir: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _loadingAssignments = false);
+      }
+    }
+  }
+
+  void _showAttendanceDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Registrar Presença'),
+            content: const Text(
+              'Deseja registrar a presença de todos os alunos para hoje?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _registerAllAttendance();
+                },
+                child: const Text('Confirmar'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _markAttendance(String studentId, bool present) async {
+    final dialogContext = context;
+    try {
+      await AttendanceService.markAttendance(
+        studentId: studentId,
+        classId: widget.classData['id'],
+        present: present,
+        date: DateTime.now(),
+      );
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(
+            content: Text(
+              present
+                  ? 'Aluno marcado como presente'
+                  : 'Aluno marcado como ausente',
+            ),
+            backgroundColor: present ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao registrar presença: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _registerAllAttendance() async {
+    final dialogContext = context;
+    try {
+      final studentIds = _students.map((s) => s['id'] as String).toList();
+      await AttendanceService.markAllAttendance(
+        classId: widget.classData['id'],
+        studentIds: studentIds,
+        present: true,
+        date: DateTime.now(),
+      );
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          const SnackBar(
+            content: Text('Presença registrada para todos os alunos'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao registrar presença: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -186,72 +333,6 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
     );
   }
 
-  Widget _buildAssignmentsTab() {
-    return _loading
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null
-        ? Center(
-          child: Text(_error!, style: const TextStyle(color: Colors.red)),
-        )
-        : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Atividades da Turma',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _showAddAssignmentDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Nova Atividade'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.yellow[700],
-                    foregroundColor: Colors.black,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child:
-                  _assignments.isEmpty
-                      ? const Center(
-                        child: Text('Nenhuma atividade cadastrada.'),
-                      )
-                      : ListView.separated(
-                        itemCount: _assignments.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          final assignment = _assignments[index];
-                          return Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 3,
-                            child: ListTile(
-                              title: Text(assignment['description'] ?? ''),
-                              subtitle: Text(
-                                'Entrega até: ${assignment['dueDate']?.toString().split('T').first ?? ''}',
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.assignment_turned_in),
-                                tooltip: 'Ver entregas dos alunos',
-                                onPressed: () {
-                                  // TODO: abrir tela de entregas dos alunos
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-            ),
-          ],
-        );
-  }
-
   Widget _buildAttendanceTab() {
     return _loadingStudents
         ? const Center(child: CircularProgressIndicator())
@@ -345,96 +426,105 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
         );
   }
 
-  void _showAttendanceDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Registrar Presença'),
-            content: const Text(
-              'Deseja registrar a presença de todos os alunos para hoje?',
+  Widget _buildAssignmentsTab() {
+    return Stack(
+      children: [
+        _loadingAssignments
+            ? const Center(child: CircularProgressIndicator())
+            : _errorAssignments != null
+            ? Center(
+              child: Text(
+                _errorAssignments!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            )
+            : _assignments.isEmpty
+            ? const Center(child: Text('Nenhuma atividade cadastrada.'))
+            : ListView.separated(
+              itemCount: _assignments.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final assignment = _assignments[index];
+                final desc = assignment['description'] ?? '';
+                final parts = desc.split('\n');
+                final nome =
+                    parts.isNotEmpty && parts[0].trim().isNotEmpty
+                        ? parts[0]
+                        : 'Sem nome';
+                final descricao =
+                    parts.length > 1 ? parts.sublist(1).join('\n') : '';
+                return Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 3,
+                  child: ListTile(
+                    title: Text(nome),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (descricao.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(descricao),
+                          ),
+                        if (assignment['dueDate'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              'Entrega até: ${assignment['dueDate'] != null ? assignment['dueDate'].toString().split('T').first : ''}',
+                            ),
+                          ),
+                        if (assignment['fileUrl'] != null &&
+                            assignment['fileUrl'].toString().isNotEmpty)
+                          TextButton.icon(
+                            icon: const Icon(Icons.attach_file),
+                            label: const Text('Baixar Anexo'),
+                            onPressed: () async {
+                              final url = assignment['fileUrl'];
+                              final uri = Uri.parse(url);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri);
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Excluir atividade',
+                      onPressed: () => _deleteAssignment(assignment['id']),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder:
+                              (_) => TaskSubmissionsScreen(
+                                assignment: assignment,
+                                students: _students,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _registerAllAttendance();
-                },
-                child: const Text('Confirmar'),
-              ),
-            ],
+        Positioned(
+          bottom: 24,
+          right: 24,
+          child: FloatingActionButton(
+            backgroundColor: Colors.orange,
+            onPressed: _showAddAssignmentDialog,
+            child: const Icon(Icons.add, size: 32, color: Colors.white),
           ),
+        ),
+      ],
     );
-  }
-
-  void _markAttendance(String studentId, bool present) async {
-    final dialogContext = context;
-    try {
-      await AttendanceService.markAttendance(
-        studentId: studentId,
-        classId: widget.classData['id'],
-        present: present,
-        date: DateTime.now(),
-      );
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(
-            content: Text(
-              present
-                  ? 'Aluno marcado como presente'
-                  : 'Aluno marcado como ausente',
-            ),
-            backgroundColor: present ? Colors.green : Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar presença: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _registerAllAttendance() async {
-    final dialogContext = context;
-    try {
-      final studentIds = _students.map((s) => s['id'] as String).toList();
-      await AttendanceService.markAllAttendance(
-        classId: widget.classData['id'],
-        studentIds: studentIds,
-        present: true,
-        date: DateTime.now(),
-      );
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          const SnackBar(
-            content: Text('Presença registrada para todos os alunos'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar presença: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 }
 
+// Nova implementação do diálogo de adicionar atividade
 class AddAssignmentDialog extends StatefulWidget {
   final String classId;
   const AddAssignmentDialog({super.key, required this.classId});
@@ -445,15 +535,35 @@ class AddAssignmentDialog extends StatefulWidget {
 
 class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _descController = TextEditingController();
   DateTime? _dueDate;
   bool _loading = false;
   String? _error;
+  String? _fileName;
+  Uint8List? _fileBytes;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles();
+      if (result != null && result.files.single.bytes != null) {
+        setState(() {
+          _fileName = result.files.single.name;
+          _fileBytes = result.files.single.bytes;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Erro ao selecionar arquivo: $e';
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -464,10 +574,37 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
     });
     final dialogContext = context;
     try {
+      String? fileUrl;
+      if (_fileBytes != null && _fileName != null) {
+        // Enviar arquivo para o backend (implemente o endpoint se necessário)
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('${AssignmentService.baseUrl}/assignments/upload'),
+        );
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            _fileBytes!,
+            filename: _fileName!,
+          ),
+        );
+        final streamed = await request.send();
+        final resp = await http.Response.fromStream(streamed);
+        if (resp.statusCode == 200) {
+          final data = jsonDecode(resp.body);
+          fileUrl = data['url'] ?? data['fileUrl'];
+        } else {
+          setState(() {
+            _error = 'Erro ao enviar arquivo: ${resp.body}';
+          });
+          return;
+        }
+      }
       await AssignmentService.createAssignment(
         classId: widget.classId,
-        description: _descController.text,
+        description: _nameController.text + '\n' + _descController.text,
         dueDate: _dueDate!,
+        fileUrl: fileUrl,
       );
       if (dialogContext.mounted) Navigator.of(dialogContext).pop(true);
     } catch (e) {
@@ -490,6 +627,13 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Nome da Atividade'),
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _descController,
               decoration: const InputDecoration(labelText: 'Descrição'),
@@ -522,6 +666,25 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _pickFile,
+                  icon: const Icon(Icons.attach_file),
+                  label: const Text('Anexar Arquivo'),
+                ),
+                const SizedBox(width: 8),
+                if (_fileName != null)
+                  Flexible(
+                    child: Text(
+                      _fileName!,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, color: Colors.green),
+                    ),
+                  ),
+              ],
+            ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
@@ -547,6 +710,141 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
                   : const Text('Salvar'),
         ),
       ],
+    );
+  }
+}
+
+// Nova tela para exibir entregas dos alunos
+class TaskSubmissionsScreen extends StatefulWidget {
+  final Map<String, dynamic> assignment;
+  final List<Map<String, dynamic>> students;
+  const TaskSubmissionsScreen({
+    super.key,
+    required this.assignment,
+    required this.students,
+  });
+
+  @override
+  State<TaskSubmissionsScreen> createState() => _TaskSubmissionsScreenState();
+}
+
+class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
+  List<Map<String, dynamic>> _submissions = [];
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSubmissions();
+  }
+
+  Future<void> _fetchSubmissions() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final submissions = await AssignmentService.getSubmissionsByAssignment(
+        widget.assignment['id'],
+      );
+      setState(() {
+        _submissions = submissions;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+      });
+    } finally {
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entregaramIds = _submissions.map((s) => s['studentId']).toSet();
+    final alunosEntregaram =
+        widget.students.where((s) => entregaramIds.contains(s['id'])).toList();
+    final alunosNaoEntregaram =
+        widget.students.where((s) => !entregaramIds.contains(s['id'])).toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Entregas da Atividade'),
+        backgroundColor: Colors.orange,
+      ),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              )
+              : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Alunos que entregaram:',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (alunosEntregaram.isEmpty)
+                      const Text('Nenhum aluno entregou ainda.'),
+                    ..._submissions.map((sub) {
+                      final aluno = widget.students.firstWhere(
+                        (s) => s['id'] == sub['studentId'],
+                        orElse: () => null,
+                      );
+                      return Card(
+                        child: ListTile(
+                          title: Text(
+                            aluno != null ? aluno['name'] ?? '' : 'Aluno',
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (sub['description'] != null &&
+                                  sub['description'].toString().isNotEmpty)
+                                Text(sub['description']),
+                              if (sub['fileUrl'] != null &&
+                                  sub['fileUrl'].toString().isNotEmpty)
+                                TextButton.icon(
+                                  icon: const Icon(Icons.attach_file),
+                                  label: const Text('Baixar Arquivo'),
+                                  onPressed: () async {
+                                    final url = sub['fileUrl'];
+                                    final uri = Uri.parse(url);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(uri);
+                                    }
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Alunos que NÃO entregaram:',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (alunosNaoEntregaram.isEmpty)
+                      const Text('Todos os alunos entregaram.'),
+                    ...alunosNaoEntregaram.map(
+                      (aluno) => ListTile(
+                        leading: const Icon(Icons.person_outline),
+                        title: Text(aluno['name'] ?? ''),
+                        subtitle: Text(aluno['registrationNumber'] ?? ''),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
     );
   }
 }

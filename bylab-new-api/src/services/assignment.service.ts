@@ -18,6 +18,12 @@ export const createAssignment = async (classId: string, data: any) => {
   });
 };
 
+export const deleteAssignment = async (assignmentId: string) => {
+  return prisma.assignment.delete({
+    where: { id: assignmentId },
+  });
+};
+
 export const getSubmissionsByAssignment = async (assignmentId: string) => {
   return prisma.assignmentSubmission.findMany({
     where: { assignmentId },

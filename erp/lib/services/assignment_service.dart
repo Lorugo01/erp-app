@@ -41,4 +41,27 @@ class AssignmentService {
       throw Exception('Erro ao criar atividade');
     }
   }
+
+  static Future<void> deleteAssignment(String assignmentId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/assignments/$assignmentId'),
+    );
+    if (response.statusCode != 204) {
+      throw Exception('Erro ao excluir atividade');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getSubmissionsByAssignment(
+    String assignmentId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/assignments/$assignmentId/submissions'),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar submissões da atividade');
+    }
+  }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../services/teacher_service.dart';
-import 'teacher_detail_screen.dart';
 
 class ClassTeachersScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
