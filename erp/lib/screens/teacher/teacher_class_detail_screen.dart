@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../services/assignment_service.dart';
 import '../../services/teacher_service.dart';
-import '../../services/attendance_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'task_submissions_screen.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 
 class TeacherClassDetailScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -19,11 +20,6 @@ class TeacherClassDetailScreen extends StatefulWidget {
 }
 
 class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
-  List<Map<String, dynamic>> _students = [];
-  bool _loadingStudents = false;
-  String? _errorStudents;
-  int _selectedTabIndex = 0;
-
   // Nova implementação da aba de atividades
   List<Map<String, dynamic>> _assignments = [];
   bool _loadingAssignments = false;
@@ -33,30 +29,6 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
   void initState() {
     super.initState();
     _fetchAssignments();
-    _fetchStudents();
-  }
-
-  Future<void> _fetchStudents() async {
-    setState(() {
-      _loadingStudents = true;
-      _errorStudents = null;
-    });
-    try {
-      final students = await TeacherService.getClassStudents(
-        widget.classData['id'],
-      );
-      setState(() {
-        _students = students;
-      });
-    } catch (e) {
-      setState(() {
-        _errorStudents = e.toString();
-      });
-    } finally {
-      setState(() {
-        _loadingStudents = false;
-      });
-    }
   }
 
   Future<void> _fetchAssignments() async {
@@ -133,95 +105,6 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
     }
   }
 
-  void _showAttendanceDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Registrar Presença'),
-            content: const Text(
-              'Deseja registrar a presença de todos os alunos para hoje?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _registerAllAttendance();
-                },
-                child: const Text('Confirmar'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _markAttendance(String studentId, bool present) async {
-    final dialogContext = context;
-    try {
-      await AttendanceService.markAttendance(
-        studentId: studentId,
-        classId: widget.classData['id'],
-        present: present,
-        date: DateTime.now(),
-      );
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(
-            content: Text(
-              present
-                  ? 'Aluno marcado como presente'
-                  : 'Aluno marcado como ausente',
-            ),
-            backgroundColor: present ? Colors.green : Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar presença: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _registerAllAttendance() async {
-    final dialogContext = context;
-    try {
-      final studentIds = _students.map((s) => s['id'] as String).toList();
-      await AttendanceService.markAllAttendance(
-        classId: widget.classData['id'],
-        studentIds: studentIds,
-        present: true,
-        date: DateTime.now(),
-      );
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          const SnackBar(
-            content: Text('Presença registrada para todos os alunos'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar presença: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   void _showAddAssignmentDialog() async {
     final result = await showDialog(
       context: context,
@@ -242,189 +125,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            // Tabs
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedTabIndex = 0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color:
-                              _selectedTabIndex == 0
-                                  ? const Color(0xFF2953A5)
-                                  : Colors.transparent,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(12),
-                            bottomLeft: Radius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Atividades',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color:
-                                _selectedTabIndex == 0
-                                    ? Colors.white
-                                    : Colors.grey,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedTabIndex = 1),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color:
-                              _selectedTabIndex == 1
-                                  ? const Color(0xFF2953A5)
-                                  : Colors.transparent,
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(12),
-                            bottomRight: Radius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Chamada',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color:
-                                _selectedTabIndex == 1
-                                    ? Colors.white
-                                    : Colors.grey,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Conteúdo das tabs
-            Expanded(
-              child:
-                  _selectedTabIndex == 0
-                      ? _buildAssignmentsTab()
-                      : _buildAttendanceTab(),
-            ),
-          ],
-        ),
+        child: _buildAssignmentsTab(),
       ),
     );
-  }
-
-  Widget _buildAttendanceTab() {
-    return _loadingStudents
-        ? const Center(child: CircularProgressIndicator())
-        : _errorStudents != null
-        ? Center(
-          child: Text(
-            _errorStudents!,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Chamada - Hoje',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _showAttendanceDialog,
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('Registrar Presença'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700],
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child:
-                  _students.isEmpty
-                      ? const Center(child: Text('Nenhum aluno encontrado.'))
-                      : ListView.separated(
-                        itemCount: _students.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final student = _students[index];
-                          return Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                            child: ListTile(
-                              leading: const CircleAvatar(
-                                backgroundColor: Color(0xFF2953A5),
-                                child: Icon(Icons.person, color: Colors.white),
-                              ),
-                              title: Text(student['name'] ?? ''),
-                              subtitle: Text(
-                                student['registrationNumber'] ?? '',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                    ),
-                                    onPressed:
-                                        () => _markAttendance(
-                                          student['id'],
-                                          true,
-                                        ),
-                                    tooltip: 'Presente',
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.cancel,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed:
-                                        () => _markAttendance(
-                                          student['id'],
-                                          false,
-                                        ),
-                                    tooltip: 'Ausente',
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-            ),
-          ],
-        );
   }
 
   Widget _buildAssignmentsTab() {
@@ -502,7 +205,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen> {
                           builder:
                               (_) => TaskSubmissionsScreen(
                                 assignment: assignment,
-                                students: _students,
+                                students: [], // No students for assignments
                               ),
                         ),
                       );

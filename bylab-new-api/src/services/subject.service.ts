@@ -53,6 +53,17 @@ export const createSubject = async (data: {
   });
 };
 
+export const getSubjectsByClassId = async (classId: string) => {
+  return prisma.subject.findMany({
+    where: { classId },
+    include: {
+      class: true,
+      teacher: true,
+      lessons: true,
+    },
+  });
+};
+
 function getSubjectLabel(type: string): string {
   const map = {
     LINGUA_INGLESA: "Língua Inglesa",

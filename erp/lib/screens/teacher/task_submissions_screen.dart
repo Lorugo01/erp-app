@@ -19,6 +19,8 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
   List<Map<String, dynamic>> _submissions = [];
   bool _loading = false;
   String? _error;
+  // Novo: controle local de marcação manual
+  Set<String> _manuallyMarkedDelivered = {};
 
   @override
   void initState() {
@@ -52,10 +54,16 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
   @override
   Widget build(BuildContext context) {
     final entregaramIds = _submissions.map((s) => s['studentId']).toSet();
+    // Inclui os marcados manualmente
+    final allDeliveredIds = {...entregaramIds, ..._manuallyMarkedDelivered};
     final alunosEntregaram =
-        widget.students.where((s) => entregaramIds.contains(s['id'])).toList();
+        widget.students
+            .where((s) => allDeliveredIds.contains(s['id']))
+            .toList();
     final alunosNaoEntregaram =
-        widget.students.where((s) => !entregaramIds.contains(s['id'])).toList();
+        widget.students
+            .where((s) => !allDeliveredIds.contains(s['id']))
+            .toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Entregas da Atividade'),
@@ -80,16 +88,14 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                     const SizedBox(height: 8),
                     if (alunosEntregaram.isEmpty)
                       const Text('Nenhum aluno entregou ainda.'),
-                    ..._submissions.map((sub) {
-                      final aluno = widget.students.firstWhere(
-                        (s) => s['id'] == sub['studentId'],
+                    ...alunosEntregaram.map((aluno) {
+                      final sub = _submissions.firstWhere(
+                        (s) => s['studentId'] == aluno['id'],
                         orElse: () => <String, dynamic>{},
                       );
                       return Card(
                         child: ListTile(
-                          title: Text(
-                            aluno != null ? aluno['name'] ?? '' : 'Aluno',
-                          ),
+                          title: Text(aluno['name'] ?? ''),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -109,8 +115,38 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                     }
                                   },
                                 ),
+                              if (sub.isEmpty &&
+                                  !_manuallyMarkedDelivered.contains(
+                                    aluno['id'],
+                                  ))
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    'Marcado manualmente',
+                                    style: const TextStyle(
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
+                          trailing:
+                              sub.isEmpty
+                                  ? IconButton(
+                                    icon: const Icon(
+                                      Icons.undo,
+                                      color: Colors.grey,
+                                    ),
+                                    tooltip: 'Desmarcar entrega manual',
+                                    onPressed: () {
+                                      setState(() {
+                                        _manuallyMarkedDelivered.remove(
+                                          aluno['id'],
+                                        );
+                                      });
+                                    },
+                                  )
+                                  : null,
                         ),
                       );
                     }),
@@ -127,6 +163,18 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                         leading: const Icon(Icons.person_outline),
                         title: Text(aluno['name'] ?? ''),
                         subtitle: Text(aluno['registrationNumber'] ?? ''),
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.check_circle,
+                            color: Colors.orange,
+                          ),
+                          tooltip: 'Marcar como entregue (manual)',
+                          onPressed: () {
+                            setState(() {
+                              _manuallyMarkedDelivered.add(aluno['id']);
+                            });
+                          },
+                        ),
                       ),
                     ),
                   ],

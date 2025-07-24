@@ -60,3 +60,24 @@ export const deleteLesson = (id: string) => {
     where: { id },
   });
 };
+
+export const getOrCreateLessonByClassDate = async (data: {
+  classId: string;
+  date: Date | string;
+  subjectId: string;
+  teacherId: string;
+}) => {
+  // Busca uma lesson existente para a turma, data, disciplina e professor
+  let lesson = await prisma.lesson.findFirst({
+    where: {
+      classId: data.classId,
+      subjectId: data.subjectId,
+      teacherId: data.teacherId,
+      date: new Date(data.date),
+    },
+  });
+  if (!lesson) {
+    lesson = await prisma.lesson.create({ data });
+  }
+  return lesson;
+};

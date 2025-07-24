@@ -8,5 +8,6 @@ router.get('/:id', SubjectController.getById);
 router.post('/', SubjectController.create);
 router.put('/:id', SubjectController.update);
 router.delete('/:id', SubjectController.remove);
+router.get('/class/:classId', SubjectController.getByClassId);
 
 export default router;

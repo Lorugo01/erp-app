@@ -31,3 +31,14 @@ export const remove = async (req: Request, res: Response) => {
   await SubjectService.deleteSubject(id);
   res.status(204).send();
 };
+
+export const getByClassId = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const classId = req.params.classId;
+    if (!classId) return res.status(400).json({ error: 'classId é obrigatório' });
+    const subjects = await SubjectService.getSubjectsByClassId(classId);
+    res.json(subjects);
+  } catch (error) {
+    next(error);
+  }
+};

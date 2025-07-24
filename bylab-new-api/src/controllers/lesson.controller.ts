@@ -31,3 +31,16 @@ export const remove = async (req: Request, res: Response) => {
   await LessonService.deleteLesson(id);
   res.status(204).send();
 };
+
+export const getOrCreateByClassDate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { classId, date, subjectId, teacherId } = req.body;
+    if (!classId || !date || !subjectId || !teacherId) {
+      return res.status(400).json({ error: 'classId, date, subjectId e teacherId são obrigatórios' });
+    }
+    const lesson = await LessonService.getOrCreateLessonByClassDate({ classId, date, subjectId, teacherId });
+    res.json(lesson);
+  } catch (error) {
+    next(error);
+  }
+};

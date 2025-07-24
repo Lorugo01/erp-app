@@ -41,4 +41,18 @@ class TeacherService {
       throw Exception('Erro ao buscar alunos da turma');
     }
   }
+
+  static Future<List<Map<String, dynamic>>> getSubjectsByClassId(
+    String classId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/subjects/class/$classId'),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar disciplinas da turma');
+    }
+  }
 }

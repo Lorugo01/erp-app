@@ -8,5 +8,6 @@ router.get('/:id', LessonController.getById);
 router.post('/', LessonController.create);
 router.put('/:id', LessonController.update);
 router.delete('/:id', LessonController.remove);
+router.post('/get-or-create', LessonController.getOrCreateByClassDate);
 
 export default router;
