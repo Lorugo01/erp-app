@@ -1,0 +1,161 @@
+Vou criar as requisições no Insomnia para cada tipo de role (ADMIN, STUDENT e TEACHER). Vou adicionar ao arquivo de coleção do Insomnia:
+
+
+Pronto! Criei as requisições para autenticação. Aqui está um resumo de como usar cada endpoint:
+
+1. **Registrar Administrador**
+- Endpoint: `POST http://localhost:3001/auth/register`
+- Body:
+```json
+{
+  "email": "admin@escola.com",
+  "password": "123456",
+  "role": "ADMIN",
+  "name": "Administrador do Sistema"
+}
+```
+
+2. **Registrar Professor**
+- Endpoint: `POST http://localhost:3001/auth/register`
+- Body:
+```json
+{
+  "email": "professor@escola.com",
+  "password": "123456",
+  "role": "TEACHER",
+  "name": "Professor Silva"
+}
+```
+
+3. **Registrar Aluno**
+- Endpoint: `POST http://localhost:3001/auth/register`
+- Body:
+```json
+{
+  "email": "aluno@escola.com",
+  "password": "123456",
+  "role": "STUDENT",
+  "name": "Aluno Silva"
+}
+```
+
+4. **Login (para qualquer tipo de usuário)**
+- Endpoint: `POST http://localhost:3001/auth/login`
+- Body:
+```json
+{
+  "email": "aluno@escola.com",
+  "password": "123456"
+}
+```
+
+Observações importantes:
+1. Todos os endpoints usam o método POST
+2. O Content-Type deve ser `application/json`
+3. O endpoint de registro é o mesmo para todos os tipos de usuário, o que muda é o campo `role` no body
+4. O endpoint de login é o mesmo para todos os tipos de usuário
+5. Ao fazer login, a API retornará os dados do usuário incluindo sua role e informações específicas (student ou teacher, se aplicável)
+
+Você pode importar essas requisições no Insomnia e testá-las. Deseja que eu explique algo mais específico sobre algum dos endpoints?
+
+
+======================	
+
+Não, vou explicar o fluxo interno do sistema quando você faz uma requisição de registro:
+
+1. **Endpoint Inicial**: 
+- A requisição chega em `POST http://localhost:3001/auth/register`
+- Este endpoint está definido em `src/routes/auth.routes.ts`:
+```typescript
+authRoutes.post('/register', (req, res) => authController.register(req, res));
+```
+
+2. **Controller**:
+- A requisição é direcionada para o `AuthController` em `src/controllers/AuthController.ts`
+- O método `register` recebe os dados:
+```typescript
+async register(req: Request, res: Response) {
+  try {
+    const { email, password, role, name } = req.body;
+    const user = await this.authService.createUser({ email, password, role, name });
+    return res.status(201).json(user);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+```
+
+3. **Service**:
+- O controller chama o `AuthService` em `src/services/AuthService.ts`
+- No método `createUser`, acontece o seguinte:
+```typescript
+async createUser(data: CreateUserDTO) {
+  // 1. Criptografa a senha
+  const hashedPassword = await hash(data.password, 10);
+
+  // 2. Cria o usuário base no banco
+  const user = await prisma.user.create({
+    data: {
+      email: data.email,
+      password: hashedPassword,
+      role: data.role,
+    },
+  });
+
+  // 3. Se for STUDENT ou TEACHER, cria o registro específico
+  if (data.role === Role.STUDENT) {
+    await prisma.student.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        userId: user.id,  // Vincula ao usuário criado
+      },
+    });
+  } else if (data.role === Role.TEACHER) {
+    await prisma.teacher.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        userId: user.id,  // Vincula ao usuário criado
+      },
+    });
+  }
+
+  // 4. Remove a senha antes de retornar
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
+```
+
+Então, o fluxo é:
+1. A requisição chega em `/auth/register`
+2. O router direciona para o AuthController
+3. O controller extrai os dados e chama o AuthService
+4. O service:
+   - Cria primeiro um registro na tabela `User`
+   - Se for STUDENT ou TEACHER, cria também um registro na tabela específica
+   - Tudo isso é feito diretamente pelo Prisma, sem fazer novas requisições HTTP
+
+Não há chamadas para outros endpoints HTTP como `/students` ou `/teachers`. Tudo é feito internamente através do Prisma ORM, que faz as operações diretamente no banco de dados.
+
+O mesmo acontece com o login:
+1. Requisição chega em `/auth/login`
+2. Controller processa
+3. Service:
+   - Busca o usuário no banco pelo email
+   - Verifica a senha
+   - Se for STUDENT ou TEACHER, já traz os dados relacionados
+   - Retorna tudo em um único objeto
+
+É uma arquitetura em camadas:
+```
+Request → Router → Controller → Service → Prisma → Database
+```
+
+Cada camada tem sua responsabilidade:
+- Router: Define os endpoints
+- Controller: Processa requisições/respostas HTTP
+- Service: Contém a lógica de negócio
+- Prisma: Faz as operações no banco de dados
+
+Deseja que eu detalhe alguma parte específica deste fluxo?
