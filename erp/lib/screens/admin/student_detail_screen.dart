@@ -3,6 +3,7 @@ import '../../services/student_service.dart' as student_service;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../services/grade_service.dart';
+import '../../services/grade_type_service.dart';
 import '../../models/grade.dart';
 
 class StudentDetailScreen extends StatefulWidget {
@@ -874,6 +875,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             ? DateTime.tryParse(_studentDetails!['birthDate'])
             : null;
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) {
@@ -926,7 +928,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                 firstDate: DateTime(1900),
                                 lastDate: DateTime.now(),
                               );
-                              if (picked != null) {
+                              if (picked != null && context.mounted) {
                                 setState(() => birthDate = picked);
                               }
                             },
@@ -977,6 +979,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       headers: {'Content-Type': 'application/json'},
                       body: jsonEncode(updated),
                     );
+                    if (!context.mounted) return;
                     setState(() => _loading = false);
                     if (response.statusCode == 200) {
                       if (dialogContext.mounted) {
@@ -1123,7 +1126,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 // Excluir nota
                 final dialogContext = context;
                 try {
-                  await GradeService().deleteGrade(grade.id);
+                  await GradeService.deleteGrade(grade.id);
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext);
                   }
@@ -1157,8 +1160,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     newGradeTypeId != null) {
                   final dialogContext = context;
                   try {
-                    await GradeService().updateGrade(
-                      grade.id,
+                    await GradeService.updateGrade(
+                      gradeId: grade.id,
                       value: newValue,
                       typeId: newGradeTypeId,
                       periodId: newPeriodId,
@@ -1228,7 +1231,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             if (loadingTypes) {
-              GradeService().getGradeTypes().then((types) {
+              GradeTypeService.getAllGradeTypes().then((types) {
                 setState(() {
                   loadingTypes = false;
                 });
@@ -1338,11 +1341,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         periodId != null) {
                       final dialogContext = context;
                       try {
-                        await GradeService().createGrade(
+                        await GradeService.createGrade(
                           studentId: widget.student.id,
                           subjectId: subjectId!,
-                          typeId: gradeTypeId!, // novo nome
-                          periodId: periodId!, // novo campo obrigatório
+                          typeId: gradeTypeId!,
+                          periodId: periodId!,
                           value: value!,
                         );
                         if (dialogContext.mounted) {
@@ -1409,8 +1412,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       builder: (context) {
         return AlertDialog(
           title: Text('Notas de ${subject['name']}'),
-          content: FutureBuilder<List<Grade>>(
-            future: GradeService().getGradesByStudent(widget.student.id),
+          content: FutureBuilder<List<Map<String, dynamic>>>(
+            future: GradeService.getGradesByStudent(widget.student.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -1418,10 +1421,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               if (snapshot.hasError) {
                 return const Text('Erro ao carregar notas');
               }
-              final grades =
-                  (snapshot.data ?? [])
-                      .where((g) => g.subjectId == subject['id'])
-                      .toList();
+              final grades = (snapshot.data ?? [])
+                  .where((g) => g['subjectId'] == subject['id'])
+                  .toList();
               if (grades.isEmpty) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1439,9 +1441,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   ],
                 );
               }
-              final gradesByPeriod = <String, List<Grade>>{};
+              final gradesByPeriod = <String, List<Map<String, dynamic>>>{};
               for (final g in grades) {
-                final periodId = g.periodId ?? '-';
+                final periodId = g['periodId'] ?? '-';
                 gradesByPeriod.putIfAbsent(periodId, () => []).add(g);
               }
               return SingleChildScrollView(
@@ -1465,15 +1467,24 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           ),
                           ...gradesByPeriod[periodId]!.map((g) {
                             return ListTile(
-                              title: Text('Nota:  ${g.value}'),
+                              title: Text('Nota:  ${g['value']}'),
                               subtitle: Text(
-                                'Tipo:  ${getGradeTypeName(g.gradeTypeId)}',
+                                'Tipo:  ${getGradeTypeName(g['gradeTypeId'])}',
                               ),
                               trailing: IconButton(
-                                icon: Icon(Icons.edit, color: Colors.blue),
+                                icon: const Icon(Icons.edit, color: Colors.blue),
                                 onPressed: () {
                                   Navigator.pop(context);
-                                  _showEditGradeDialog(g);
+                                  _showEditGradeDialog(Grade(
+                                    id: g['id'],
+                                    value: g['value'].toDouble(),
+                                    gradeTypeId: g['gradeTypeId'],
+                                    periodId: g['periodId'],
+                                    subjectId: g['subjectId'],
+                                    studentId: g['studentId'],
+                                    createdAt: DateTime.parse(g['createdAt']),
+                                    updatedAt: DateTime.parse(g['updatedAt']),
+                                  ));
                                 },
                               ),
                             );

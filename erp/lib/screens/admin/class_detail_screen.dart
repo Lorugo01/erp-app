@@ -89,33 +89,18 @@ class ClassDetailScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 32),
-                    // Abas para calendário semanal e anual
-                    DefaultTabController(
-                      length: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TabBar(
-                            labelColor: const Color(0xFF2953A5),
-                            unselectedLabelColor: Colors.grey,
-                            indicatorColor: const Color(0xFF2953A5),
-                            tabs: const [
-                              Tab(text: 'Horário Semanal de Aulas'),
-                              Tab(text: 'Eventos do Ano Letivo'),
-                            ],
-                          ),
-                          SizedBox(
-                            height: 420,
-                            child: TabBarView(
-                              children: [
-                                _WeeklyScheduleTab(),
-                                _AnnualEventsTab(),
-                              ],
-                            ),
-                          ),
-                        ],
+                    // Título do horário semanal
+                    const Text(
+                      'Horário Semanal de Aulas',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2953A5),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    // Widget do horário semanal
+                    SizedBox(height: 420, child: _WeeklyScheduleTab()),
                   ],
                 ),
               ),
@@ -144,7 +129,14 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     'Sábado',
     'Domingo',
   ];
-  final horarios = ['07:00', '07:50', '08:40', '09:50', '10:40'];
+
+  // Lista de horários gerada dinamicamente
+  List<String> horarios = [];
+
+  // Duração padrão de cada aula em minutos
+  final int duracaoAula = 50;
+  final int intervalo = 10;
+
   final subjectTypes = [
     'LINGUA_INGLESA',
     'ARTE',
@@ -165,7 +157,93 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   @override
   void initState() {
     super.initState();
+    _gerarHorarios();
     fetchEvents();
+  }
+
+  void _gerarHorarios() {
+    final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
+    final turno = parent?.classData['shift']?.toString().toUpperCase() ?? '';
+
+    int horaInicio;
+    int horaFim;
+
+    switch (turno) {
+      case 'MATUTINO':
+        horaInicio = 7;
+        horaFim = 12;
+        break;
+      case 'VESPERTINO':
+        horaInicio = 13;
+        horaFim = 17;
+        break;
+      case 'NOTURNO':
+        horaInicio = 18;
+        horaFim = 22;
+        break;
+      case 'INTEGRAL':
+        horaInicio = 7; // Começa no mesmo horário do matutino
+        horaFim = 22; // Termina no mesmo horário do noturno
+        break;
+      default:
+        horaInicio = 7;
+        horaFim = 12;
+    }
+
+    // Inicialmente, gera apenas as horas cheias
+    horarios = [];
+    for (int hora = horaInicio; hora <= horaFim; hora++) {
+      horarios.add('${hora.toString().padLeft(2, '0')}:00');
+    }
+
+    // Para o turno integral, adiciona também os horários intermediários padrão
+    if (turno == 'INTEGRAL') {
+      // Adiciona horários de intervalo entre turnos
+      horarios.addAll([
+        '12:00', // Fim do turno matutino
+        '13:00', // Início do turno vespertino
+        '17:00', // Fim do turno vespertino
+        '18:00', // Início do turno noturno
+      ]);
+      horarios = horarios.toSet().toList(); // Remove duplicatas
+      horarios.sort(); // Ordena os horários
+    }
+
+    // Adiciona horários existentes nos eventos
+    for (var evento in events) {
+      final startTime = evento['startTime'];
+      final endTime = evento['endTime'];
+      if (startTime != null && !horarios.contains(startTime)) {
+        _inserirHorarioOrdenado(startTime);
+      }
+      if (endTime != null && !horarios.contains(endTime)) {
+        _inserirHorarioOrdenado(endTime);
+      }
+    }
+  }
+
+  void _inserirHorarioOrdenado(String novoHorario) {
+    // Encontra a posição correta para inserir o novo horário
+    int indice = 0;
+    while (indice < horarios.length &&
+        horarios[indice].compareTo(novoHorario) < 0) {
+      indice++;
+    }
+    if (indice == horarios.length) {
+      horarios.add(novoHorario);
+    } else {
+      horarios.insert(indice, novoHorario);
+    }
+  }
+
+  void _atualizarHorariosComNovoEvento(String startTime, String endTime) {
+    if (!horarios.contains(startTime)) {
+      _inserirHorarioOrdenado(startTime);
+    }
+    if (!horarios.contains(endTime)) {
+      _inserirHorarioOrdenado(endTime);
+    }
+    setState(() {}); // Atualiza a tabela com os novos horários
   }
 
   Future<void> fetchEvents() async {
@@ -178,6 +256,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
       setState(() {
         events = List<Map<String, dynamic>>.from(json.decode(response.body));
       });
+      _gerarHorarios(); // Atualiza a lista de horários após carregar eventos
     }
   }
 
@@ -193,6 +272,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     debugPrint('Status da resposta: ${response.statusCode}');
     if (response.statusCode == 201) {
       fetchEvents();
+      _atualizarHorariosComNovoEvento(event['startTime'], event['endTime']);
     } else {
       // Mostra alerta de erro
       if (mounted) {
@@ -224,6 +304,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     );
     if (response.statusCode == 200) {
       fetchEvents();
+      _atualizarHorariosComNovoEvento(data['startTime'], data['endTime']);
     }
   }
 
@@ -233,6 +314,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     );
     if (response.statusCode == 204) {
       fetchEvents();
+      _gerarHorarios(); // Recarrega os horários após exclusão
     }
   }
 
@@ -518,12 +600,49 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     );
   }
 
+  String _gerarHorarioIntermediario(String horaBase) {
+    // Converte a string de hora para minutos
+    final partes = horaBase.split(':');
+    final horas = int.parse(partes[0]);
+    final minutos = int.parse(partes[1]);
+    final totalMinutos = horas * 60 + minutos;
+
+    // Adiciona a duração da aula
+    final novoTotalMinutos = totalMinutos + duracaoAula;
+
+    // Converte de volta para formato de hora
+    final novaHora = (novoTotalMinutos ~/ 60).toString().padLeft(2, '0');
+    final novoMinuto = (novoTotalMinutos % 60).toString().padLeft(2, '0');
+
+    return '$novaHora:$novoMinuto';
+  }
+
+  List<String> _gerarOpcoesHorarioFim(String horaInicio) {
+    final horaInicioMinutos =
+        int.parse(horaInicio.split(':')[0]) * 60 +
+        int.parse(horaInicio.split(':')[1]);
+    final horarioFimSugerido = _gerarHorarioIntermediario(horaInicio);
+
+    // Se o horário sugerido já existe na lista, retorna apenas os horários existentes
+    if (horarios.contains(horarioFimSugerido)) {
+      return horarios.where((h) => h.compareTo(horaInicio) > 0).toList();
+    }
+
+    // Caso contrário, adiciona o novo horário à lista de opções
+    final opcoesHorario = [
+      ...horarios.where((h) => h.compareTo(horaInicio) > 0),
+    ];
+    opcoesHorario.add(horarioFimSugerido);
+    opcoesHorario.sort();
+    return opcoesHorario;
+  }
+
   void _showAddEventDialog() async {
     String? subjectType;
     String? teacherId;
     int dayOfWeek = 1;
-    String startTime = horarios.first;
-    String endTime = horarios[1];
+    String? startTime;
+    String? endTime;
 
     // Buscar subjects (matérias) da turma
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
@@ -562,6 +681,11 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                 subjectType != null
                     ? professoresPorMateria[subjectType] ?? []
                     : [];
+
+            // Gera as opções de horário de fim com base no horário de início selecionado
+            final opcoesHorarioFim =
+                startTime != null ? _gerarOpcoesHorarioFim(startTime!) : [];
+
             return AlertDialog(
               title: const Text('Adicionar Aula'),
               content: SingleChildScrollView(
@@ -633,21 +757,29 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                               )
                               .toList(),
                       onChanged:
-                          (v) =>
-                              setState(() => startTime = v ?? horarios.first),
+                          (v) => setState(() {
+                            startTime = v;
+                            if (v != null) {
+                              // Gera um horário de fim baseado na duração da aula
+                              endTime = _gerarHorarioIntermediario(v);
+                            }
+                          }),
                       decoration: const InputDecoration(labelText: 'Início'),
                     ),
                     DropdownButtonFormField<String>(
                       value: endTime,
                       items:
-                          horarios
-                              .map(
-                                (h) =>
-                                    DropdownMenuItem(value: h, child: Text(h)),
-                              )
-                              .toList(),
-                      onChanged:
-                          (v) => setState(() => endTime = v ?? horarios[1]),
+                          startTime != null
+                              ? _gerarOpcoesHorarioFim(startTime!)
+                                  .map(
+                                    (h) => DropdownMenuItem(
+                                      value: h,
+                                      child: Text(h),
+                                    ),
+                                  )
+                                  .toList()
+                              : [],
+                      onChanged: (v) => setState(() => endTime = v),
                       decoration: const InputDecoration(labelText: 'Fim'),
                     ),
                   ],
@@ -660,7 +792,10 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                 ),
                 ElevatedButton(
                   onPressed:
-                      subjectType != null && teacherId != null
+                      subjectType != null &&
+                              teacherId != null &&
+                              startTime != null &&
+                              endTime != null
                           ? () {
                             // Validação: não pode haver duas aulas no mesmo dia e horário
                             final conflito = eventosExistentes.any(
@@ -710,167 +845,5 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
         );
       },
     );
-  }
-}
-
-// Aba: Eventos do Ano Letivo
-class _AnnualEventsTab extends StatefulWidget {
-  @override
-  State<_AnnualEventsTab> createState() => _AnnualEventsTabState();
-}
-
-class _AnnualEventsTabState extends State<_AnnualEventsTab> {
-  List<Map<String, dynamic>> events = [];
-
-  @override
-  void initState() {
-    super.initState();
-    fetchEvents();
-  }
-
-  Future<void> fetchEvents() async {
-    final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
-    final turmaId = parent?.classData['id'] ?? '';
-    final response = await http.get(
-      Uri.parse('http://localhost:3000/classes/$turmaId/events'),
-    );
-    if (response.statusCode == 200) {
-      setState(() {
-        events = List<Map<String, dynamic>>.from(json.decode(response.body));
-      });
-    }
-  }
-
-  Future<void> addEvent(Map<String, dynamic> event) async {
-    final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
-    final turmaId = parent?.classData['id'] ?? '';
-    final response = await http.post(
-      Uri.parse('http://localhost:3000/classes/$turmaId/events'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(event),
-    );
-    if (response.statusCode == 201) {
-      fetchEvents();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final eventosAnuais = events.where((e) => e['date'] != null).toList();
-    return Column(
-      children: [
-        Expanded(
-          child:
-              eventosAnuais.isEmpty
-                  ? const Center(child: Text('Nenhum evento anual cadastrado.'))
-                  : ListView.builder(
-                    itemCount: eventosAnuais.length,
-                    itemBuilder: (context, i) {
-                      final evento = eventosAnuais[i];
-                      return ListTile(
-                        leading: const Icon(Icons.event),
-                        title: Text(evento['title'] ?? ''),
-                        subtitle: Text(
-                          (evento['description'] ?? '') +
-                              (evento['date'] != null
-                                  ? '\n${_formatDate(evento['date'])}'
-                                  : ''),
-                        ),
-                      );
-                    },
-                  ),
-        ),
-        const SizedBox(height: 8),
-        ElevatedButton.icon(
-          icon: const Icon(Icons.add),
-          label: const Text('Adicionar Evento Anual'),
-          onPressed: _showAddAnnualEventDialog,
-        ),
-      ],
-    );
-  }
-
-  void _showAddAnnualEventDialog() {
-    String? title;
-    String? description;
-    DateTime? date;
-    if (!context.mounted) return;
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Adicionar Evento Anual'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(labelText: 'Título'),
-                  onChanged: (v) => title = v,
-                ),
-                TextField(
-                  decoration: const InputDecoration(labelText: 'Descrição'),
-                  onChanged: (v) => description = v,
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime(DateTime.now().year),
-                      lastDate: DateTime(DateTime.now().year + 1),
-                    );
-                    if (picked != null) {
-                      setState(() => date = picked);
-                    }
-                  },
-                  child: Text(
-                    date == null ? 'Selecionar Data' : _formatDate(date),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (title != null && title!.isNotEmpty && date != null) {
-                  addEvent({
-                    'title': title,
-                    'description': description,
-                    'date': date!.toIso8601String(),
-                    'teacherId': null,
-                    'startTime': null,
-                    'endTime': null,
-                    'dayOfWeek': null,
-                  });
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                  }
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  String _formatDate(dynamic date) {
-    if (date is DateTime) {
-      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    }
-    if (date is String) {
-      final d = DateTime.tryParse(date);
-      if (d != null) {
-        return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-      }
-    }
-    return '';
   }
 }

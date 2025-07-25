@@ -22,8 +22,30 @@ class AssignmentService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> getAssignmentsByClassAndSubject(
+    String classId,
+    String subjectId,
+  ) async {
+    print(
+      'Fazendo requisição para: $baseUrl/classes/$classId/assignments?subjectId=$subjectId',
+    );
+    final response = await http.get(
+      Uri.parse('$baseUrl/classes/$classId/assignments?subjectId=$subjectId'),
+    );
+    print('Status code: ${response.statusCode}');
+    print('Response body: ${response.body}');
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      print('Erro na requisição: ${response.statusCode} - ${response.body}');
+      throw Exception('Erro ao buscar atividades');
+    }
+  }
+
   static Future<void> createAssignment({
     required String classId,
+    required String subjectId,
     required String description,
     required DateTime dueDate,
     String? fileUrl,
@@ -32,6 +54,7 @@ class AssignmentService {
       Uri.parse('$baseUrl/classes/$classId/assignments'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'subjectId': subjectId,
         'description': description,
         'dueDate': dueDate.toIso8601String(),
         if (fileUrl != null) 'fileUrl': fileUrl,

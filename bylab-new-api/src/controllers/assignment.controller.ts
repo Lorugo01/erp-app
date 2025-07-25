@@ -6,7 +6,15 @@ import prisma from '../prisma/client';
 export const getAssignmentsByClass = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const classId = req.params.id;
-    const assignments = await AssignmentService.getAssignmentsByClass(classId);
+    const { subjectId } = req.query;
+    
+    let assignments;
+    if (subjectId && typeof subjectId === 'string') {
+      assignments = await AssignmentService.getAssignmentsByClassAndSubject(classId, subjectId);
+    } else {
+      assignments = await AssignmentService.getAssignmentsByClass(classId);
+    }
+    
     res.json(assignments);
   } catch (error) {
     console.error('Erro ao buscar assignments:', error);
@@ -18,7 +26,13 @@ export const getAssignmentsByClass = async (req: Request, res: Response, next: N
 export const createAssignment = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const classId = req.params.id;
-    const assignment = await AssignmentService.createAssignment(classId, req.body);
+    const { subjectId, ...assignmentData } = req.body;
+    
+    if (!subjectId) {
+      return res.status(400).json({ error: 'subjectId é obrigatório' });
+    }
+    
+    const assignment = await AssignmentService.createAssignment(classId, subjectId, assignmentData);
     res.status(201).json(assignment);
   } catch (error) {
     console.error('Erro ao criar assignment:', error);

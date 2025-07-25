@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Shift" ADD VALUE 'INTEGRAL';

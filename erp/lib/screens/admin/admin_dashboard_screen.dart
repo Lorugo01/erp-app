@@ -12,6 +12,7 @@ import 'class_detail_screen.dart';
 import 'student_detail_screen.dart';
 import 'teacher_detail_screen.dart';
 import 'user_detail_screen.dart';
+import 'grade_management_screen.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/admin_app_bar_menu.dart';
 
@@ -1009,6 +1010,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         );
       case 7:
+        return const GradeManagementScreen();
+      case 8:
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1124,7 +1127,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 actions: [
                   AdminAppBarMenu(
-                    onConfig: () => setState(() => _selectedIndex = 7),
+                    onConfig: () => setState(() => _selectedIndex = 8),
                     onLogout: () => authProvider.logout(),
                   ),
                 ],
@@ -1137,7 +1140,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   AdminResponsiveNavigation(
                     selectedIndex: _selectedIndex,
                     onSelect: (index) {
-                      if (index == 7) {
+                      if (index == 8) {
                         authProvider.logout();
                       } else {
                         setState(() => _selectedIndex = index);
@@ -2279,6 +2282,7 @@ class _AddClassDialogState extends State<_AddClassDialog> {
                   child: Text('Vespertino'),
                 ),
                 DropdownMenuItem(value: 'NOTURNO', child: Text('Noturno')),
+                DropdownMenuItem(value: 'INTEGRAL', child: Text('Integral')),
               ],
               validator:
                   (v) => v == null || v.isEmpty ? 'Selecione o turno' : null,

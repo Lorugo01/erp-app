@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/teacher_service.dart';
 import 'dart:async';
 import 'teacher_class_detail_screen.dart';
+import 'teacher_student_detail_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -310,10 +311,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
-                      children: [
-                        _buildClassesTab(),
-                        _buildStudentsTab(),
-                      ],
+                      children: [_buildClassesTab(), _buildStudentsTab()],
                     ),
                   ),
                 ],
@@ -605,61 +603,115 @@ class _StudentCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Color(0xFF2953A5),
-                      child: Icon(Icons.person, size: 32, color: Colors.white),
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final teacherId = authProvider.user?.teacher?.id;
+
+        if (teacherId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erro: Professor não encontrado'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Debug: verificar dados do professor
+        debugPrint('ID do Professor: $teacherId');
+        debugPrint('Dados do aluno: $student');
+
+        TeacherService.getTeacherClasses(teacherId)
+            .then((classes) {
+              // Debug: verificar turmas retornadas
+              debugPrint('Turmas retornadas: $classes');
+
+              // Filtrar as turmas que contêm este aluno
+              final studentClasses =
+                  classes.where((classData) {
+                    final enrollments = classData['enrollments'] as List? ?? [];
+                    return enrollments.any(
+                      (e) => e['studentId'] == student['id'],
+                    );
+                  }).toList();
+
+              // Debug: verificar turmas filtradas
+              debugPrint('Turmas do aluno: $studentClasses');
+
+              if (studentClasses.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Aluno não encontrado em nenhuma turma atual',
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        student['name'] ?? 'Aluno',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (student['registrationNumber'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          'Matrícula: ${student['registrationNumber']}',
-                        ),
-                      ),
-                    Text('Email: ${student['email'] ?? ''}'),
-                    if (student['createdAt'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          'Criado em: ${DateTime.parse(student['createdAt']).toLocal().toString().split(" ")[0]}',
-                        ),
-                      ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Fechar'),
+                    backgroundColor: Colors.orange,
                   ),
-                ],
-              ),
-        );
+                );
+                return;
+              }
+
+              // Se houver apenas uma turma
+              if (studentClasses.length == 1) {
+                final classData = studentClasses.first;
+                final subjects = classData['subjects'] as List? ?? [];
+
+                // Debug: verificar disciplinas da turma
+                debugPrint('Disciplinas da turma: $subjects');
+
+                // Se não houver disciplinas
+                if (subjects.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Nenhuma disciplina encontrada para esta turma',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                // Se houver apenas uma disciplina
+                if (subjects.length == 1) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder:
+                          (_) => TeacherStudentDetailScreen(
+                            student: student,
+                            classData: classData,
+                            subjectId: subjects.first['id'],
+                            teacherId: teacherId,
+                          ),
+                    ),
+                  );
+                } else {
+                  // Se houver múltiplas disciplinas
+                  _showSubjectSelectionDialog(
+                    context,
+                    student,
+                    classData,
+                    subjects,
+                    teacherId,
+                  );
+                }
+              } else {
+                // Se houver múltiplas turmas
+                _showClassSelectionDialog(
+                  context,
+                  student,
+                  studentClasses,
+                  teacherId,
+                );
+              }
+            })
+            .catchError((error) {
+              debugPrint('Erro ao carregar turmas: $error');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erro ao carregar turmas: $error'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            });
       },
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -698,6 +750,196 @@ class _StudentCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _showClassSelectionDialog(
+    BuildContext context,
+    Map<String, dynamic> student,
+    List<Map<String, dynamic>> classes,
+    String teacherId,
+  ) {
+    // Debug: verificar dados recebidos
+    debugPrint('Classes recebidas: $classes');
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.class_, color: Color(0xFF2953A5)),
+                const SizedBox(width: 8),
+                const Text('Selecione a Turma'),
+              ],
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            content: Container(
+              width: 300,
+              constraints: const BoxConstraints(maxHeight: 400),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children:
+                      classes.map((classData) {
+                        // Debug: verificar dados da turma
+                        debugPrint('Dados da turma: $classData');
+                        final subjects = classData['subjects'] as List? ?? [];
+                        debugPrint('Disciplinas da turma: $subjects');
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.class_,
+                              color: Color(0xFF2953A5),
+                            ),
+                            title: Text(
+                              classData['name'] ?? 'Turma',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text('Ano: ${classData['year'] ?? ''}'),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              if (subjects.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Nenhuma disciplina encontrada para esta turma',
+                                    ),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+                              if (subjects.length == 1) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => TeacherStudentDetailScreen(
+                                          student: student,
+                                          classData: classData,
+                                          subjectId: subjects.first['id'],
+                                          teacherId: teacherId,
+                                        ),
+                                  ),
+                                );
+                              } else {
+                                _showSubjectSelectionDialog(
+                                  context,
+                                  student,
+                                  classData,
+                                  subjects,
+                                  teacherId,
+                                );
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showSubjectSelectionDialog(
+    BuildContext context,
+    Map<String, dynamic> student,
+    Map<String, dynamic> classData,
+    List subjects,
+    String teacherId,
+  ) {
+    // Debug: verificar dados recebidos
+    debugPrint('Dados da turma: $classData');
+    debugPrint('Disciplinas: $subjects');
+
+    if (subjects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhuma disciplina encontrada para esta turma'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.book, color: Color(0xFF2953A5)),
+                const SizedBox(width: 8),
+                const Text('Selecione a Disciplina'),
+              ],
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            content: Container(
+              width: 300,
+              constraints: const BoxConstraints(maxHeight: 400),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children:
+                      subjects.map<Widget>((subject) {
+                        // Debug: verificar cada disciplina
+                        debugPrint('Disciplina: $subject');
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.subject,
+                              color: Color(0xFF2953A5),
+                            ),
+                            title: Text(
+                              subject['name'] ?? 'Disciplina',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => TeacherStudentDetailScreen(
+                                        student: student,
+                                        classData: classData,
+                                        subjectId: subject['id'],
+                                        teacherId: teacherId,
+                                      ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          ),
     );
   }
 }

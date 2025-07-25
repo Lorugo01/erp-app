@@ -171,3 +171,43 @@ export const getAttendanceByLesson = async (lessonId: string) => {
     }
   });
 };
+
+// Novo método para buscar attendance por student ID
+export const getAttendanceByStudent = async (studentId: string) => {
+  if (!studentId || typeof studentId !== 'string' || studentId.length < 10) {
+    throw new Error('ID do aluno inválido');
+  }
+
+  return prisma.attendance.findMany({
+    where: { studentId },
+    include: {
+      student: {
+        select: {
+          id: true,
+          name: true,
+          registrationNumber: true,
+          profilePicture: true
+        }
+      },
+      lesson: {
+        include: {
+          subject: true,
+          class: true,
+          teacher: true
+        }
+      },
+    },
+    orderBy: [
+      {
+        lesson: {
+          date: 'desc'
+        }
+      },
+      {
+        student: {
+          name: 'asc'
+        }
+      }
+    ]
+  });
+};

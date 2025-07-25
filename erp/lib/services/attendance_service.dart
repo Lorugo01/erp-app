@@ -95,10 +95,7 @@ class AttendanceService {
     final response = await http.post(
       Uri.parse('$baseUrl/attendances/bulk'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'lessonId': lessonId,
-        'presences': presences,
-      }),
+      body: jsonEncode({'lessonId': lessonId, 'presences': presences}),
     );
     if (response.statusCode != 201) {
       throw Exception('Erro ao registrar frequência: ${response.body}');
@@ -117,6 +114,21 @@ class AttendanceService {
       return List<Map<String, dynamic>>.from(data);
     } else {
       throw Exception('Erro ao buscar frequência da aula');
+    }
+  }
+
+  // Novo método para buscar frequência de um aluno
+  static Future<List<Map<String, dynamic>>> getAttendanceByStudent(
+    String studentId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/attendances/student/$studentId'),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar frequência do aluno');
     }
   }
 }

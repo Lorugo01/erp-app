@@ -139,6 +139,11 @@ export const getTeacherClasses = async (teacherId: string) => {
             include: {
               enrollments: {
                 include: { student: true }
+              },
+              subjects: {
+                where: {
+                  teacherId: teacherId
+                }
               }
             }
           }
@@ -151,11 +156,17 @@ export const getTeacherClasses = async (teacherId: string) => {
     return []; // Retorna lista vazia se professor não encontrado
   }
 
-  // Extrair as turmas únicas dos subjects
-  const classes = teacher.subjects.map(subject => subject.class);
-  const uniqueClasses = classes.filter((classItem, index, self) => 
-    index === self.findIndex(c => c.id === classItem.id)
-  );
+  // Extrair as turmas únicas dos subjects e incluir as disciplinas do professor
+  const uniqueClasses = teacher.subjects.reduce((acc, subject) => {
+    const existingClass = acc.find(c => c.id === subject.class.id);
+    if (!existingClass) {
+      acc.push({
+        ...subject.class,
+        subjects: subject.class.subjects
+      });
+    }
+    return acc;
+  }, [] as any[]);
 
   return uniqueClasses;
 };

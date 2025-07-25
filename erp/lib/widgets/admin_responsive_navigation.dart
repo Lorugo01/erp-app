@@ -99,13 +99,19 @@ class _AdminSidebar extends StatelessWidget {
             selected: selectedIndex == 6,
             onTap: () => onSelect(6),
           ),
+          _SidebarButton(
+            icon: Icons.grade,
+            label: 'Gestão de Notas',
+            selected: selectedIndex == 7,
+            onTap: () => onSelect(7),
+          ),
           const Spacer(),
           const Divider(color: Colors.white54, indent: 16, endIndent: 16),
           _SidebarButton(
             icon: Icons.settings,
             label: 'Configurações',
-            selected: selectedIndex == 7,
-            onTap: () => onSelect(7),
+            selected: selectedIndex == 8,
+            onTap: () => onSelect(8),
           ),
           _SidebarButton(
             icon: Icons.logout,

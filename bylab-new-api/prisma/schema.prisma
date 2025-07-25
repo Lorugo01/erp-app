@@ -101,6 +101,7 @@ enum Shift {
   MATUTINO
   VESPERTINO
   NOTURNO
+  INTEGRAL
 }
 
 model Class {
@@ -141,6 +142,7 @@ model Subject {
   teacherId  String
   lessons    Lesson[]
   grades     Grade[]
+  assignments Assignment[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 }
@@ -243,6 +245,7 @@ model Event {
 model Assignment {
   id          String   @id @default(uuid())
   classId     String
+  subjectId   String
   description String
   dueDate     DateTime
   sentDate    DateTime @default(now())
@@ -250,6 +253,7 @@ model Assignment {
   createdAt   DateTime @default(now())
 
   class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   submissions AssignmentSubmission[]
 }
 

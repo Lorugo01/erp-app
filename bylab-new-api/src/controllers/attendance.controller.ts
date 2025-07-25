@@ -60,3 +60,14 @@ export const getByLesson = async (req: Request, res: Response, next: NextFunctio
     next(error);
   }
 };
+
+// Novo método para buscar attendance por student ID
+export const getByStudent = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { studentId } = req.params;
+    const attendances = await AttendanceService.getAttendanceByStudent(studentId);
+    res.json(attendances);
+  } catch (error) {
+    next(error);
+  }
+};

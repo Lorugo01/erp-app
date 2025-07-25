@@ -1,0 +1,621 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../services/grade_service.dart';
+import '../../services/grade_type_service.dart';
+import '../../services/attendance_service.dart';
+import '../../services/grade_period_service.dart';
+import 'package:intl/intl.dart';
+
+class TeacherStudentDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> student;
+  final Map<String, dynamic> classData;
+  final String subjectId;
+  final String teacherId;
+
+  const TeacherStudentDetailScreen({
+    super.key,
+    required this.student,
+    required this.classData,
+    required this.subjectId,
+    required this.teacherId,
+  });
+
+  @override
+  State<TeacherStudentDetailScreen> createState() =>
+      _TeacherStudentDetailScreenState();
+}
+
+class _TeacherStudentDetailScreenState
+    extends State<TeacherStudentDetailScreen> {
+  bool _loading = false;
+  String? _error;
+  List<Map<String, dynamic>> _periods = [];
+  List<Map<String, dynamic>> _grades = [];
+  List<Map<String, dynamic>> _attendances = [];
+  List<Map<String, dynamic>> _gradeTypes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPeriods();
+    _fetchGradeTypes();
+    _fetchGrades();
+    _fetchAttendances();
+  }
+
+  Future<void> _fetchPeriods() async {
+    try {
+      final periods = await GradePeriodService.getAllGradePeriods();
+      setState(() {
+        _periods = periods;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar períodos: $e');
+    }
+  }
+
+  Future<void> _fetchGradeTypes() async {
+    try {
+      final types = await GradeTypeService.getAllGradeTypes();
+      setState(() {
+        _gradeTypes = types;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar tipos de nota: $e');
+    }
+  }
+
+  Future<void> _fetchGrades() async {
+    try {
+      final grades = await GradeService.getGradesByStudent(
+        widget.student['id'],
+      );
+      setState(() {
+        _grades =
+            grades.where((g) => g['subjectId'] == widget.subjectId).toList();
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar notas: $e');
+    }
+  }
+
+  Future<void> _fetchAttendances() async {
+    try {
+      final attendances = await AttendanceService.getAttendanceByStudent(
+        widget.student['id'],
+      );
+      setState(() {
+        // Filtrar apenas as frequências da disciplina atual
+        _attendances =
+            attendances
+                .where((a) => a['lesson']['subjectId'] == widget.subjectId)
+                .toList();
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar frequências: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FB),
+      appBar: AppBar(
+        title: Text('Ficha do Aluno: ${widget.student['name']}'),
+        backgroundColor: const Color(0xFF2953A5),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      style: TextStyle(fontSize: 16, color: Colors.red[700]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Re-fetch student details if error is related to student data
+                        // For now, we'll just show the error message
+                      },
+                      child: const Text('Tentar Novamente'),
+                    ),
+                  ],
+                ),
+              )
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 32),
+                    _buildSection(
+                      title: 'Informações Pessoais',
+                      icon: Icons.person,
+                      children: [
+                        _buildInfoRow(
+                          'Nome',
+                          widget.student['name'] ?? 'Não informado',
+                        ),
+                        _buildInfoRow(
+                          'Email',
+                          widget.student['email'] ?? 'Não informado',
+                        ),
+                        _buildInfoRow(
+                          'Matrícula',
+                          widget.student['registrationNumber'] ??
+                              'Não informado',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    _buildSection(
+                      title: 'Desempenho na Disciplina',
+                      icon: Icons.school,
+                      children: [
+                        _buildGradesCard(),
+                        const SizedBox(height: 16),
+                        _buildAttendanceCard(),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+    );
+  }
+
+  Widget _buildHeader() {
+    final photoUrl =
+        widget.student['profilePicture'] != null
+            ? 'http://localhost:3000${widget.student['profilePicture']}'
+            : null;
+
+    return Container(
+      padding: const EdgeInsets.all(24.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2953A5),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.white,
+            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+            child:
+                photoUrl == null
+                    ? const Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Color(0xFF2953A5),
+                    )
+                    : null,
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.student['name'] ?? '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.student['email'] ?? '',
+                  style: const TextStyle(color: Colors.white70, fontSize: 16),
+                ),
+                if (widget.student['registrationNumber'] != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Matrícula: ${widget.student['registrationNumber']}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(20),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Icon(icon, color: const Color(0xFF2953A5), size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2953A5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 16))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGradesCard() {
+    if (_grades.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Text(
+          'Nenhuma nota registrada para esta disciplina',
+          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+        ),
+      );
+    }
+
+    // Agrupar notas por período
+    final gradesByPeriod = <String, List<Map<String, dynamic>>>{};
+    for (var grade in _grades) {
+      final periodId = grade['periodId'];
+      if (!gradesByPeriod.containsKey(periodId)) {
+        gradesByPeriod[periodId] = [];
+      }
+      gradesByPeriod[periodId]!.add(grade);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Text(
+            'Notas',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2953A5),
+            ),
+          ),
+        ),
+        ...gradesByPeriod.entries.map((entry) {
+          final period = _periods.firstWhere(
+            (p) => p['id'] == entry.key,
+            orElse: () => {'name': 'Período não encontrado'},
+          );
+
+          // Ordenar notas: regulares primeiro, depois recuperação, por último recuperação final
+          final sortedGrades = List<Map<String, dynamic>>.from(entry.value)
+            ..sort((a, b) {
+              final aType = a['typeId'];
+              final bType = b['typeId'];
+              if (aType == 'RECUPERACAO_FINAL') return 1;
+              if (bType == 'RECUPERACAO_FINAL') return -1;
+              if (aType == 'RECUPERACAO') return 1;
+              if (bType == 'RECUPERACAO') return -1;
+              return 0;
+            });
+
+          // Encontrar a menor nota regular
+          final regularGrades = sortedGrades.where((g) => 
+            !['RECUPERACAO', 'RECUPERACAO_FINAL'].contains(g['typeId'])
+          ).toList();
+          
+          final minRegularGrade = regularGrades.isEmpty ? null : 
+            regularGrades.reduce((a, b) => 
+              (a['value'] ?? 0.0) < (b['value'] ?? 0.0) ? a : b
+            );
+
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        period['name'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getGradeColor({
+                            'value': entry.value.first['calculatedAverage'],
+                          }),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Média: ${entry.value.first['calculatedAverage']?.toStringAsFixed(1) ?? '-'}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                ...sortedGrades.map((grade) {
+                  final gradeType = _gradeTypes.firstWhere(
+                    (t) => t['id'] == grade['typeId'],
+                    orElse: () => {'name': 'Tipo não encontrado'},
+                  );
+
+                  final isRecovery = grade['typeId'] == 'RECUPERACAO' || 
+                                   grade['typeId'] == 'RECUPERACAO_FINAL';
+                  
+                  final isReplacingGrade = isRecovery && grade['replacedGrade'] == true;
+                  final isBeingReplaced = minRegularGrade != null && 
+                                        grade == minRegularGrade &&
+                                        sortedGrades.any((g) => 
+                                          (g['typeId'] == 'RECUPERACAO' || 
+                                           g['typeId'] == 'RECUPERACAO_FINAL') &&
+                                          g['replacedGrade'] == true
+                                        );
+
+                  return ListTile(
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            gradeType['name'],
+                            style: TextStyle(
+                              fontStyle: isRecovery ? FontStyle.italic : FontStyle.normal,
+                              decoration: isBeingReplaced ? TextDecoration.lineThrough : null,
+                            ),
+                          ),
+                        ),
+                        if (isReplacingGrade)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Substituindo',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getGradeColor(grade),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _getGradeDisplayText(grade),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          decoration: isBeingReplaced ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildAttendanceCard() {
+    if (_attendances.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Text(
+          'Nenhuma frequência registrada para esta disciplina',
+          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Text(
+            'Frequência',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2953A5),
+            ),
+          ),
+        ),
+        ..._attendances.map((attendance) {
+          final present = attendance['present'] == true;
+          final lesson = attendance['lesson'];
+          final date = DateTime.parse(lesson['date']);
+
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color:
+                  present
+                      ? Colors.green.withAlpha(30)
+                      : Colors.red.withAlpha(30),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color:
+                    present
+                        ? Colors.green.withAlpha(80)
+                        : Colors.red.withAlpha(80),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  present ? Icons.check_circle : Icons.cancel,
+                  color: present ? Colors.green : Colors.red,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(date),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  present ? 'Presente' : 'Ausente',
+                  style: TextStyle(
+                    color: present ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Color _getGradeColor(Map<String, dynamic> grade) {
+    if (grade['concept'] != null) {
+      final concept = grade['concept'].toString().toUpperCase();
+      switch (concept) {
+        case 'A':
+        case 'MB':
+          return Colors.green;
+        case 'B':
+          return Colors.blue;
+        case 'C':
+        case 'R':
+          return Colors.orange;
+        case 'D':
+        case 'I':
+          return Colors.red;
+        default:
+          return Colors.grey;
+      }
+    } else if (grade['value'] != null) {
+      final value = (grade['value'] as num).toDouble();
+      if (value >= 8.0) return Colors.green;
+      if (value >= 6.0) return Colors.blue;
+      if (value >= 4.0) return Colors.orange;
+      return Colors.red;
+    }
+    return Colors.grey;
+  }
+
+  String _getGradeDisplayText(Map<String, dynamic> grade) {
+    if (grade['concept'] != null) {
+      return grade['concept'].toString();
+    } else if (grade['value'] != null) {
+      return (grade['value'] as num).toStringAsFixed(1);
+    }
+    return '-';
+  }
+}

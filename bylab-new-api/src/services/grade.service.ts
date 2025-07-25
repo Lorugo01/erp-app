@@ -124,6 +124,92 @@ function calcularMedia(valores: number[]): number {
   return Number((valores.reduce((a, b) => a + b, 0) / valores.length).toFixed(2));
 }
 
+// Função auxiliar para calcular a média considerando recuperações
+const calculateFinalGrade = (grades: any[]) => {
+  // Separar as notas por tipo
+  const regularGrades = grades.filter(g => 
+    !['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(g.typeId)
+  );
+  const recGrade = grades.find(g => g.typeId === 'RECUPERACAO');
+  const recFinalGrade = grades.find(g => g.typeId === 'RECUPERACAO_FINAL');
+
+  // Se não houver notas regulares, retorna 0
+  if (regularGrades.length === 0) return 0;
+
+  // Criar uma cópia das notas para manipulação
+  let finalGrades = [...regularGrades];
+
+  // Encontrar a menor nota regular
+  let minGradeIndex = 0;
+  for (let i = 1; i < finalGrades.length; i++) {
+    if (finalGrades[i].value < finalGrades[minGradeIndex].value) {
+      minGradeIndex = i;
+    }
+  }
+
+  // Se houver recuperação final, ela substitui a menor nota
+  if (recFinalGrade && recFinalGrade.value > finalGrades[minGradeIndex].value) {
+    finalGrades[minGradeIndex] = recFinalGrade;
+  }
+  // Se não houver recuperação final mas houver recuperação normal, ela pode substituir a menor nota
+  else if (recGrade && recGrade.value > finalGrades[minGradeIndex].value) {
+    finalGrades[minGradeIndex] = recGrade;
+  }
+
+  // Calcular a média final
+  const sum = finalGrades.reduce((acc, grade) => acc + (grade.value || 0), 0);
+  const average = sum / finalGrades.length;
+  
+  return Number(average.toFixed(1));
+};
+
+export const getGradesByStudent = async (studentId: string) => {
+  const grades = await prisma.grade.findMany({
+    where: { studentId },
+    include: {
+      student: true,
+      subject: true,
+      type: true,
+      period: true
+    },
+    orderBy: [
+      { period: { startDate: 'asc' } },
+      { type: { name: 'asc' } }
+    ]
+  });
+
+  // Agrupar notas por período e disciplina
+  const groupedGrades = grades.reduce((acc, grade) => {
+    const key = `${grade.periodId}-${grade.subjectId}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(grade);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  // Calcular médias finais considerando recuperações
+  for (const key in groupedGrades) {
+    const gradesGroup = groupedGrades[key];
+    const average = calculateFinalGrade(gradesGroup);
+    
+    // Adicionar a média calculada a cada nota do grupo
+    gradesGroup.forEach(grade => {
+      grade.calculatedAverage = average;
+      // Adicionar flag para indicar se a nota foi substituída
+      if (grade.typeId === 'RECUPERACAO' || grade.typeId === 'RECUPERACAO_FINAL') {
+        const regularGrades = gradesGroup.filter(g => 
+          !['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(g.typeId)
+        );
+        const minRegularGrade = Math.min(...regularGrades.map(g => g.value));
+        grade.replacedGrade = grade.value > minRegularGrade;
+      }
+    });
+  }
+
+  return grades;
+};
+
 // Utilitário: retorna status de aprovação por nota e frequência
 export async function getBoletimCompleto(studentId: string) {
   // Busca todas as notas do aluno
