@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+// ignore: depend_on_referenced_packages
+import 'package:http_parser/http_parser.dart';
+import 'dart:convert';
 import '../../models/user.dart';
 import '../../services/user_service.dart';
 
@@ -24,13 +30,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
-              // TODO: Implementar edição do usuário
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Funcionalidade de edição em desenvolvimento'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
+              _showEditUserDialog();
             },
           ),
           IconButton(
@@ -67,16 +67,25 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       CircleAvatar(
                         radius: 50,
                         backgroundColor: const Color(0xFF2953A5),
-                        child: Text(
-                          widget.user.displayName.isNotEmpty
-                              ? widget.user.displayName[0].toUpperCase()
-                              : 'U',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        backgroundImage:
+                            widget.user.photoUrl != null
+                                ? NetworkImage(
+                                  'http://localhost:3000${widget.user.photoUrl}',
+                                )
+                                : null,
+                        child:
+                            widget.user.photoUrl == null
+                                ? Text(
+                                  widget.user.displayName.isNotEmpty
+                                      ? widget.user.displayName[0].toUpperCase()
+                                      : 'U',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : null,
                       ),
                       const SizedBox(width: 24),
                       Expanded(
@@ -311,6 +320,281 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         );
       },
     );
+  }
+
+  void _showEditUserDialog() {
+    final TextEditingController nameController = TextEditingController(
+      text: widget.user.displayName,
+    );
+    final TextEditingController emailController = TextEditingController(
+      text: widget.user.email,
+    );
+    File? selectedImage;
+    String? currentPhotoUrl = widget.user.photoUrl;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Editar Usuário'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Seção de foto
+                    Center(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage:
+                                selectedImage != null
+                                    ? FileImage(selectedImage!)
+                                    : (currentPhotoUrl != null
+                                        ? NetworkImage(
+                                              'http://localhost:3000$currentPhotoUrl',
+                                            )
+                                            as ImageProvider
+                                        : null),
+                            child:
+                                selectedImage == null && currentPhotoUrl == null
+                                    ? const Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    )
+                                    : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    FilePickerResult? result = await FilePicker
+                                        .platform
+                                        .pickFiles(
+                                          type: FileType.image,
+                                          allowMultiple: false,
+                                        );
+
+                                    if (result != null) {
+                                      setState(() {
+                                        selectedImage = File(
+                                          result.files.single.path!,
+                                        );
+                                      });
+                                    }
+                                  } catch (e) {
+                                    // ignore: use_build_context_synchronously
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Erro ao selecionar imagem: ${e.toString()}',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.photo_camera),
+                                label: const Text('Selecionar Foto'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2953A5),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                              if (selectedImage != null) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      selectedImage = null;
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: 'Remover foto',
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Campos de texto
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome',
+                        border: OutlineInputBorder(),
+                        hintText: 'Digite o nome completo',
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                        hintText: 'Digite o email',
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // Validação básica
+                      if (nameController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Nome é obrigatório'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (emailController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Email é obrigatório'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final updatedData = {
+                        'name': nameController.text.trim(),
+                        'email': emailController.text.trim(),
+                      };
+
+                      // Se uma nova foto foi selecionada, fazer upload
+                      if (selectedImage != null) {
+                        try {
+                          final photoUrl = await _uploadUserPhoto(
+                            widget.user.id,
+                            selectedImage!,
+                          );
+                          updatedData['photoUrl'] = photoUrl;
+                        } catch (e) {
+                          // ignore: use_build_context_synchronously
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Erro ao fazer upload da foto: ${e.toString()}',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+                      }
+
+                      // TODO: Implementar atualização do usuário
+                      // Por enquanto, apenas fecha o diálogo
+                      // ignore: use_build_context_synchronously
+                      Navigator.of(context).pop();
+                      // ignore: use_build_context_synchronously
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Funcionalidade de atualização em desenvolvimento',
+                          ),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      // ignore: use_build_context_synchronously
+                      Navigator.of(context).pop();
+                      // ignore: use_build_context_synchronously
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Erro ao atualizar usuário: ${e.toString()}',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Salvar Alterações'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<String> _uploadUserPhoto(String userId, File imageFile) async {
+    try {
+      // Determina o mimetype baseado na extensão do arquivo
+      String getMimeType(String filePath) {
+        final extension = filePath.split('.').last.toLowerCase();
+        switch (extension) {
+          case 'jpg':
+          case 'jpeg':
+            return 'image/jpeg';
+          case 'png':
+            return 'image/png';
+          case 'gif':
+            return 'image/gif';
+          default:
+            return 'image/jpeg'; // fallback
+        }
+      }
+
+      final mimeType = getMimeType(imageFile.path);
+
+      // Cria uma requisição multipart
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://localhost:3000/users/$userId/photo'),
+      );
+
+      // Adiciona o arquivo com mimetype correto
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
+
+      // Envia a requisição
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        return data['photoUrl'] ?? '';
+      } else {
+        final error = jsonDecode(responseBody);
+        throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
   }
 
   Future<void> _deleteUser() async {

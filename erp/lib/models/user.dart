@@ -51,6 +51,7 @@ class User {
   final String id;
   final String email;
   final Role role;
+  final String? photoUrl;
   final Student? student;
   final Teacher? teacher;
   final DateTime createdAt;
@@ -59,6 +60,7 @@ class User {
     required this.id,
     required this.email,
     required this.role,
+    this.photoUrl,
     this.student,
     this.teacher,
     required this.createdAt,
@@ -74,6 +76,7 @@ class User {
             (json['role']?.toString().toLowerCase() ?? ''),
         orElse: () => Role.student, // ou outro valor padrão
       ),
+      photoUrl: json['photoUrl'],
       student:
           json['student'] != null ? Student.fromJson(json['student']) : null,
       teacher:
@@ -87,6 +90,7 @@ class User {
       'id': id,
       'email': email,
       'role': role.toString().split('.').last,
+      'photoUrl': photoUrl,
       'student': student?.toJson(),
       'teacher': teacher?.toJson(),
       'createdAt': createdAt.toIso8601String(),

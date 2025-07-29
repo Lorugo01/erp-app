@@ -33,10 +33,21 @@ const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain',
     'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/octet-stream' // Para arquivos do Flutter
   ];
 
-  if (allowedMimes.includes(file.mimetype)) {
+  // Se o mimetype for application/octet-stream, verificar a extensão
+  if (file.mimetype === 'application/octet-stream') {
+    const extension = file.originalname?.toLowerCase().split('.').pop();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'];
+    
+    if (extension && allowedExtensions.includes(extension)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de arquivo inválido. Apenas imagens e documentos são permitidos.'));
+    }
+  } else if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Tipo de arquivo inválido. Apenas imagens e documentos são permitidos.'));

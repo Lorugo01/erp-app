@@ -11,8 +11,9 @@ router.get('/search/:name', StudentController.getByName);
 router.get('/registration/:registrationNumber', StudentController.getByRegistrationNumber);
 router.get('/:id/current-class', StudentController.getCurrentClass);
 
-router.post('/', upload.single('photo'), StudentController.create);
-router.put('/:id', upload.single('photo'), StudentController.update);
+router.post('/', StudentController.create);
+router.put('/:id', StudentController.update);
+router.post('/:id/photo', upload.single('photo'), StudentController.uploadPhoto);
 router.delete('/:id', StudentController.remove);
 
 export default router;

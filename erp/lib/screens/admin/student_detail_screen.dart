@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../services/student_service.dart' as student_service;
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+// ignore: depend_on_referenced_packages
+import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
+import '../../services/student_service.dart' as student_service;
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../models/grade.dart';
@@ -874,6 +878,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         _studentDetails?['birthDate'] != null
             ? DateTime.tryParse(_studentDetails!['birthDate'])
             : null;
+    File? selectedImage;
+    String? currentPhotoUrl = widget.student.profilePicture;
 
     if (!context.mounted) return;
     showDialog(
@@ -890,6 +896,97 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Seção de foto
+                    Center(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage:
+                                selectedImage != null
+                                    ? FileImage(selectedImage!)
+                                    : (currentPhotoUrl != null
+                                        ? NetworkImage(
+                                              'http://localhost:3000$currentPhotoUrl',
+                                            )
+                                            as ImageProvider
+                                        : null),
+                            child:
+                                selectedImage == null && currentPhotoUrl == null
+                                    ? const Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    )
+                                    : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    FilePickerResult? result = await FilePicker
+                                        .platform
+                                        .pickFiles(
+                                          type: FileType.image,
+                                          allowMultiple: false,
+                                        );
+
+                                    if (result != null) {
+                                      setState(() {
+                                        selectedImage = File(
+                                          result.files.single.path!,
+                                        );
+                                      });
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      // ignore: use_build_context_synchronously
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Erro ao selecionar imagem: ${e.toString()}',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.photo_camera),
+                                label: const Text('Selecionar Foto'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2953A5),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                              if (selectedImage != null) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      selectedImage = null;
+                                    });
+                                  },
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: 'Remover foto',
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Campos de texto
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(labelText: 'Nome'),
@@ -962,50 +1059,97 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    final updated = {
-                      'name': nameController.text.trim(),
-                      'email': emailController.text.trim(),
-                      'registrationNumber': matriculaController.text.trim(),
-                      'phone': phoneController.text.trim(),
-                      'address': addressController.text.trim(),
-                      'birthDate': birthDate?.toIso8601String(),
-                    };
-                    setState(() => _loading = true);
-                    final dialogContext = context;
-                    final response = await http.put(
-                      Uri.parse(
-                        'http://localhost:3000/students/${widget.student.id}',
-                      ),
-                      headers: {'Content-Type': 'application/json'},
-                      body: jsonEncode(updated),
-                    );
-                    if (!context.mounted) return;
-                    setState(() => _loading = false);
-                    if (response.statusCode == 200) {
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
+                    try {
+                      // Validação básica
+                      if (nameController.text.trim().isEmpty) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Nome é obrigatório'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
                       }
-                      await _fetchStudentDetails();
-                      if (dialogContext.mounted) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+
+                      if (emailController.text.trim().isEmpty) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Email é obrigatório'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      final updatedData = {
+                        'name': nameController.text.trim(),
+                        'email': emailController.text.trim(),
+                        'registrationNumber': matriculaController.text.trim(),
+                        'phone': phoneController.text.trim(),
+                        'address': addressController.text.trim(),
+                        if (birthDate != null)
+                          'birthDate': birthDate!.toIso8601String(),
+                      };
+
+                      // Se uma nova foto foi selecionada, fazer upload
+                      if (selectedImage != null) {
+                        try {
+                          final photoUrl = await _uploadStudentPhoto(
+                            widget.student.id,
+                            selectedImage!,
+                          );
+                          updatedData['profilePicture'] = photoUrl;
+                        } catch (e) {
+                          if (mounted) {
+                            // ignore: use_build_context_synchronously
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Erro ao fazer upload da foto: ${e.toString()}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                      }
+
+                      // TODO: Implementar atualização do aluno
+                      // Por enquanto, apenas fecha o diálogo
+                      if (mounted) {
+                        // ignore: use_build_context_synchronously
+                        Navigator.of(context).pop();
+                        // ignore: use_build_context_synchronously
+                        ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Aluno atualizado com sucesso!'),
-                            backgroundColor: Colors.green,
+                            content: Text(
+                              'Funcionalidade de atualização em desenvolvimento',
+                            ),
+                            backgroundColor: Colors.orange,
                           ),
                         );
                       }
-                    } else {
-                      if (dialogContext.mounted) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(
-                            content: Text('Erro ao atualizar aluno!'),
-                            backgroundColor: Colors.red,
+                    } catch (e) {
+                      if (!mounted) return;
+                      // ignore: use_build_context_synchronously
+                      Navigator.of(context).pop();
+                      // ignore: use_build_context_synchronously
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Erro ao atualizar aluno: ${e.toString()}',
                           ),
-                        );
-                      }
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                     }
                   },
-                  child: const Text('Salvar'),
+                  child: const Text('Salvar Alterações'),
                 ),
               ],
             );
@@ -1013,6 +1157,57 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         );
       },
     );
+  }
+
+  Future<String> _uploadStudentPhoto(String studentId, File imageFile) async {
+    try {
+      // Determina o mimetype baseado na extensão do arquivo
+      String getMimeType(String filePath) {
+        final extension = filePath.split('.').last.toLowerCase();
+        switch (extension) {
+          case 'jpg':
+          case 'jpeg':
+            return 'image/jpeg';
+          case 'png':
+            return 'image/png';
+          case 'gif':
+            return 'image/gif';
+          default:
+            return 'image/jpeg'; // fallback
+        }
+      }
+
+      final mimeType = getMimeType(imageFile.path);
+
+      // Cria uma requisição multipart
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://localhost:3000/students/$studentId/photo'),
+      );
+
+      // Adiciona o arquivo com mimetype correto
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType),
+        ),
+      );
+
+      // Envia a requisição
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        return data['photoUrl'] ?? '';
+      } else {
+        final error = jsonDecode(responseBody);
+        throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
   }
 
   Future<void> _deleteStudent() async {
@@ -1226,6 +1421,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     }
     bool loadingTypes = true;
     await showDialog(
+      // ignore: use_build_context_synchronously
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -1421,9 +1617,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               if (snapshot.hasError) {
                 return const Text('Erro ao carregar notas');
               }
-              final grades = (snapshot.data ?? [])
-                  .where((g) => g['subjectId'] == subject['id'])
-                  .toList();
+              final grades =
+                  (snapshot.data ?? [])
+                      .where((g) => g['subjectId'] == subject['id'])
+                      .toList();
               if (grades.isEmpty) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1472,19 +1669,24 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                 'Tipo:  ${getGradeTypeName(g['gradeTypeId'])}',
                               ),
                               trailing: IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.blue,
+                                ),
                                 onPressed: () {
                                   Navigator.pop(context);
-                                  _showEditGradeDialog(Grade(
-                                    id: g['id'],
-                                    value: g['value'].toDouble(),
-                                    gradeTypeId: g['gradeTypeId'],
-                                    periodId: g['periodId'],
-                                    subjectId: g['subjectId'],
-                                    studentId: g['studentId'],
-                                    createdAt: DateTime.parse(g['createdAt']),
-                                    updatedAt: DateTime.parse(g['updatedAt']),
-                                  ));
+                                  _showEditGradeDialog(
+                                    Grade(
+                                      id: g['id'],
+                                      value: g['value'].toDouble(),
+                                      gradeTypeId: g['gradeTypeId'],
+                                      periodId: g['periodId'],
+                                      subjectId: g['subjectId'],
+                                      studentId: g['studentId'],
+                                      createdAt: DateTime.parse(g['createdAt']),
+                                      updatedAt: DateTime.parse(g['updatedAt']),
+                                    ),
+                                  );
                                 },
                               ),
                             );

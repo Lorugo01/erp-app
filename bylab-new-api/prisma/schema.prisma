@@ -18,6 +18,7 @@ model User {
   email     String   @unique
   password  String
   role      Role
+  photoUrl  String?
   student   Student?
   teacher   Teacher?
   chatParticipants chatparticipant[]
@@ -125,6 +126,7 @@ model Teacher {
   userId    String?     @unique
   name      String
   email     String      @unique
+  photoUrl  String?
   subjects  Subject[]
   lessons   Lesson[]
   createdAt DateTime    @default(now())

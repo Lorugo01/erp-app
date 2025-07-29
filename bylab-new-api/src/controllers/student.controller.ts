@@ -158,3 +158,23 @@ export const remove = async (req: Request, res: Response, next: NextFunction) =>
     next(error);
   }
 };
+
+export const uploadPhoto = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhuma foto foi enviada' });
+    }
+
+    const tempFilePath = req.file.path;
+    const photoUrl = await StudentService.uploadStudentPhoto(id, tempFilePath);
+    
+    res.json({ 
+      message: 'Foto do aluno atualizada com sucesso!',
+      photoUrl 
+    });
+  } catch (error) {
+    next(error);
+  }
+};

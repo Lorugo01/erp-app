@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
 import 'dart:convert';
 
 class AuthProvider extends ChangeNotifier {
@@ -77,6 +78,27 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _user = null;
     await _clearUserFromStorage();
+    notifyListeners();
+  }
+
+  // Atualizar dados do usuário atual do backend
+  Future<void> refreshUserData() async {
+    if (_user == null) return;
+
+    try {
+      final updatedUser = await UserService.getUserById(_user!.id);
+      _user = updatedUser;
+      await _saveUserToStorage(updatedUser);
+      notifyListeners();
+    } catch (e) {
+      _setError('Erro ao atualizar dados do usuário: $e');
+    }
+  }
+
+  // Atualizar dados do usuário após edição
+  Future<void> updateUserData(User updatedUser) async {
+    _user = updatedUser;
+    await _saveUserToStorage(updatedUser);
     notifyListeners();
   }
 

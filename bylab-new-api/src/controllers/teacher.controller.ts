@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import * as TeacherService from '../services/teacher.service';
+import { renameStudentPhoto } from '../middlewares/upload.middleware';
+import path from 'path';
+import fs from 'fs';
 
 export const getAll = async (_: Request, res: Response) => {
   const teachers = await TeacherService.getAllTeachers();
@@ -76,5 +79,25 @@ export const remove = async (req: Request, res: Response) => {
     });
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
+  }
+};
+
+export const uploadPhoto = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhuma foto foi enviada' });
+    }
+
+    const tempFilePath = req.file.path;
+    const photoUrl = await TeacherService.uploadTeacherPhoto(id, tempFilePath);
+    
+    res.json({ 
+      message: 'Foto do professor atualizada com sucesso!',
+      photoUrl 
+    });
+  } catch (error) {
+    next(error);
   }
 };

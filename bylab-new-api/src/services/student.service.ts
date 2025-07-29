@@ -1,6 +1,8 @@
 import prisma from '../prisma/client';
 import { hash } from 'bcrypt';
 import { Role } from '@prisma/client';
+import path from 'path';
+import fs from 'fs';
 
 export const getAllStudents = () => {
   return prisma.student.findMany({
@@ -253,4 +255,47 @@ export const getStudentByUserId = async (userId: string) => {
   }
 
   return student;
+};
+
+export const uploadStudentPhoto = async (studentId: string, tempFilePath: string): Promise<string> => {
+  try {
+    // Verifica se o aluno existe
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+    });
+
+    if (!student) {
+      throw new Error('Aluno não encontrado');
+    }
+
+    // Renomeia o arquivo com o ID do aluno
+    const uploadDir = path.join(__dirname, '../../uploads');
+    const fileName = path.basename(tempFilePath);
+    const ext = path.extname(fileName);
+    const newFileName = `student-${studentId}${ext}`;
+    const newFilePath = path.join(uploadDir, newFileName);
+
+    // Remove arquivo anterior se existir
+    if (fs.existsSync(newFilePath)) {
+      fs.unlinkSync(newFilePath);
+    }
+
+    // Renomeia o arquivo
+    fs.renameSync(tempFilePath, newFilePath);
+
+    // Atualiza o aluno com a URL da foto
+    const photoUrl = `/uploads/${newFileName}`;
+    await prisma.student.update({
+      where: { id: studentId },
+      data: { profilePicture: photoUrl },
+    });
+
+    return photoUrl;
+  } catch (error) {
+    // Remove arquivo temporário em caso de erro
+    if (fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+    throw error;
+  }
 };

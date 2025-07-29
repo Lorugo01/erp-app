@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/data_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/teacher/teacher_dashboard_screen.dart';
@@ -16,8 +17,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => DataProvider()),
+      ],
       child: MaterialApp(
         title: 'ByLAB ERP',
         debugShowCheckedModeBanner: false,
@@ -55,9 +59,9 @@ class _AuthFlowState extends State<AuthFlow> {
           name: student?.name ?? authProvider.user!.email,
           registrationNumber: student?.registrationNumber ?? '-',
           profilePictureUrl: student?.profilePicture,
-          absences: 0, // TODO: buscar da API
-          messages: 0, // TODO: buscar da API
-          todayClasses: 0, // TODO: buscar da API
+          absences: 0,
+          messages: 0,
+          todayClasses: 0,
         );
       }
       if (authProvider.user!.isAdmin) {

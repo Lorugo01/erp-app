@@ -65,7 +65,6 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
 
   void _showAddStudentToClassDialog() async {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
 
     final alunos = await student_service.StudentService.getAllStudents();
     if (!mounted) return;
@@ -162,8 +161,9 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                 );
                                 if (jaMatriculadoMesmoAno) {
                                   if (!mounted) return;
+                                  if (!context.mounted) return;
                                   showDialog(
-                                    context: dialogContext,
+                                    context: context,
                                     builder:
                                         (warningContext) => AlertDialog(
                                           title: const Text('Aviso'),
@@ -204,12 +204,14 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                               }
 
                               if (!mounted) return;
+                              // ignore: use_build_context_synchronously
                               Navigator.of(dialogContext).pop();
                               await _fetchEnrollments();
 
                               if (!mounted) return;
                               if (success > 0) {
-                                messenger.showSnackBar(
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       '$success aluno(s) matriculado(s) com sucesso!',
@@ -247,6 +249,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                   return GestureDetector(
                     onTap: () async {
                       if (!mounted) return;
+                      if (!context.mounted) return;
                       final navigator = Navigator.of(context);
                       await navigator.push(
                         MaterialPageRoute(
@@ -316,7 +319,6 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () async {
                               if (!mounted) return;
-                              final messenger = ScaffoldMessenger.of(context);
                               final navigator = Navigator.of(context);
 
                               final confirmed = await showDialog<bool>(

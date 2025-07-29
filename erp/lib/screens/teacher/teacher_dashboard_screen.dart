@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/data_provider.dart';
+import '../../widgets/data_refresh_widget.dart';
 import '../../services/teacher_service.dart';
 import 'dart:async';
 import 'teacher_class_detail_screen.dart';
@@ -14,7 +16,7 @@ class TeacherDashboardScreen extends StatefulWidget {
 }
 
 class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, DataRefreshMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
@@ -25,6 +27,83 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   String? _errorClasses;
   String? _errorStudents;
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    await _loadTeacherClasses();
+    await _loadAllStudents();
+  }
+
+  Future<void> _loadTeacherClasses() async {
+    setState(() {
+      _loadingClasses = true;
+      _errorClasses = null;
+    });
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.user?.teacher != null) {
+        final classes = await TeacherService.getTeacherClasses(
+          authProvider.user!.teacher!.id,
+        );
+        setState(() {
+          _teacherClasses = classes;
+          _loadingClasses = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorClasses = e.toString();
+        _loadingClasses = false;
+      });
+    }
+  }
+
+  Future<void> _loadAllStudents() async {
+    setState(() {
+      _loadingStudents = true;
+      _errorStudents = null;
+    });
+
+    try {
+      final dataProvider = Provider.of<DataProvider>(context, listen: false);
+      await dataProvider.refreshStudents();
+      setState(() {
+        _allStudents = dataProvider.students;
+        _loadingStudents = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorStudents = e.toString();
+        _loadingStudents = false;
+      });
+    }
+  }
+
+  // Atualizar dados do professor atual
+  Future<void> _refreshTeacherData() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final dataProvider = Provider.of<DataProvider>(context, listen: false);
+
+    if (authProvider.user?.teacher != null) {
+      await dataProvider.refreshCurrentTeacher(authProvider.user!.teacher!.id);
+      showRefreshSnackBar('Dados do professor atualizados!');
+    }
+  }
+
+  // Atualizar todos os dados
+  Future<void> _refreshAllData() async {
+    await refreshAllData();
+    await _loadTeacherClasses();
+    await _loadAllStudents();
+    showRefreshSnackBar('Todos os dados foram atualizados!');
+  }
 
   void _showHelpDialog() {
     showDialog(
@@ -46,12 +125,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   Text('• Clique em uma turma para ver detalhes'),
                   Text('• Clique em um aluno para ver seu desempenho'),
                   Text('• Use a barra de pesquisa para encontrar alunos'),
+                  Text('• Puxe para baixo para atualizar os dados'),
                   SizedBox(height: 16),
                   Text('Dicas:', style: TextStyle(fontWeight: FontWeight.bold)),
                   SizedBox(height: 8),
                   Text('• Mantenha as informações dos alunos atualizadas'),
                   Text('• Registre a frequência regularmente'),
                   Text('• Acompanhe o desempenho dos alunos'),
+                  Text(
+                    '• Use a atualização automática para dados em tempo real',
+                  ),
                 ],
               ),
             ),
@@ -96,6 +179,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                     title: Text('Idioma'),
                     subtitle: Text('Português'),
                   ),
+                  ListTile(
+                    leading: Icon(Icons.refresh),
+                    title: Text('Atualização Automática'),
+                    subtitle: Text('Ativado'),
+                  ),
                 ],
               ),
             ),
@@ -107,21 +195,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
             ],
           ),
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _fetchTeacherClasses();
-    _searchController.addListener(_onSearchChanged);
-    _tabController.addListener(() {
-      if (_tabController.index == 1 &&
-          _allStudents.isEmpty &&
-          _teacherClasses.isNotEmpty) {
-        _fetchStudentsFromClasses();
-      }
-    });
   }
 
   @override
@@ -250,10 +323,23 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
               children: [
                 const SizedBox(height: 24),
                 // Avatar
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 40,
                   backgroundColor: Colors.white,
-                  child: Icon(Icons.person, size: 60, color: Color(0xFF2953A5)),
+                  backgroundImage:
+                      authProvider.user?.photoUrl != null
+                          ? NetworkImage(
+                            'http://localhost:3000${authProvider.user!.photoUrl}',
+                          )
+                          : null,
+                  child:
+                      authProvider.user?.photoUrl == null
+                          ? const Icon(
+                            Icons.person,
+                            size: 60,
+                            color: Color(0xFF2953A5),
+                          )
+                          : null,
                 ),
                 const SizedBox(height: 24),
                 // Nome do professor

@@ -14,6 +14,75 @@ class TeacherService {
     }
   }
 
+  // Buscar professor por ID
+  static Future<Map<String, dynamic>> getTeacherById(String id) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/teachers/$id'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Map<String, dynamic>.from(data);
+      } else {
+        throw Exception('Erro ao buscar professor: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateTeacher(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/teachers/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao atualizar professor');
+    }
+  }
+
+  // Atualizar foto do professor
+  static Future<Map<String, dynamic>> updateTeacherPhoto(
+    String id,
+    String photoUrl,
+  ) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/teachers/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'photoUrl': photoUrl}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Map<String, dynamic>.from(data);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(
+          error['error'] ?? 'Erro ao atualizar foto do professor',
+        );
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
+  }
+
+  // Buscar dados atualizados do professor
+  static Future<Map<String, dynamic>> refreshTeacherData(String id) async {
+    return await getTeacherById(id);
+  }
+
   static Future<List<Map<String, dynamic>>> getTeacherClasses(
     String teacherId,
   ) async {

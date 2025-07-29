@@ -74,6 +74,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     ];
     final selectedSubjects = <String>{};
     showDialog(
+      // ignore: use_build_context_synchronously
       context: context,
       builder:
           (context) => StatefulBuilder(
@@ -169,6 +170,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                 Navigator.of(context).pop();
                                 await _fetchSubjects();
                                 if (!mounted) return;
+                                // ignore: use_build_context_synchronously
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
@@ -263,13 +265,45 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.person),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    teacher['name'] ?? 'Professor',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: Colors.grey[200],
+                                    backgroundImage:
+                                        teacher['photoUrl'] != null
+                                            ? NetworkImage(
+                                              'http://localhost:3000${teacher['photoUrl']}',
+                                            )
+                                            : null,
+                                    child:
+                                        teacher['photoUrl'] == null
+                                            ? const Icon(
+                                              Icons.person,
+                                              color: Colors.grey,
+                                            )
+                                            : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          teacher['name'] ?? 'Professor',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        if (teacher['email'] != null)
+                                          Text(
+                                            teacher['email'],
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ],

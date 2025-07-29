@@ -494,6 +494,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  void _showAddUserDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => _AddUserDialog(
+            onAdd: (name, email, password, role) async {
+              setState(() {
+                _loadingUsers = true;
+                _errorUsers = null;
+              });
+              try {
+                final user = await UserService.createUser(
+                  name: name,
+                  email: email,
+                  password: password,
+                  role: role,
+                );
+                setState(() {
+                  _users.add(user);
+                });
+                // ignore: use_build_context_synchronously
+                Navigator.of(context).pop();
+                // ignore: use_build_context_synchronously
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Usuário cadastrado com sucesso!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erro ao cadastrar usuário: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } finally {
+                setState(() {
+                  _loadingUsers = false;
+                });
+              }
+            },
+          ),
+    );
+  }
+
   Widget _buildTabContent() {
     switch (_selectedIndex) {
       case 0:
@@ -1193,7 +1241,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   backgroundColor: Colors.yellow[700],
                   onPressed: () {
                     if (_selectedIndex == 1) {
-                      // TODO: ação de adicionar usuário
+                      _showAddUserDialog();
                     } else if (_selectedIndex == 2) {
                       _showAddTeacherDialog();
                     } else if (_selectedIndex == 3) {
@@ -1512,11 +1560,20 @@ class _TeacherCardGrid extends StatelessWidget {
                 CircleAvatar(
                   radius: isSmall ? 24 : 32,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: isSmall ? 28 : 40,
-                    color: const Color(0xFF2953A5),
-                  ),
+                  backgroundImage:
+                      teacher['photoUrl'] != null
+                          ? NetworkImage(
+                            'http://localhost:3000${teacher['photoUrl']}',
+                          )
+                          : null,
+                  child:
+                      teacher['photoUrl'] == null
+                          ? Icon(
+                            Icons.person,
+                            size: isSmall ? 28 : 40,
+                            color: const Color(0xFF2953A5),
+                          )
+                          : null,
                 ),
                 Expanded(
                   child: Align(
@@ -2838,4 +2895,125 @@ void _showReportDialog(BuildContext context, String reportTitle) {
           ],
         ),
   );
+}
+
+class _AddUserDialog extends StatefulWidget {
+  final void Function(String name, String email, String password, Role role)
+  onAdd;
+  const _AddUserDialog({required this.onAdd});
+
+  @override
+  State<_AddUserDialog> createState() => _AddUserDialogState();
+}
+
+class _AddUserDialogState extends State<_AddUserDialog> {
+  final _formKey = GlobalKey<FormState>();
+  String _name = '';
+  String _email = '';
+  String _password = '';
+  Role _selectedRole = Role.student;
+  bool _obscurePassword = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('Cadastrar Usuário'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Nome'),
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
+              onSaved: (v) => _name = (v ?? '').trim(),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Email'),
+              keyboardType: TextInputType.emailAddress,
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o email' : null,
+              onSaved: (v) => _email = (v ?? '').trim(),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              decoration: InputDecoration(
+                labelText: 'Senha',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed:
+                      () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+              obscureText: _obscurePassword,
+              validator:
+                  (v) =>
+                      v == null || v.length < 6 ? 'Mínimo 6 caracteres' : null,
+              onSaved: (v) => _password = v ?? '',
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<Role>(
+              decoration: const InputDecoration(labelText: 'Tipo de Usuário'),
+              value: _selectedRole,
+              items:
+                  Role.values.map((role) {
+                    return DropdownMenuItem(
+                      value: role,
+                      child: Text(_getRoleDisplayName(role)),
+                    );
+                  }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedRole = value);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              _formKey.currentState!.save();
+              if (_name.isNotEmpty &&
+                  _email.isNotEmpty &&
+                  _password.isNotEmpty) {
+                widget.onAdd(_name, _email, _password, _selectedRole);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Preencha todos os campos corretamente!'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+          child: const Text('Cadastrar'),
+        ),
+      ],
+    );
+  }
+
+  String _getRoleDisplayName(Role role) {
+    switch (role) {
+      case Role.admin:
+        return 'Administrador';
+      case Role.teacher:
+        return 'Professor';
+      case Role.student:
+        return 'Aluno';
+    }
+  }
 }
