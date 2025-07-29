@@ -20,7 +20,11 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
   bool _loading = false;
   String? _error;
   // Controle local de marcação manual
-  Set<String> _manuallyMarkedDelivered = {};
+  final Set<String> _manuallyMarkedDelivered = {};
+
+  // Cores constantes
+  static const _orangeAlpha = Color(0xB5FFA500); // Laranja com alpha 0.7
+  static const _redAlpha = Color(0xBFFF0000); // Vermelho com alpha 0.75
 
   @override
   void initState() {
@@ -294,12 +298,12 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                       },
                                     ),
                                   if (sub.isEmpty)
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 4),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
                                       child: Text(
                                         'Marcado manualmente',
                                         style: TextStyle(
-                                          color: Colors.orange,
+                                          color: _orangeAlpha,
                                           fontStyle: FontStyle.italic,
                                         ),
                                       ),
@@ -356,7 +360,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                           return Card(
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: Colors.red.withOpacity(0.8),
+                                backgroundColor: _redAlpha,
                                 child: Text(
                                   aluno['name']
                                           ?.substring(0, 1)
@@ -434,7 +438,10 @@ class _StatisticCard extends StatelessWidget {
         ),
         Text(
           '$percentage%',
-          style: TextStyle(fontSize: 14, color: color.withOpacity(0.8)),
+          style: TextStyle(
+            fontSize: 14,
+            color: color.withAlpha(204),
+          ), // 0.8 * 255 ≈ 204
         ),
       ],
     );

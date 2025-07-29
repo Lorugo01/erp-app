@@ -216,9 +216,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                       children: [
                         if (_teacherDetails != null &&
                             _teacherDetails!['subjects'] != null)
-                          ...(_teacherDetails!['subjects'] as List)
-                              .map((subject) => _buildSubjectCard(subject))
-                              .toList()
+                          ...(_teacherDetails!['subjects'] as List).map(
+                            (subject) => _buildSubjectCard(subject),
+                          )
                         else
                           const Padding(
                             padding: EdgeInsets.all(16.0),

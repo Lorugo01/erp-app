@@ -41,30 +41,48 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
     setState(() => _loading = false);
   }
 
-  Future<void> _removeEnrollment(String enrollmentId) async {
-    await http.delete(
-      Uri.parse('http://localhost:3000/enrollments/$enrollmentId'),
-    );
-    await _fetchEnrollments();
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Aluno removido da turma!')));
+  Future<void> _removeStudent(String enrollmentId) async {
+    try {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+
+      await http.delete(
+        Uri.parse('http://localhost:3000/enrollments/$enrollmentId'),
+      );
+      await _fetchEnrollments();
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Aluno removido da turma!')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao remover aluno: $e')));
+    }
   }
 
   void _showAddStudentToClassDialog() async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
     final alunos = await student_service.StudentService.getAllStudents();
+    if (!mounted) return;
+
     // Filtrar alunos já matriculados
     final idsMatriculados = _enrollments.map((e) => e['student']['id']).toSet();
     final alunosDisponiveis =
         alunos.where((aluno) => !idsMatriculados.contains(aluno.id)).toList();
     final selected = <String>{};
     String search = '';
+
+    if (!mounted) return;
     showDialog(
       context: context,
       builder:
-          (context) => StatefulBuilder(
-            builder: (context, setState) {
+          (dialogContext) => StatefulBuilder(
+            builder: (builderContext, setState) {
               final filteredAlunos =
                   alunosDisponiveis.where((aluno) {
                     final query = search.toLowerCase();
@@ -124,7 +142,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
                     child: const Text('Cancelar'),
                   ),
                   ElevatedButton(
@@ -143,21 +161,21 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                       e['year'] == year,
                                 );
                                 if (jaMatriculadoMesmoAno) {
-                                  if (!context.mounted) return;
+                                  if (!mounted) return;
                                   showDialog(
-                                    context: context,
+                                    context: dialogContext,
                                     builder:
-                                        (context) => AlertDialog(
-                                          title: const Text('Atenção'),
+                                        (warningContext) => AlertDialog(
+                                          title: const Text('Aviso'),
                                           content: Text(
-                                            'Este aluno já está matriculado em uma turma no ano $year.',
+                                            'O aluno já está matriculado em uma turma no ano $year.',
                                           ),
                                           actions: [
                                             TextButton(
                                               onPressed:
                                                   () =>
                                                       Navigator.of(
-                                                        context,
+                                                        warningContext,
                                                       ).pop(),
                                               child: const Text('OK'),
                                             ),
@@ -166,30 +184,32 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                   );
                                   continue;
                                 }
+
                                 final response = await http.post(
                                   Uri.parse(
-                                    'http://localhost:3000/enrollments',
+                                    'http://localhost:3000/classes/$classId/enrollments',
                                   ),
                                   headers: {'Content-Type': 'application/json'},
                                   body: jsonEncode({
                                     'studentId': studentId,
-                                    'classId': classId,
                                     'year': year,
-                                    'current': true,
                                   }),
                                 );
-                                if (!context.mounted) return;
+
+                                if (!mounted) return;
                                 if (response.statusCode == 201 ||
                                     response.statusCode == 200) {
                                   success++;
                                 }
                               }
-                              if (!context.mounted) return;
-                              Navigator.of(context).pop();
+
+                              if (!mounted) return;
+                              Navigator.of(dialogContext).pop();
                               await _fetchEnrollments();
+
                               if (!mounted) return;
                               if (success > 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       '$success aluno(s) matriculado(s) com sucesso!',
@@ -225,8 +245,10 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                   final enrollment = _enrollments[i];
                   final student = enrollment['student'];
                   return GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
+                    onTap: () async {
+                      if (!mounted) return;
+                      final navigator = Navigator.of(context);
+                      await navigator.push(
                         MaterialPageRoute(
                           builder:
                               (_) => StudentDetailScreen(
@@ -260,7 +282,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                           BoxShadow(
                             color: Colors.black12,
                             blurRadius: 4,
-                            offset: Offset(0, 2),
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
@@ -277,30 +299,53 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
-                                    color: Color(0xFF2953A5),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                Text(
-                                  student?['email'] ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.black87,
+                                if (student?['registrationNumber'] != null)
+                                  Text(
+                                    'Matrícula: ${student['registrationNumber']}',
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 14,
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
                               ],
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(
-                              Icons.remove_circle,
-                              color: Colors.red,
-                            ),
+                            icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () async {
-                              await _removeEnrollment(enrollment['id']);
+                              if (!mounted) return;
+                              final messenger = ScaffoldMessenger.of(context);
+                              final navigator = Navigator.of(context);
+
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder:
+                                    (dialogContext) => AlertDialog(
+                                      title: const Text('Confirmar Remoção'),
+                                      content: const Text(
+                                        'Tem certeza que deseja remover este aluno da turma?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => navigator.pop(false),
+                                          child: const Text('Cancelar'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => navigator.pop(true),
+                                          child: const Text(
+                                            'Remover',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                              );
+
+                              if (confirmed == true) {
+                                await _removeStudent(enrollment['id']);
+                              }
                             },
                           ),
                         ],
@@ -309,18 +354,11 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                   );
                 },
               ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.width < 600 ? 80 : 24,
-          right: 24,
-        ),
-        child: FloatingActionButton(
-          backgroundColor: Colors.yellow[700],
-          onPressed: _showAddStudentToClassDialog,
-          child: const Icon(Icons.add, size: 36, color: Colors.white),
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddStudentToClassDialog,
+        backgroundColor: const Color(0xFF2953A5),
+        child: const Icon(Icons.add),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
     );
   }
 }

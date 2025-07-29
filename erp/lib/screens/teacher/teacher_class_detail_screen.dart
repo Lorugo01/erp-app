@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/assignment_service.dart';
-import '../../services/teacher_service.dart';
 import '../../services/attendance_service.dart';
-import '../../services/grade_service.dart';
 import '../../services/grade_period_service.dart';
+import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
+import '../../services/teacher_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'task_submissions_screen.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
 import 'package:intl/intl.dart';
 import 'teacher_student_detail_screen.dart';
 
@@ -839,14 +839,36 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                 onPressed: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder:
-                                          (_) => TeacherStudentDetailScreen(
-                                            student: student,
-                                            classData: widget.classData,
-                                            subjectId: _selectedSubjectId!,
-                                            teacherId:
-                                                widget.classData['teacherId'],
-                                          ),
+                                      builder: (_) {
+                                        final authProvider =
+                                            Provider.of<AuthProvider>(
+                                              context,
+                                              listen: false,
+                                            );
+                                        final teacherId =
+                                            authProvider.user?.teacher?.id;
+
+                                        if (teacherId == null) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Erro: Professor não encontrado',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return const SizedBox.shrink();
+                                        }
+
+                                        return TeacherStudentDetailScreen(
+                                          student: student,
+                                          classData: widget.classData,
+                                          subjectId: _selectedSubjectId!,
+                                          teacherId: teacherId,
+                                        );
+                                      },
                                     ),
                                   );
                                 },
@@ -1589,8 +1611,9 @@ class _GradeDialogState extends State<GradeDialog> {
                   if (v == null || v.isEmpty) return 'Informe a nota';
                   final value = double.tryParse(v);
                   if (value == null) return 'Nota deve ser um número';
-                  if (value < 0 || value > 10)
+                  if (value < 0 || value > 10) {
                     return 'Nota deve estar entre 0 e 10';
+                  }
                   return null;
                 },
               ),

@@ -618,9 +618,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   }
 
   List<String> _gerarOpcoesHorarioFim(String horaInicio) {
-    final horaInicioMinutos =
-        int.parse(horaInicio.split(':')[0]) * 60 +
-        int.parse(horaInicio.split(':')[1]);
+    // Remove a variável não utilizada horaInicioMinutos
     final horarioFimSugerido = _gerarHorarioIntermediario(horaInicio);
 
     // Se o horário sugerido já existe na lista, retorna apenas os horários existentes
@@ -647,12 +645,19 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     // Buscar subjects (matérias) da turma
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
     final turmaId = parent?.classData['id'] ?? '';
+
+    if (!mounted) return;
+
     final response = await http.get(
       Uri.parse('http://localhost:3000/classes/$turmaId'),
     );
+
+    if (!mounted) return;
+
     final turma = response.statusCode == 200 ? json.decode(response.body) : {};
     final List subjects = turma['subjects'] ?? [];
     final Map<String, List<Map<String, dynamic>>> professoresPorMateria = {};
+
     for (final subject in subjects) {
       final type = subject['type'];
       final teacher = subject['teacher'];
@@ -660,18 +665,23 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
         professoresPorMateria.putIfAbsent(type, () => []).add(teacher);
       }
     }
+
     final subjectTypesDisponiveis = professoresPorMateria.keys.toList();
 
     // Buscar eventos já cadastrados para a turma
+    if (!mounted) return;
+
     final eventsResponse = await http.get(
       Uri.parse('http://localhost:3000/classes/$turmaId/events'),
     );
+
+    if (!mounted) return;
+
     final List<Map<String, dynamic>> eventosExistentes =
         eventsResponse.statusCode == 200
             ? List<Map<String, dynamic>>.from(json.decode(eventsResponse.body))
             : [];
 
-    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) {
@@ -681,10 +691,6 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                 subjectType != null
                     ? professoresPorMateria[subjectType] ?? []
                     : [];
-
-            // Gera as opções de horário de fim com base no horário de início selecionado
-            final opcoesHorarioFim =
-                startTime != null ? _gerarOpcoesHorarioFim(startTime!) : [];
 
             return AlertDialog(
               title: const Text('Adicionar Aula'),
@@ -760,7 +766,6 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                           (v) => setState(() {
                             startTime = v;
                             if (v != null) {
-                              // Gera um horário de fim baseado na duração da aula
                               endTime = _gerarHorarioIntermediario(v);
                             }
                           }),
@@ -832,9 +837,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                               'endTime': endTime,
                               'date': null,
                             });
-                            if (context.mounted) {
-                              Navigator.of(context).pop();
-                            }
+                            Navigator.of(context).pop();
                           }
                           : null,
                   child: const Text('Salvar'),

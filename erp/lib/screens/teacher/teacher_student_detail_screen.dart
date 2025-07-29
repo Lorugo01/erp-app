@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../services/attendance_service.dart';
@@ -28,7 +26,7 @@ class TeacherStudentDetailScreen extends StatefulWidget {
 
 class _TeacherStudentDetailScreenState
     extends State<TeacherStudentDetailScreen> {
-  bool _loading = false;
+  final bool _loading = false;
   String? _error;
   List<Map<String, dynamic>> _periods = [];
   List<Map<String, dynamic>> _grades = [];
@@ -361,15 +359,85 @@ class _TeacherStudentDetailScreenState
               return 0;
             });
 
+          // Separar notas por tipo
+          final regularGrades =
+              sortedGrades
+                  .where(
+                    (g) =>
+                        ![
+                          'RECUPERACAO',
+                          'RECUPERACAO_FINAL',
+                        ].contains(g['typeId']),
+                  )
+                  .toList();
+
+          final recoveryGrade = sortedGrades.firstWhere(
+            (g) => g['typeId'] == 'RECUPERACAO',
+            orElse: () => <String, dynamic>{},
+          );
+
+          final finalRecoveryGrade = sortedGrades.firstWhere(
+            (g) => g['typeId'] == 'RECUPERACAO_FINAL',
+            orElse: () => <String, dynamic>{},
+          );
+
           // Encontrar a menor nota regular
-          final regularGrades = sortedGrades.where((g) => 
-            !['RECUPERACAO', 'RECUPERACAO_FINAL'].contains(g['typeId'])
-          ).toList();
-          
-          final minRegularGrade = regularGrades.isEmpty ? null : 
-            regularGrades.reduce((a, b) => 
-              (a['value'] ?? 0.0) < (b['value'] ?? 0.0) ? a : b
+          final minRegularGrade =
+              regularGrades.isEmpty
+                  ? null
+                  : regularGrades.reduce(
+                    (a, b) => (a['value'] ?? 0.0) < (b['value'] ?? 0.0) ? a : b,
+                  );
+
+          // Calcular média
+          double calculatedAverage = 0.0;
+          if (regularGrades.isNotEmpty) {
+            // Criar uma cópia das notas regulares
+            final gradesToAverage = List<Map<String, dynamic>>.from(
+              regularGrades,
             );
+
+            // Se houver nota de recuperação maior que a menor nota regular
+            if (minRegularGrade != null) {
+              final minRegularValue = minRegularGrade['value'] ?? 0.0;
+
+              // Verificar recuperação final primeiro
+              if (finalRecoveryGrade.isNotEmpty) {
+                final finalRecoveryValue = finalRecoveryGrade['value'] ?? 0.0;
+                if (finalRecoveryValue > minRegularValue) {
+                  // Substituir a menor nota pela recuperação final
+                  final index = gradesToAverage.indexOf(minRegularGrade);
+                  if (index != -1) {
+                    gradesToAverage[index] = {
+                      ...finalRecoveryGrade,
+                      'replacedGrade': true,
+                    };
+                  }
+                }
+              }
+              // Se não substituiu com recuperação final, tentar com recuperação normal
+              else if (recoveryGrade.isNotEmpty) {
+                final recoveryValue = recoveryGrade['value'] ?? 0.0;
+                if (recoveryValue > minRegularValue) {
+                  // Substituir a menor nota pela recuperação
+                  final index = gradesToAverage.indexOf(minRegularGrade);
+                  if (index != -1) {
+                    gradesToAverage[index] = {
+                      ...recoveryGrade,
+                      'replacedGrade': true,
+                    };
+                  }
+                }
+              }
+            }
+
+            // Calcular a média com as notas após possível substituição
+            final sum = gradesToAverage.fold<double>(
+              0.0,
+              (sum, grade) => sum + (grade['value'] ?? 0.0),
+            );
+            calculatedAverage = sum / gradesToAverage.length;
+          }
 
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
@@ -394,13 +462,11 @@ class _TeacherStudentDetailScreenState
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: _getGradeColor({
-                            'value': entry.value.first['calculatedAverage'],
-                          }),
+                          color: _getGradeColor({'value': calculatedAverage}),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'Média: ${entry.value.first['calculatedAverage']?.toStringAsFixed(1) ?? '-'}',
+                          'Média: ${calculatedAverage.toStringAsFixed(1)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -417,17 +483,21 @@ class _TeacherStudentDetailScreenState
                     orElse: () => {'name': 'Tipo não encontrado'},
                   );
 
-                  final isRecovery = grade['typeId'] == 'RECUPERACAO' || 
-                                   grade['typeId'] == 'RECUPERACAO_FINAL';
-                  
-                  final isReplacingGrade = isRecovery && grade['replacedGrade'] == true;
-                  final isBeingReplaced = minRegularGrade != null && 
-                                        grade == minRegularGrade &&
-                                        sortedGrades.any((g) => 
-                                          (g['typeId'] == 'RECUPERACAO' || 
-                                           g['typeId'] == 'RECUPERACAO_FINAL') &&
-                                          g['replacedGrade'] == true
-                                        );
+                  final isRecovery =
+                      grade['typeId'] == 'RECUPERACAO' ||
+                      grade['typeId'] == 'RECUPERACAO_FINAL';
+
+                  final isReplacingGrade =
+                      isRecovery && grade['replacedGrade'] == true;
+                  final isBeingReplaced =
+                      minRegularGrade != null &&
+                      grade == minRegularGrade &&
+                      sortedGrades.any(
+                        (g) =>
+                            (g['typeId'] == 'RECUPERACAO' ||
+                                g['typeId'] == 'RECUPERACAO_FINAL') &&
+                            g['replacedGrade'] == true,
+                      );
 
                   return ListTile(
                     title: Row(
@@ -436,8 +506,14 @@ class _TeacherStudentDetailScreenState
                           child: Text(
                             gradeType['name'],
                             style: TextStyle(
-                              fontStyle: isRecovery ? FontStyle.italic : FontStyle.normal,
-                              decoration: isBeingReplaced ? TextDecoration.lineThrough : null,
+                              fontStyle:
+                                  isRecovery
+                                      ? FontStyle.italic
+                                      : FontStyle.normal,
+                              decoration:
+                                  isBeingReplaced
+                                      ? TextDecoration.lineThrough
+                                      : null,
                             ),
                           ),
                         ),
@@ -449,7 +525,9 @@ class _TeacherStudentDetailScreenState
                             ),
                             margin: const EdgeInsets.only(right: 8),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.2),
+                              color: Colors.green.withAlpha(
+                                51,
+                              ), // 0.2 * 255 ≈ 51
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -476,7 +554,10 @@ class _TeacherStudentDetailScreenState
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          decoration: isBeingReplaced ? TextDecoration.lineThrough : null,
+                          decoration:
+                              isBeingReplaced
+                                  ? TextDecoration.lineThrough
+                                  : null,
                         ),
                       ),
                     ),
@@ -588,26 +669,29 @@ class _TeacherStudentDetailScreenState
       switch (concept) {
         case 'A':
         case 'MB':
-          return Colors.green;
+          return Colors.green.withAlpha(204);
         case 'B':
-          return Colors.blue;
+          return Colors.blue.withAlpha(204);
         case 'C':
         case 'R':
-          return Colors.orange;
+          return Colors.orange.withAlpha(204);
         case 'D':
         case 'I':
-          return Colors.red;
+          return Colors.red.withAlpha(204);
         default:
-          return Colors.grey;
+          return Colors.grey.withAlpha(204);
       }
     } else if (grade['value'] != null) {
       final value = (grade['value'] as num).toDouble();
-      if (value >= 8.0) return Colors.green;
-      if (value >= 6.0) return Colors.blue;
-      if (value >= 4.0) return Colors.orange;
-      return Colors.red;
+      if (value >= 7.0) {
+        return Colors.green.withAlpha(204);
+      } else if (value >= 5.0) {
+        return Colors.orange.withAlpha(204);
+      } else {
+        return Colors.red.withAlpha(204);
+      }
     }
-    return Colors.grey;
+    return Colors.grey.withAlpha(204);
   }
 
   String _getGradeDisplayText(Map<String, dynamic> grade) {

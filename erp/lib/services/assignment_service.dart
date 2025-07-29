@@ -1,5 +1,6 @@
-import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class AssignmentService {
   static const String baseUrl = 'http://localhost:3000';
@@ -7,17 +8,22 @@ class AssignmentService {
   static Future<List<Map<String, dynamic>>> getAssignmentsByClass(
     String classId,
   ) async {
-    print('Fazendo requisição para: $baseUrl/classes/$classId/assignments');
-    final response = await http.get(
-      Uri.parse('$baseUrl/classes/$classId/assignments'),
-    );
-    print('Status code: ${response.statusCode}');
-    print('Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
-    } else {
-      print('Erro na requisição: ${response.statusCode} - ${response.body}');
+    debugPrint('Buscando atividades da turma: $classId');
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/classes/$classId/assignments'),
+      );
+      debugPrint('Status da resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      } else {
+        debugPrint('Erro ao buscar atividades: ${response.body}');
+        throw Exception('Erro ao buscar atividades');
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar atividades: $e');
       throw Exception('Erro ao buscar atividades');
     }
   }
@@ -26,19 +32,24 @@ class AssignmentService {
     String classId,
     String subjectId,
   ) async {
-    print(
-      'Fazendo requisição para: $baseUrl/classes/$classId/assignments?subjectId=$subjectId',
-    );
-    final response = await http.get(
-      Uri.parse('$baseUrl/classes/$classId/assignments?subjectId=$subjectId'),
-    );
-    print('Status code: ${response.statusCode}');
-    print('Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
-    } else {
-      print('Erro na requisição: ${response.statusCode} - ${response.body}');
+    debugPrint('Buscando atividades da turma $classId e disciplina $subjectId');
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/classes/$classId/assignments?subjectId=$subjectId',
+        ),
+      );
+      debugPrint('Status da resposta: ${response.statusCode}');
+      debugPrint('Corpo da resposta: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(json.decode(response.body));
+      } else {
+        debugPrint('Erro ao buscar atividades: ${response.body}');
+        throw Exception('Erro ao buscar atividades');
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar atividades: $e');
       throw Exception('Erro ao buscar atividades');
     }
   }
