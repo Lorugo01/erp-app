@@ -13,7 +13,10 @@ class ClassDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF2953A5),
-        title: Text(classData['name'] ?? 'Turma'),
+        title: Text(
+          classData['name'] ?? 'Turma',
+          style: const TextStyle(color: Colors.white),
+        ),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -120,6 +123,7 @@ class _WeeklyScheduleTab extends StatefulWidget {
 
 class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   List<Map<String, dynamic>> events = [];
+  List<Map<String, dynamic>> professores = [];
   final List<String> weekDays = [
     'Segunda',
     'Terça',
@@ -158,7 +162,12 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   void initState() {
     super.initState();
     _gerarHorarios();
+    _garantirHorariosMinimos();
     fetchEvents();
+    fetchProfessores();
+
+    // Debug: verifica os horários após inicialização
+    debugPrint('Horários após initState: $horarios');
   }
 
   void _gerarHorarios() {
@@ -170,79 +179,88 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
     switch (turno) {
       case 'MATUTINO':
-        horaInicio = 7;
-        horaFim = 12;
+        horaInicio = 6; // 1 hora antes do limite
+        horaFim = 13; // 1 hora depois do limite
         break;
       case 'VESPERTINO':
-        horaInicio = 13;
-        horaFim = 17;
+        horaInicio = 12; // 1 hora antes do limite
+        horaFim = 18; // 1 hora depois do limite
         break;
       case 'NOTURNO':
-        horaInicio = 18;
-        horaFim = 22;
+        horaInicio = 17; // 1 hora antes do limite
+        horaFim = 23; // 1 hora depois do limite
         break;
       case 'INTEGRAL':
-        horaInicio = 7; // Começa no mesmo horário do matutino
-        horaFim = 22; // Termina no mesmo horário do noturno
+        horaInicio = 6; // 1 hora antes do limite
+        horaFim = 23; // 1 hora depois do limite
         break;
       default:
-        horaInicio = 7;
-        horaFim = 12;
+        horaInicio = 6;
+        horaFim = 13;
     }
 
-    // Inicialmente, gera apenas as horas cheias
-    horarios = [];
+    // Gera horários de 30 em 30 minutos
+    final Set<String> horariosSet = {};
     for (int hora = horaInicio; hora <= horaFim; hora++) {
-      horarios.add('${hora.toString().padLeft(2, '0')}:00');
-    }
-
-    // Para o turno integral, adiciona também os horários intermediários padrão
-    if (turno == 'INTEGRAL') {
-      // Adiciona horários de intervalo entre turnos
-      horarios.addAll([
-        '12:00', // Fim do turno matutino
-        '13:00', // Início do turno vespertino
-        '17:00', // Fim do turno vespertino
-        '18:00', // Início do turno noturno
-      ]);
-      horarios = horarios.toSet().toList(); // Remove duplicatas
-      horarios.sort(); // Ordena os horários
+      horariosSet.add('${hora.toString().padLeft(2, '0')}:00');
+      if (hora < horaFim) {
+        horariosSet.add('${hora.toString().padLeft(2, '0')}:30');
+      }
     }
 
     // Adiciona horários existentes nos eventos
     for (var evento in events) {
       final startTime = evento['startTime'];
       final endTime = evento['endTime'];
-      if (startTime != null && !horarios.contains(startTime)) {
-        _inserirHorarioOrdenado(startTime);
+      if (startTime != null) {
+        horariosSet.add(startTime);
       }
-      if (endTime != null && !horarios.contains(endTime)) {
-        _inserirHorarioOrdenado(endTime);
+      if (endTime != null) {
+        horariosSet.add(endTime);
       }
     }
+
+    // Converte para lista ordenada
+    horarios = horariosSet.toList()..sort();
+
+    // Debug: verifica se os horários estão sendo gerados
+    debugPrint('Horários gerados: $horarios');
+    debugPrint('Quantidade de horários: ${horarios.length}');
+
+    // Garante que sempre há pelo menos 2 horários disponíveis
+    _garantirHorariosMinimos();
   }
 
-  void _inserirHorarioOrdenado(String novoHorario) {
-    // Encontra a posição correta para inserir o novo horário
-    int indice = 0;
-    while (indice < horarios.length &&
-        horarios[indice].compareTo(novoHorario) < 0) {
-      indice++;
-    }
-    if (indice == horarios.length) {
-      horarios.add(novoHorario);
-    } else {
-      horarios.insert(indice, novoHorario);
+  void _garantirHorariosMinimos() {
+    if (horarios.isEmpty) {
+      horarios = ['07:00', '07:30'];
+    } else if (horarios.length == 1) {
+      final primeiroHorario = horarios.first;
+      final partes = primeiroHorario.split(':');
+      final hora = int.parse(partes[0]);
+      final minuto = int.parse(partes[1]);
+      final proximoMinuto = minuto + 30;
+      final proximaHora = hora + (proximoMinuto ~/ 60);
+      final minutoFinal = proximoMinuto % 60;
+      horarios.add(
+        '${proximaHora.toString().padLeft(2, '0')}:${minutoFinal.toString().padLeft(2, '0')}',
+      );
+      // Reordena após adicionar
+      horarios.sort();
     }
   }
 
   void _atualizarHorariosComNovoEvento(String startTime, String endTime) {
+    // Adiciona horários de início e fim se não existirem
     if (!horarios.contains(startTime)) {
-      _inserirHorarioOrdenado(startTime);
+      horarios.add(startTime);
     }
     if (!horarios.contains(endTime)) {
-      _inserirHorarioOrdenado(endTime);
+      horarios.add(endTime);
     }
+
+    // Remove duplicatas e ordena
+    horarios = horarios.toSet().toList()..sort();
     setState(() {}); // Atualiza a tabela com os novos horários
   }
 
@@ -257,6 +275,12 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
         events = List<Map<String, dynamic>>.from(json.decode(response.body));
       });
       _gerarHorarios(); // Atualiza a lista de horários após carregar eventos
+      _garantirHorariosMinimos();
+
+      // Garante que não há duplicatas após carregar eventos
+      setState(() {
+        horarios = horarios.toSet().toList()..sort();
+      });
     }
   }
 
@@ -345,11 +369,16 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   }
 
   void _showEditEventDialog(Map<String, dynamic> evento) {
+    // Garante que há horários disponíveis antes de abrir o diálogo
+    _garantirHorariosMinimos();
+
     String? subjectType = evento['title'];
     String? description = evento['description'];
     int dayOfWeek = evento['dayOfWeek'] ?? 1;
-    String startTime = evento['startTime'] ?? horarios.first;
-    String endTime = evento['endTime'] ?? horarios[1];
+    String startTime =
+        evento['startTime'] ?? (horarios.isNotEmpty ? horarios.first : '07:00');
+    String endTime =
+        evento['endTime'] ?? (horarios.length > 1 ? horarios[1] : '07:50');
     showDialog(
       context: context,
       builder: (context) {
@@ -396,25 +425,39 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                   decoration: const InputDecoration(labelText: 'Dia da Semana'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: startTime,
+                  value:
+                      horarios.contains(startTime)
+                          ? startTime
+                          : (horarios.isNotEmpty ? horarios.first : null),
                   items:
                       horarios
                           .map(
                             (h) => DropdownMenuItem(value: h, child: Text(h)),
                           )
                           .toList(),
-                  onChanged: (v) => startTime = v ?? horarios.first,
+                  onChanged:
+                      (v) =>
+                          startTime =
+                              v ??
+                              (horarios.isNotEmpty ? horarios.first : '07:00'),
                   decoration: const InputDecoration(labelText: 'Início'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: endTime,
+                  value:
+                      horarios.contains(endTime)
+                          ? endTime
+                          : (horarios.length > 1 ? horarios[1] : null),
                   items:
                       horarios
                           .map(
                             (h) => DropdownMenuItem(value: h, child: Text(h)),
                           )
                           .toList(),
-                  onChanged: (v) => endTime = v ?? horarios[1],
+                  onChanged:
+                      (v) =>
+                          endTime =
+                              v ??
+                              (horarios.length > 1 ? horarios[1] : '07:50'),
                   decoration: const InputDecoration(labelText: 'Fim'),
                 ),
               ],
@@ -461,6 +504,16 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Garante que sempre há horários disponíveis antes de renderizar
+    _garantirHorariosMinimos();
+
+    // Garante que não há duplicatas antes de renderizar
+    horarios = horarios.toSet().toList()..sort();
+
+    // Debug: verifica os horários antes de renderizar
+    debugPrint('Horários antes de renderizar: $horarios');
+    debugPrint('Quantidade de horários: ${horarios.length}');
+
     return Column(
       children: [
         Row(
@@ -503,7 +556,10 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                     scrollDirection: Axis.vertical,
                     child: Table(
                       border: TableBorder.all(color: Colors.grey[300]!),
-                      defaultColumnWidth: FixedColumnWidth(120),
+                      columnWidths: const {0: FixedColumnWidth(80)},
+                      defaultColumnWidth: FixedColumnWidth(90),
+                      defaultVerticalAlignment:
+                          TableCellVerticalAlignment.middle,
                       children: [
                         TableRow(
                           children: [
@@ -532,58 +588,118 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                         ...horarios.map((horario) {
                           return TableRow(
                             children: [
-                              TableCell(child: Center(child: Text(horario))),
+                              TableCell(
+                                child: SizedBox(
+                                  height: 45,
+                                  width: 80,
+                                  child: Center(
+                                    child: Text(
+                                      horario,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               ...List.generate(7, (dia) {
-                                final celulaEventos =
-                                    events
-                                        .where(
-                                          (e) =>
-                                              e['dayOfWeek'] == dia + 1 &&
-                                              e['startTime'] == horario &&
-                                              e['date'] == null,
-                                        )
-                                        .toList();
-                                return TableCell(
-                                  child:
-                                      celulaEventos.isEmpty
-                                          ? const SizedBox.shrink()
-                                          : Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children:
-                                                celulaEventos
-                                                    .map(
-                                                      (evento) => Padding(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              vertical: 2,
-                                                            ),
-                                                        child: GestureDetector(
-                                                          onDoubleTap:
-                                                              () =>
-                                                                  _showEditEventDialog(
-                                                                    evento,
-                                                                  ),
-                                                          child: Text(
-                                                            evento['title']
-                                                                    ?.replaceAll(
-                                                                      '_',
-                                                                      ' ',
-                                                                    ) ??
-                                                                '',
-                                                            style:
-                                                                const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    )
-                                                    .toList(),
+                                // Verifica se este horário está dentro do intervalo de algum evento
+                                Map<String, dynamic>? evento;
+                                try {
+                                  evento = events.firstWhere((e) {
+                                    if (e['dayOfWeek'] != dia + 1 ||
+                                        e['date'] != null) {
+                                      return false;
+                                    }
+                                    final startIndex = horarios.indexOf(
+                                      e['startTime'],
+                                    );
+                                    final endIndex = horarios.indexOf(
+                                      e['endTime'],
+                                    );
+                                    final currentIndex = horarios.indexOf(
+                                      horario,
+                                    );
+                                    return startIndex != -1 &&
+                                        endIndex != -1 &&
+                                        currentIndex >= startIndex &&
+                                        currentIndex <= endIndex;
+                                  });
+                                } catch (e) {
+                                  evento = null;
+                                }
+
+                                if (evento != null) {
+                                  // Renderiza o evento em cada célula do intervalo
+
+                                  return TableCell(
+                                    child: GestureDetector(
+                                      onDoubleTap:
+                                          () => _showEditEventDialog(evento!),
+                                      child: Container(
+                                        height: 45,
+                                        margin: const EdgeInsets.symmetric(
+                                          vertical: 1,
+                                          horizontal: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF2953A5,
+                                          ).withAlpha(100),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
                                           ),
-                                );
+                                          border: Border.all(
+                                            color: const Color(0xFF2953A5),
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(1),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              evento['title']?.replaceAll(
+                                                    '_',
+                                                    ' ',
+                                                  ) ??
+                                                  '',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                            ),
+                                            if (evento['description'] != null)
+                                              Text(
+                                                evento['description'],
+                                                style: const TextStyle(
+                                                  fontSize: 7,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            Text(
+                                              _getTeacherName(evento),
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  // Célula normal vazia
+                                  return const TableCell(
+                                    child: SizedBox.shrink(),
+                                  );
+                                }
                               }),
                             ],
                           );
@@ -607,7 +723,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     final minutos = int.parse(partes[1]);
     final totalMinutos = horas * 60 + minutos;
 
-    // Adiciona a duração da aula
+    // Adiciona 50 minutos (duração padrão da aula)
     final novoTotalMinutos = totalMinutos + duracaoAula;
 
     // Converte de volta para formato de hora
@@ -618,29 +734,84 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   }
 
   List<String> _gerarOpcoesHorarioFim(String horaInicio) {
-    // Remove a variável não utilizada horaInicioMinutos
-    final horarioFimSugerido = _gerarHorarioIntermediario(horaInicio);
+    // Garante que há horários disponíveis
+    _garantirHorariosMinimos();
 
-    // Se o horário sugerido já existe na lista, retorna apenas os horários existentes
-    if (horarios.contains(horarioFimSugerido)) {
-      return horarios.where((h) => h.compareTo(horaInicio) > 0).toList();
+    // Retorna todos os horários que vêm depois do horário de início
+    final opcoes = horarios.where((h) => h.compareTo(horaInicio) > 0).toList();
+
+    // Se não há opções, gera um horário padrão
+    if (opcoes.isEmpty) {
+      try {
+        final partes = horaInicio.split(':');
+        if (partes.length >= 2) {
+          final hora = int.parse(partes[0]);
+          final minuto = int.parse(partes[1]);
+          final proximoMinuto = minuto + 30;
+          final proximaHora = hora + (proximoMinuto ~/ 60);
+          final minutoFinal = proximoMinuto % 60;
+          return [
+            '${proximaHora.toString().padLeft(2, '0')}:${minutoFinal.toString().padLeft(2, '0')}',
+          ];
+        }
+      } catch (e) {
+        // Se houver erro ao processar o horário, retorna um horário padrão
+        debugPrint('Erro ao processar horário: $horaInicio - $e');
+      }
+
+      // Fallback: retorna um horário padrão
+      return ['07:30'];
     }
 
-    // Caso contrário, adiciona o novo horário à lista de opções
-    final opcoesHorario = [
-      ...horarios.where((h) => h.compareTo(horaInicio) > 0),
-    ];
-    opcoesHorario.add(horarioFimSugerido);
-    opcoesHorario.sort();
-    return opcoesHorario;
+    return opcoes;
+  }
+
+  Future<void> fetchProfessores() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://localhost:3000/teachers'),
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          professores = List<Map<String, dynamic>>.from(
+            json.decode(response.body),
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar professores: $e');
+    }
+  }
+
+  String _getTeacherName(Map<String, dynamic> evento) {
+    // Se o evento tem dados do professor diretamente
+    if (evento['teacher'] != null && evento['teacher']['name'] != null) {
+      return evento['teacher']['name'];
+    }
+
+    // Se tem teacherId, busca o professor na lista
+    if (evento['teacherId'] != null) {
+      final professor = professores.firstWhere(
+        (p) => p['id'] == evento['teacherId'],
+        orElse: () => {},
+      );
+      if (professor.isNotEmpty && professor['name'] != null) {
+        return professor['name'];
+      }
+    }
+
+    return 'Professor não definido';
   }
 
   void _showAddEventDialog() async {
+    // Garante que há horários disponíveis antes de abrir o diálogo
+    _garantirHorariosMinimos();
+
     String? subjectType;
     String? teacherId;
     int dayOfWeek = 1;
-    String? startTime;
-    String? endTime;
+    String startTime = horarios.isNotEmpty ? horarios.first : '07:00';
+    String endTime = horarios.length > 1 ? horarios[1] : '07:30';
 
     // Buscar subjects (matérias) da turma
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
@@ -754,7 +925,10 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                       ),
                     ),
                     DropdownButtonFormField<String>(
-                      value: startTime,
+                      value:
+                          horarios.contains(startTime)
+                              ? startTime
+                              : (horarios.isNotEmpty ? horarios.first : null),
                       items:
                           horarios
                               .map(
@@ -764,7 +938,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                               .toList(),
                       onChanged:
                           (v) => setState(() {
-                            startTime = v;
+                            startTime = v ?? startTime;
                             if (v != null) {
                               endTime = _gerarHorarioIntermediario(v);
                             }
@@ -772,19 +946,20 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                       decoration: const InputDecoration(labelText: 'Início'),
                     ),
                     DropdownButtonFormField<String>(
-                      value: endTime,
+                      value:
+                          _gerarOpcoesHorarioFim(startTime).contains(endTime)
+                              ? endTime
+                              : (_gerarOpcoesHorarioFim(startTime).isNotEmpty
+                                  ? _gerarOpcoesHorarioFim(startTime).first
+                                  : null),
                       items:
-                          startTime != null
-                              ? _gerarOpcoesHorarioFim(startTime!)
-                                  .map(
-                                    (h) => DropdownMenuItem(
-                                      value: h,
-                                      child: Text(h),
-                                    ),
-                                  )
-                                  .toList()
-                              : [],
-                      onChanged: (v) => setState(() => endTime = v),
+                          _gerarOpcoesHorarioFim(startTime)
+                              .map(
+                                (h) =>
+                                    DropdownMenuItem(value: h, child: Text(h)),
+                              )
+                              .toList(),
+                      onChanged: (v) => setState(() => endTime = v ?? endTime),
                       decoration: const InputDecoration(labelText: 'Fim'),
                     ),
                   ],
@@ -797,10 +972,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                 ),
                 ElevatedButton(
                   onPressed:
-                      subjectType != null &&
-                              teacherId != null &&
-                              startTime != null &&
-                              endTime != null
+                      subjectType != null && teacherId != null
                           ? () {
                             // Validação: não pode haver duas aulas no mesmo dia e horário
                             final conflito = eventosExistentes.any(

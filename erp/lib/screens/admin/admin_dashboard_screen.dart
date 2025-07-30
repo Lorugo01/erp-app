@@ -1249,7 +1249,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     } else if (_selectedIndex == 4) {
                       _showAddClassDialog();
                     } else if (_selectedIndex == 5) {
-                      // TODO: ação de adicionar equipamento
+                      // Funcionalidade de equipamentos em desenvolvimento
                     }
                   },
                   child: const Icon(Icons.add, size: 36, color: Colors.white),
@@ -1743,11 +1743,20 @@ class _StudentCardGrid extends StatelessWidget {
                 CircleAvatar(
                   radius: isSmall ? 24 : 32,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: isSmall ? 28 : 40,
-                    color: const Color(0xFF2953A5),
-                  ),
+                  backgroundImage:
+                      student.profilePicture != null
+                          ? NetworkImage(
+                            'http://localhost:3000${student.profilePicture}',
+                          )
+                          : null,
+                  child:
+                      student.profilePicture == null
+                          ? Icon(
+                            Icons.person,
+                            size: isSmall ? 28 : 40,
+                            color: const Color(0xFF2953A5),
+                          )
+                          : null,
                 ),
                 Expanded(
                   child: Align(
@@ -1945,16 +1954,27 @@ class _UserCardGrid extends StatelessWidget {
                           ? 18
                           : 24,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size:
-                        isVerySmall
-                            ? 16
-                            : isSmall
-                            ? 18
-                            : 24,
-                    color: const Color(0xFF2953A5),
-                  ),
+                  backgroundImage:
+                      user.photoUrl != null
+                          ? NetworkImage(
+                            user.photoUrl!.startsWith('http')
+                                ? user.photoUrl!
+                                : 'http://localhost:3000${user.photoUrl}',
+                          )
+                          : null,
+                  child:
+                      user.photoUrl == null
+                          ? Icon(
+                            Icons.person,
+                            size:
+                                isVerySmall
+                                    ? 16
+                                    : isSmall
+                                    ? 18
+                                    : 24,
+                            color: const Color(0xFF2953A5),
+                          )
+                          : null,
                 ),
                 Expanded(
                   child: Align(

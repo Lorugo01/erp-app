@@ -10,6 +10,7 @@ router.get('/:id', StudentController.getById);
 router.get('/search/:name', StudentController.getByName);
 router.get('/registration/:registrationNumber', StudentController.getByRegistrationNumber);
 router.get('/:id/current-class', StudentController.getCurrentClass);
+router.get('/:studentId/subjects', StudentController.getStudentSubjects);
 
 router.post('/', StudentController.create);
 router.put('/:id', StudentController.update);

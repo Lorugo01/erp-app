@@ -187,11 +187,12 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
 
                                 final response = await http.post(
                                   Uri.parse(
-                                    'http://localhost:3000/classes/$classId/enrollments',
+                                    'http://localhost:3000/enrollments',
                                   ),
                                   headers: {'Content-Type': 'application/json'},
                                   body: jsonEncode({
                                     'studentId': studentId,
+                                    'classId': classId,
                                     'year': year,
                                   }),
                                 );

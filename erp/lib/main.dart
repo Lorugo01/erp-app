@@ -54,15 +54,7 @@ class _AuthFlowState extends State<AuthFlow> {
         return TeacherDashboardScreen();
       }
       if (authProvider.user!.isStudent) {
-        final student = authProvider.user!.student;
-        return StudentDashboardScreen(
-          name: student?.name ?? authProvider.user!.email,
-          registrationNumber: student?.registrationNumber ?? '-',
-          profilePictureUrl: student?.profilePicture,
-          absences: 0,
-          messages: 0,
-          todayClasses: 0,
-        );
+        return StudentDashboardScreen();
       }
       if (authProvider.user!.isAdmin) {
         return const AdminDashboardScreen();

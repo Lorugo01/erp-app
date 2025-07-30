@@ -131,4 +131,40 @@ class AttendanceService {
       throw Exception('Erro ao buscar frequência do aluno');
     }
   }
+
+  // Método para calcular total de faltas de um aluno
+  static Future<int> getStudentAbsences(String studentId) async {
+    try {
+      final attendances = await getAttendanceByStudent(studentId);
+      // Conta apenas as faltas (present: false)
+      return attendances
+          .where((attendance) => attendance['present'] == false)
+          .length;
+    } catch (e) {
+      throw Exception('Erro ao calcular faltas do aluno: $e');
+    }
+  }
+
+  // Método para buscar estatísticas de frequência do aluno
+  static Future<Map<String, dynamic>> getStudentAttendanceStats(
+    String studentId,
+  ) async {
+    try {
+      final attendances = await getAttendanceByStudent(studentId);
+
+      final total = attendances.length;
+      final present = attendances.where((a) => a['present'] == true).length;
+      final absent = attendances.where((a) => a['present'] == false).length;
+      final percentage = total > 0 ? (present / total * 100).round() : 0;
+
+      return {
+        'total': total,
+        'present': present,
+        'absent': absent,
+        'percentage': percentage,
+      };
+    } catch (e) {
+      throw Exception('Erro ao buscar estatísticas de frequência: $e');
+    }
+  }
 }

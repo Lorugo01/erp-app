@@ -55,6 +55,16 @@ export const getByUserId = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const getStudentSubjects = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { studentId } = req.params;
+    const subjects = await StudentService.getStudentSubjects(studentId);
+    res.json(subjects);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const create = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, registrationNumber } = req.body;

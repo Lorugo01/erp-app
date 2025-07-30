@@ -195,17 +195,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: Implementar edição
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Funcionalidade de edição em desenvolvimento',
-                          ),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
-                    },
+                    onPressed: () => _showEditUserDialog(),
                     icon: const Icon(Icons.edit),
                     label: const Text('Editar Usuário'),
                     style: ElevatedButton.styleFrom(
@@ -508,19 +498,53 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         }
                       }
 
-                      // TODO: Implementar atualização do usuário
-                      // Por enquanto, apenas fecha o diálogo
-                      // ignore: use_build_context_synchronously
-                      Navigator.of(context).pop();
-                      // ignore: use_build_context_synchronously
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Funcionalidade de atualização em desenvolvimento',
+                      // Implementar atualização do usuário
+                      try {
+                        final response = await http.put(
+                          Uri.parse(
+                            'http://localhost:3000/users/${widget.user.id}',
                           ),
-                          backgroundColor: Colors.orange,
-                        ),
-                      );
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode(updatedData),
+                        );
+
+                        if (response.statusCode == 200) {
+                          jsonDecode(response.body);
+
+                          // Atualizar dados locais da tela
+                          setState(() {
+                            // Atualizar os dados do usuário na tela
+                            // Como widget.user é final, vamos atualizar apenas os dados exibidos
+                            // Os dados serão atualizados quando a tela for recarregada
+                          });
+
+                          // ignore: use_build_context_synchronously
+                          Navigator.of(context).pop();
+                          // ignore: use_build_context_synchronously
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Usuário atualizado com sucesso!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          final error = jsonDecode(response.body);
+                          throw Exception(
+                            error['error'] ?? 'Erro ao atualizar usuário',
+                          );
+                        }
+                      } catch (e) {
+                        // ignore: use_build_context_synchronously
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Erro ao atualizar usuário: ${e.toString()}',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
                     } catch (e) {
                       if (!mounted) return;
                       // ignore: use_build_context_synchronously

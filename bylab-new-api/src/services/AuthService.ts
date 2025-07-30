@@ -63,13 +63,15 @@ export class AuthService {
           select: {
             id: true,
             name: true,
-            registrationNumber: true
+            registrationNumber: true,
+            profilePicture: true,
           }
         },
         teacher: {
           select: {
             id: true,
-            name: true
+            name: true,
+            photoUrl: true,
           }
         }
       }
@@ -102,12 +104,15 @@ export class AuthService {
           select: {
             id: true,
             name: true,
+            registrationNumber: true,
+            profilePicture: true,
           },
         },
         teacher: {
           select: {
             id: true,
             name: true,
+            photoUrl: true,
           },
         },
       },

@@ -6,7 +6,12 @@ const prisma = new PrismaClient();
 
 export const getAllUsers = async (_: Request, res: Response) => {
   const users = await prisma.user.findMany({
-    include: {
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      photoUrl: true,
+      createdAt: true,
       student: {
         select: {
           id: true,
@@ -38,7 +43,12 @@ export const getById = async (req: Request, res: Response) => {
     
     const user = await prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        photoUrl: true,
+        createdAt: true,
         student: {
           select: {
             id: true,
@@ -74,7 +84,12 @@ export const getUserById = async (req: Request, res: Response) => {
     
     const user = await prisma.user.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        photoUrl: true,
+        createdAt: true,
         student: {
           select: {
             id: true,

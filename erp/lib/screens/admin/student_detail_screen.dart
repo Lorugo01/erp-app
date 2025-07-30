@@ -1119,20 +1119,71 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         }
                       }
 
-                      // TODO: Implementar atualização do aluno
-                      // Por enquanto, apenas fecha o diálogo
-                      if (mounted) {
-                        // ignore: use_build_context_synchronously
-                        Navigator.of(context).pop();
-                        // ignore: use_build_context_synchronously
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Funcionalidade de atualização em desenvolvimento',
-                            ),
-                            backgroundColor: Colors.orange,
+                      // Implementar atualização do aluno
+                      try {
+                        final response = await http.put(
+                          Uri.parse(
+                            'http://localhost:3000/students/${widget.student.id}',
                           ),
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode(updatedData),
                         );
+
+                        if (response.statusCode == 200) {
+                          final updatedStudent = jsonDecode(response.body);
+
+                          // Atualizar dados locais da tela
+                          setState(() {
+                            // Atualizar os detalhes do aluno na tela
+                            if (_studentDetails != null) {
+                              _studentDetails = {
+                                ..._studentDetails!,
+                                'name':
+                                    updatedStudent['name'] ??
+                                    widget.student.name,
+                                'email':
+                                    updatedStudent['email'] ??
+                                    widget.student.email,
+                                'registrationNumber':
+                                    updatedStudent['registrationNumber'] ??
+                                    widget.student.registrationNumber,
+                                if (updatedStudent['profilePicture'] != null)
+                                  'profilePicture':
+                                      updatedStudent['profilePicture'],
+                              };
+                            }
+                          });
+
+                          if (mounted) {
+                            // ignore: use_build_context_synchronously
+                            Navigator.of(context).pop();
+                            // ignore: use_build_context_synchronously
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Aluno atualizado com sucesso!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } else {
+                          final error = jsonDecode(response.body);
+                          throw Exception(
+                            error['error'] ?? 'Erro ao atualizar aluno',
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          // ignore: use_build_context_synchronously
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Erro ao atualizar aluno: ${e.toString()}',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
                       }
                     } catch (e) {
                       if (!mounted) return;

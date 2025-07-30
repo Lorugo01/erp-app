@@ -63,4 +63,18 @@ class StudentService {
       throw Exception('Erro ao buscar alunos por nome');
     }
   }
+
+  static Future<List<Map<String, dynamic>>> getStudentSubjects(
+    String studentId,
+  ) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/students/$studentId/subjects'),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar disciplinas do aluno');
+    }
+  }
 }

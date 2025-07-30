@@ -244,9 +244,32 @@ export const getStudentByUserId = async (userId: string) => {
     include: {
       enrollments: {
         orderBy: { year: 'desc' },
-        include: { class: true }
+        include: { 
+          class: { 
+            include: { 
+              subjects: {
+                include: {
+                  teacher: {
+                    select: {
+                      id: true,
+                      name: true,
+                      photoUrl: true
+                    }
+                  }
+                }
+              } 
+            } 
+          } 
+        }
       },
-      attendances: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          createdAt: true
+        }
+      }
     },
   });
 
@@ -255,6 +278,61 @@ export const getStudentByUserId = async (userId: string) => {
   }
 
   return student;
+};
+
+export const getStudentSubjects = async (studentId: string) => {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: {
+      enrollments: {
+        where: { current: true },
+        include: { 
+          class: { 
+            include: { 
+              subjects: {
+                include: {
+                  teacher: {
+                    select: {
+                      id: true,
+                      name: true,
+                      photoUrl: true
+                    }
+                  }
+                }
+              } 
+            } 
+          } 
+        }
+      }
+    },
+  });
+
+  if (!student) {
+    throw new Error('Estudante não encontrado');
+  }
+
+  // Extrai as disciplinas das turmas atuais do aluno
+  const subjects = student.enrollments
+    .flatMap(enrollment => enrollment.class?.subjects || [])
+    .filter(subject => subject != null)
+    .map(subject => ({
+      id: subject.id,
+      name: subject.name,
+      type: subject.type,
+      teacher: subject.teacher ? {
+        id: subject.teacher.id,
+        name: subject.teacher.name,
+        photoUrl: subject.teacher.photoUrl
+      } : null,
+      class: subject.class ? {
+        id: subject.class.id,
+        name: subject.class.name,
+        grade: subject.class.grade,
+        letter: subject.class.letter
+      } : null
+    }));
+
+  return subjects;
 };
 
 export const uploadStudentPhoto = async (studentId: string, tempFilePath: string): Promise<string> => {
