@@ -27,7 +27,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
     final classId = widget.classData['id'];
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/classes/$classId'),
+        Uri.parse('http://192.168.18.15:3000/classes/$classId'),
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
@@ -47,7 +47,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
       final messenger = ScaffoldMessenger.of(context);
 
       await http.delete(
-        Uri.parse('http://localhost:3000/enrollments/$enrollmentId'),
+        Uri.parse('http://192.168.18.15:3000/enrollments/$enrollmentId'),
       );
       await _fetchEnrollments();
 
@@ -187,7 +187,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
 
                                 final response = await http.post(
                                   Uri.parse(
-                                    'http://localhost:3000/enrollments',
+                                    'http://192.168.18.15:3000/enrollments',
                                   ),
                                   headers: {'Content-Type': 'application/json'},
                                   body: jsonEncode({

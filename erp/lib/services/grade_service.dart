@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class GradeService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
 
   // Buscar todas as notas
   static Future<List<Map<String, dynamic>>> getAllGrades() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/grades'),
-    );
+    final response = await http.get(Uri.parse('$baseUrl/grades'));
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
@@ -110,9 +108,7 @@ class GradeService {
 
   // Deletar nota
   static Future<void> deleteGrade(String gradeId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/grades/$gradeId'),
-    );
+    final response = await http.delete(Uri.parse('$baseUrl/grades/$gradeId'));
     if (response.statusCode != 204) {
       throw Exception('Erro ao deletar nota');
     }

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/user.dart';
 
 class UserService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
   static const String usersEndpoint = '/users';
   static const String authEndpoint = '/auth';
 

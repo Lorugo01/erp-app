@@ -26,7 +26,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     final classId = widget.classData['id'];
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/classes/$classId'),
+        Uri.parse('http://192.168.18.15:3000/classes/$classId'),
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
@@ -39,7 +39,9 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
   }
 
   Future<void> _removeSubject(String subjectId) async {
-    await http.delete(Uri.parse('http://localhost:3000/subjects/$subjectId'));
+    await http.delete(
+      Uri.parse('http://192.168.18.15:3000/subjects/$subjectId'),
+    );
     await _fetchSubjects();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -150,7 +152,9 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                 int success = 0;
                                 for (final subjectType in selectedSubjects) {
                                   final response = await http.post(
-                                    Uri.parse('http://localhost:3000/subjects'),
+                                    Uri.parse(
+                                      'http://192.168.18.15:3000/subjects',
+                                    ),
                                     headers: {
                                       'Content-Type': 'application/json',
                                     },
@@ -271,7 +275,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     backgroundImage:
                                         teacher['photoUrl'] != null
                                             ? NetworkImage(
-                                              'http://localhost:3000${teacher['photoUrl']}',
+                                              'http://192.168.18.15:3000${teacher['photoUrl']}',
                                             )
                                             : null,
                                     child:

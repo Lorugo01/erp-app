@@ -227,7 +227,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     }
 
     debugPrint(
-      'Fazendo requisição para: http://localhost:3000/teachers/$teacherId/classes',
+      'Fazendo requisição para: http://192.168.18.15:3000/teachers/$teacherId/classes',
     );
     try {
       final classes = await TeacherService.getTeacherClasses(teacherId);
@@ -329,7 +329,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   backgroundImage:
                       authProvider.user?.photoUrl != null
                           ? NetworkImage(
-                            'http://localhost:3000${authProvider.user!.photoUrl}',
+                            'http://192.168.18.15:3000${authProvider.user!.photoUrl}',
                           )
                           : null,
                   child:

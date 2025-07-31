@@ -268,7 +268,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
     final turmaId = parent?.classData['id'] ?? '';
     final response = await http.get(
-      Uri.parse('http://localhost:3000/classes/$turmaId/events'),
+      Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
     );
     if (response.statusCode == 200) {
       setState(() {
@@ -289,7 +289,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
     final turmaId = parent?.classData['id'] ?? '';
     final response = await http.post(
-      Uri.parse('http://localhost:3000/classes/$turmaId/events'),
+      Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(event),
     );
@@ -322,7 +322,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {
     final response = await http.put(
-      Uri.parse('http://localhost:3000/classes/events/$id'),
+      Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(data),
     );
@@ -334,7 +334,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
   Future<void> deleteEvent(String id) async {
     final response = await http.delete(
-      Uri.parse('http://localhost:3000/classes/events/$id'),
+      Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
     );
     if (response.statusCode == 204) {
       fetchEvents();
@@ -769,7 +769,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   Future<void> fetchProfessores() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/teachers'),
+        Uri.parse('http://192.168.18.15:3000/teachers'),
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -820,7 +820,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     if (!mounted) return;
 
     final response = await http.get(
-      Uri.parse('http://localhost:3000/classes/$turmaId'),
+      Uri.parse('http://192.168.18.15:3000/classes/$turmaId'),
     );
 
     if (!mounted) return;
@@ -843,7 +843,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     if (!mounted) return;
 
     final eventsResponse = await http.get(
-      Uri.parse('http://localhost:3000/classes/$turmaId/events'),
+      Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
     );
 
     if (!mounted) return;

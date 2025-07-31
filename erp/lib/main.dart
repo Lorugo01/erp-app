@@ -7,8 +7,12 @@ import 'screens/register_screen.dart';
 import 'screens/teacher/teacher_dashboard_screen.dart';
 import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
+import 'config/environment.dart';
 
 void main() {
+  // Configurar ambiente de desenvolvimento
+  EnvironmentConfig.setEnvironment(Environment.development);
+
   runApp(const MyApp());
 }
 

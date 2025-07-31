@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import '../../widgets/navigation_bar_widget.dart';
-import '../admin/subject_detail_screen.dart';
-import 'student_calendar_screen.dart';
+import 'dart:convert';
 import '../../providers/auth_provider.dart';
-import '../../services/student_service.dart';
-import '../../services/attendance_service.dart';
-import '../../services/user_service.dart';
+import '../../config/api_config.dart';
+import 'class_details_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -22,399 +16,948 @@ class StudentDashboardScreen extends StatefulWidget {
 
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   int _selectedIndex = 0;
-  List<Map<String, dynamic>> _subjects = [];
-  bool _isLoadingSubjects = false;
-  String? _subjectsError;
+  bool _isWide = false;
 
-  // Estado para estatísticas de frequência
-  Map<String, dynamic>? _attendanceStats;
-  bool _isLoadingStats = false;
-  String? _statsError;
+  // Dados do aluno
+  Map<String, dynamic>? _studentData;
 
-  // Estado para dados do aluno
-  String _studentName = '';
-  String _registrationNumber = '';
-  String? _profilePictureUrl;
+  // Dados das turmas
+  List<Map<String, dynamic>> _classes = [];
+  bool _loadingClasses = false;
+  String? _errorClasses;
+
+  // Dados de frequência
+  List<Map<String, dynamic>> _attendanceData = [];
+  bool _loadingAttendance = false;
+
+  // Dados das aulas do dia
+  List<Map<String, dynamic>> _todayLessons = [];
+  bool _loadingLessons = false;
+
+  // Dados de notas
 
   @override
   void initState() {
     super.initState();
     _loadStudentData();
-    _loadSubjects();
-    _loadAttendanceStats();
+    _loadClasses();
+    _loadAttendanceData();
+    _loadTodayLessons();
+    _loadGrades();
   }
 
   Future<void> _loadStudentData() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.user;
-
-    if (user?.student == null) {
-      setState(() {
-        _studentName = user?.email ?? 'Aluno';
-        _registrationNumber = '-';
-        _profilePictureUrl = null;
-      });
-      return;
-    }
-
     setState(() {});
 
     try {
-      // Usar dados do usuário atual diretamente
-      final currentUser = authProvider.user;
-      debugPrint('Usuário atual: ${currentUser?.toJson()}');
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
 
-      if (currentUser?.student != null) {
-        debugPrint('Dados do aluno: ${currentUser!.student!.toJson()}');
+      debugPrint('🔍 === CARREGANDO DADOS DO ALUNO ===');
+      debugPrint('🔍 User: ${user?.toJson()}');
+      debugPrint('🔍 Student ID: ${user?.student?.id}');
+      debugPrint('🔍 User ID: ${user?.id}');
 
-        setState(() {
-          _studentName = currentUser.student!.name;
-          _registrationNumber = currentUser.student!.registrationNumber ?? '-';
-          _profilePictureUrl = currentUser.student!.profilePicture;
-        });
+      if (user?.student?.id != null) {
+        debugPrint('🔍 Usando student ID: ${user!.student!.id}');
+        final response = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/students/${user.student!.id}'),
+          headers: ApiConfig.defaultHeaders,
+        );
 
-        // Debug: verificar URL da imagem
-        if (currentUser.student!.profilePicture != null &&
-            currentUser.student!.profilePicture!.isNotEmpty) {
-          debugPrint(
-            'URL da imagem: http://localhost:3000${currentUser.student!.profilePicture}',
-          );
+        debugPrint('🔍 Status da resposta: ${response.statusCode}');
+        debugPrint('🔍 Corpo da resposta: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          debugPrint('🔍 Dados do aluno carregados: $data');
+          setState(() {
+            _studentData = data;
+          });
         } else {
-          debugPrint('Nenhuma imagem encontrada para o aluno');
+          throw Exception(
+            'Erro ao carregar dados do aluno: ${response.statusCode}',
+          );
+        }
+      } else if (user?.id != null) {
+        // Fallback: usar o ID do usuário
+        debugPrint('🔍 Usando user ID como fallback: ${user!.id}');
+        final response = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
+          headers: ApiConfig.defaultHeaders,
+        );
+
+        debugPrint('🔍 Status da resposta (fallback): ${response.statusCode}');
+        debugPrint('🔍 Corpo da resposta (fallback): ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          debugPrint('🔍 Dados do aluno carregados (fallback): $data');
+          setState(() {
+            _studentData = data;
+          });
+        } else {
+          throw Exception(
+            'Erro ao carregar dados do aluno: ${response.statusCode}',
+          );
         }
       } else {
-        debugPrint('Dados do aluno não encontrados');
+        debugPrint('❌ Nenhum ID encontrado');
+        throw Exception('ID do aluno não encontrado');
       }
     } catch (e) {
-      setState(() {
-        _studentName = user?.student?.name ?? user?.email ?? 'Aluno';
-        _registrationNumber = user?.student?.registrationNumber ?? '-';
-        _profilePictureUrl = user?.student?.profilePicture;
-      });
+      debugPrint('❌ Erro ao carregar dados do aluno: $e');
+      setState(() {});
+    } finally {
+      setState(() {});
     }
   }
 
-  Future<void> _loadSubjects() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.user;
-
-    if (user?.student?.id == null) {
-      setState(() {
-        _subjectsError = 'ID do aluno não encontrado';
-      });
-      return;
-    }
-
+  Future<void> _loadClasses() async {
     setState(() {
-      _isLoadingSubjects = true;
-      _subjectsError = null;
+      _loadingClasses = true;
+      _errorClasses = null;
     });
 
     try {
-      final subjects = await StudentService.getStudentSubjects(
-        user!.student!.id,
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+
+      debugPrint('🔍 === CARREGANDO TURMAS ===');
+      debugPrint('🔍 User: ${user?.toJson()}');
+      debugPrint('🔍 Student ID: ${user?.student?.id}');
+      debugPrint('🔍 User ID: ${user?.id}');
+
+      String? studentId;
+
+      if (user?.student?.id != null) {
+        studentId = user!.student!.id;
+        debugPrint('🔍 Usando student ID para buscar turmas: $studentId');
+      } else if (user?.id != null) {
+        // Se não temos student ID, buscar o student pelo user ID primeiro
+        debugPrint('🔍 Buscando student pelo user ID: ${user!.id}');
+        final studentResponse = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
+          headers: ApiConfig.defaultHeaders,
+        );
+
+        if (studentResponse.statusCode == 200) {
+          final studentData = jsonDecode(studentResponse.body);
+          studentId = studentData['id'];
+          debugPrint('🔍 Student ID encontrado: $studentId');
+        } else {
+          debugPrint('❌ Erro ao buscar student pelo user ID');
+          return;
+        }
+      } else {
+        debugPrint('❌ Nenhum ID encontrado para buscar turmas');
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/enrollments/student/$studentId'),
+        headers: ApiConfig.defaultHeaders,
       );
-      setState(() {
-        _subjects = subjects;
-        _isLoadingSubjects = false;
-      });
+
+      debugPrint('🔍 Status da resposta das turmas: ${response.statusCode}');
+      debugPrint('🔍 Corpo da resposta das turmas: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        debugPrint('🔍 Dados das turmas: $data');
+        final classes =
+            data.map((e) => Map<String, dynamic>.from(e['class'])).toList();
+        debugPrint('🔍 Turmas processadas: $classes');
+        setState(() {
+          _classes = classes;
+        });
+      } else {
+        debugPrint('❌ Erro ao carregar turmas: ${response.statusCode}');
+      }
     } catch (e) {
+      debugPrint('❌ Erro ao carregar turmas: $e');
       setState(() {
-        _subjectsError = 'Erro ao carregar disciplinas: $e';
-        _isLoadingSubjects = false;
+        _errorClasses = e.toString();
+      });
+    } finally {
+      setState(() {
+        _loadingClasses = false;
       });
     }
   }
 
-  Future<void> _loadAttendanceStats() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.user;
-
-    if (user?.student?.id == null) {
-      setState(() {
-        _statsError = 'ID do aluno não encontrado';
-      });
-      return;
-    }
-
+  Future<void> _loadAttendanceData() async {
     setState(() {
-      _isLoadingStats = true;
-      _statsError = null;
+      _loadingAttendance = true;
     });
 
     try {
-      final stats = await AttendanceService.getStudentAttendanceStats(
-        user!.student!.id,
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+
+      debugPrint('🔍 === CARREGANDO FREQUÊNCIA ===');
+      debugPrint('🔍 User: ${user?.toJson()}');
+      debugPrint('🔍 Student ID: ${user?.student?.id}');
+      debugPrint('🔍 User ID: ${user?.id}');
+
+      String? studentId;
+
+      if (user?.student?.id != null) {
+        studentId = user!.student!.id;
+        debugPrint('🔍 Usando student ID para buscar frequência: $studentId');
+      } else if (user?.id != null) {
+        // Se não temos student ID, buscar o student pelo user ID primeiro
+        debugPrint('🔍 Buscando student pelo user ID: ${user!.id}');
+        final studentResponse = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
+          headers: ApiConfig.defaultHeaders,
+        );
+
+        if (studentResponse.statusCode == 200) {
+          final studentData = jsonDecode(studentResponse.body);
+          studentId = studentData['id'];
+          debugPrint('🔍 Student ID encontrado: $studentId');
+        } else {
+          debugPrint('❌ Erro ao buscar student pelo user ID');
+          return;
+        }
+      } else {
+        debugPrint('❌ Nenhum ID encontrado para buscar frequência');
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/attendances/student/$studentId'),
+        headers: ApiConfig.defaultHeaders,
       );
-      setState(() {
-        _attendanceStats = stats;
-        _isLoadingStats = false;
-      });
+
+      debugPrint('🔍 Status da resposta da frequência: ${response.statusCode}');
+      debugPrint('🔍 Corpo da resposta da frequência: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        debugPrint('🔍 Dados da frequência: $data');
+        setState(() {
+          _attendanceData = List<Map<String, dynamic>>.from(data);
+        });
+      } else {
+        debugPrint('❌ Erro ao carregar frequência: ${response.statusCode}');
+      }
     } catch (e) {
+      debugPrint('❌ Erro ao carregar frequência: $e');
+    } finally {
       setState(() {
-        _statsError = 'Erro ao carregar estatísticas: $e';
-        _isLoadingStats = false;
+        _loadingAttendance = false;
       });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 700;
-        return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FB),
-          body: SafeArea(
-            child: Row(
-              children: [
-                if (isWide)
-                  NavigationBarWidget(
-                    selectedIndex: _selectedIndex,
-                    onSelect: (i) => setState(() => _selectedIndex = i),
-                    isWide: isWide,
-                  ),
-                Expanded(child: _buildTabContent(_selectedIndex)),
-              ],
+  Future<void> _loadTodayLessons() async {
+    setState(() {
+      _loadingLessons = true;
+    });
+
+    try {
+      // Buscar aulas do dia atual
+      final now = DateTime.now();
+      final today =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/lessons/date/$today'),
+        headers: ApiConfig.defaultHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        setState(() {
+          _todayLessons = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    } catch (e) {
+      // Ignorar erro de aulas por enquanto
+    } finally {
+      setState(() {
+        _loadingLessons = false;
+      });
+    }
+  }
+
+  Future<void> _loadGrades() async {
+    setState(() {});
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+
+      if (user?.student?.id != null || user?.id != null) {
+        final studentId = user!.student?.id ?? user.id;
+        final response = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/grades/student/$studentId'),
+          headers: ApiConfig.defaultHeaders,
+        );
+
+        if (response.statusCode == 200) {
+          final List data = jsonDecode(response.body);
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      // Ignorar erro de notas por enquanto
+    } finally {
+      setState(() {});
+    }
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sair'),
+          content: const Text('Tem certeza que deseja sair da aplicação?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
             ),
-          ),
-          bottomNavigationBar:
-              isWide
-                  ? null
-                  : NavigationBarWidget(
-                    selectedIndex: _selectedIndex,
-                    onSelect: (i) => setState(() => _selectedIndex = i),
-                    isWide: isWide,
-                  ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sair'),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildTabContent(int index) {
-    switch (index) {
-      case 0:
-        return _buildHomeTab();
-      case 1:
-        return _buildSubjectsTab();
-      case 2:
-        return StudentCalendarScreen();
-      default:
-        return const SizedBox.shrink();
-    }
+  void _logout() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.logout();
+
+    // O AuthFlow automaticamente redirecionará para a tela de login
+    // Não precisamos navegar manualmente
   }
 
-  Widget _buildHomeTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar com botão de edição sobreposto
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  _profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
-                      ? ClipOval(
-                        child: Image.network(
-                          'http://localhost:3000$_profilePictureUrl!',
-                          width: 96,
-                          height: 96,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            debugPrint('Erro ao carregar imagem: $error');
-                            return Container(
-                              width: 96,
-                              height: 96,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.person,
-                                size: 56,
-                                color: Colors.grey,
-                              ),
-                            );
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              width: 96,
-                              height: 96,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                      : CircleAvatar(
-                        radius: 48,
-                        backgroundColor: Colors.grey[300],
-                        child: const Icon(
-                          Icons.person,
-                          size: 56,
-                          color: Colors.grey,
-                        ),
-                      ),
-                  Positioned(
-                    bottom: 4,
-                    right: 4,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder:
-                                (context) => _EditProfileDialog(
-                                  currentEmail:
-                                      Provider.of<AuthProvider>(
-                                        context,
-                                        listen: false,
-                                      ).user?.email ??
-                                      '',
-                                  onSave: _saveProfileChanges,
-                                ),
-                          );
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2953A5),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 2,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.all(8),
-                          child: const Icon(
-                            Icons.edit,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _studentName,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Matrícula: $_registrationNumber',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              // Sininho
-              IconButton(
-                icon: const Icon(Icons.notifications_none, size: 32),
-                onPressed: () {},
-              ),
-            ],
-          ),
-        ),
-        // Cards
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            children: [
-              // Frequência detalhada
-              _buildAttendanceStatsCard(),
-              const SizedBox(height: 16),
-              // Mensagens
-              _InfoCard(
-                icon: Icons.mail,
-                iconColor: Colors.blue,
-                label: 'Mensagens',
-                value: '0 mensagens',
-              ),
-              const SizedBox(height: 16),
-              // Agenda de hoje
-              _InfoCard(
-                icon: Icons.calendar_today,
-                iconColor: Colors.deepPurple,
-                label: 'Agenda de hoje',
-                value: '0 aulas',
-              ),
-            ],
-          ),
-        ),
-      ],
+  void _showEditProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Editar Perfil'),
+          content: const Text('Funcionalidade em desenvolvimento...'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildSubjectsTab() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  void _showClassDetails(Map<String, dynamic> classData) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ClassDetailsScreen(classData: classData),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Detectar se é tela larga
+    final screenWidth = MediaQuery.of(context).size.width;
+    _isWide = screenWidth > 600;
+
+    return Scaffold(
+      body: Row(
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Disciplinas',
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 28),
-                onPressed: _loadSubjects,
-              ),
-            ],
+          if (_isWide) _buildSidebar(),
+          Expanded(
+            child: Column(
+              children: [
+                if (!_isWide) _buildAppBar(),
+                Expanded(child: _buildContent()),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _isWide ? null : _buildBottomNavBar(),
+    );
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 220,
+      color: const Color(0xFF2953A5),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.white,
+            backgroundImage:
+                _studentData?['profilePicture'] != null
+                    ? NetworkImage(_studentData!['profilePicture'])
+                    : null,
+            child:
+                _studentData?['profilePicture'] == null
+                    ? const Icon(
+                      Icons.person,
+                      size: 60,
+                      color: Color(0xFF2953A5),
+                    )
+                    : null,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _studentData?['name'] ?? 'Aluno',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Matrícula: ${_studentData?['registrationNumber'] ?? 'N/A'}',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          _SidebarButton(
+            icon: Icons.dashboard,
+            label: 'Visão Geral',
+            selected: _selectedIndex == 0,
+            onTap: () => setState(() => _selectedIndex = 0),
+          ),
+          _SidebarButton(
+            icon: Icons.class_,
+            label: 'Turmas',
+            selected: _selectedIndex == 1,
+            onTap: () => setState(() => _selectedIndex = 1),
+          ),
+          _SidebarButton(
+            icon: Icons.calendar_today,
+            label: 'Calendário',
+            selected: _selectedIndex == 2,
+            onTap: () => setState(() => _selectedIndex = 2),
+          ),
+          const Spacer(),
+          _SidebarButton(
+            icon: Icons.logout,
+            label: 'Sair',
+            selected: false,
+            onTap: _showLogoutDialog,
           ),
           const SizedBox(height: 24),
-          Expanded(child: _buildSubjectsContent()),
         ],
       ),
     );
   }
 
-  Widget _buildSubjectsContent() {
-    if (_isLoadingSubjects) {
+  Widget _buildAppBar() {
+    return AppBar(
+      title: Text(_getPageTitle()),
+      backgroundColor: const Color(0xFF2953A5),
+      foregroundColor: Colors.white,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: _showLogoutDialog,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavBar() {
+    return BottomNavigationBar(
+      currentIndex: _selectedIndex,
+      onTap: (index) => setState(() => _selectedIndex = index),
+      selectedItemColor: const Color(0xFF2953A5),
+      unselectedItemColor: Colors.grey,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.dashboard),
+          label: 'Visão Geral',
+        ),
+        BottomNavigationBarItem(icon: Icon(Icons.class_), label: 'Turmas'),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.calendar_today),
+          label: 'Calendário',
+        ),
+      ],
+    );
+  }
+
+  String _getPageTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return 'Visão Geral';
+      case 1:
+        return 'Minhas Turmas';
+      case 2:
+        return 'Calendário';
+      default:
+        return 'Dashboard';
+    }
+  }
+
+  Widget _buildContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildOverviewTab();
+      case 1:
+        return _buildClassesTab();
+      case 2:
+        return _buildCalendarTab();
+      default:
+        return _buildOverviewTab();
+    }
+  }
+
+  Widget _buildOverviewTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cabeçalho do perfil
+          _buildProfileHeader(),
+          const SizedBox(height: 24),
+
+          // Seção de frequência
+          _buildAttendanceSection(),
+          const SizedBox(height: 24),
+
+          // Seção de mensagens
+          _buildMessagesSection(),
+          const SizedBox(height: 24),
+
+          // Seção de aulas do dia
+          _buildTodayLessonsSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundImage:
+                  _studentData?['profilePicture'] != null
+                      ? NetworkImage(_studentData!['profilePicture'])
+                      : null,
+              child:
+                  _studentData?['profilePicture'] == null
+                      ? const Icon(Icons.person, size: 40)
+                      : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _studentData?['name'] ?? 'Carregando...',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Matrícula: ${_studentData?['registrationNumber'] ?? 'N/A'}',
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: _showEditProfileDialog,
+              icon: const Icon(Icons.edit),
+              tooltip: 'Editar perfil',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Color(0xFF2953A5)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Frequência',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (_loadingAttendance)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_attendanceData.isNotEmpty) ...[
+              _buildAttendanceStats(),
+            ] else
+              const Text(
+                'Nenhum dado de frequência disponível',
+                style: TextStyle(color: Colors.grey),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceStats() {
+    // Calcular estatísticas
+    final total = _attendanceData.length;
+    final presentes = _attendanceData.where((a) => a['present'] == true).length;
+    final ausentes = _attendanceData.where((a) => a['present'] == false).length;
+    final percentualPresente =
+        total > 0 ? (presentes / total * 100).round() : 0;
+
+    return Column(
+      children: [
+        // Card de percentual
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2953A5).withAlpha(30),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF2953A5).withAlpha(100)),
+          ),
+          child: Column(
+            children: [
+              Text(
+                '$percentualPresente%',
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2953A5),
+                ),
+              ),
+              const Text(
+                'de presença',
+                style: TextStyle(fontSize: 14, color: Color(0xFF2953A5)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Cards de estatísticas
+        Row(
+          children: [
+            Expanded(
+              child: _buildAttendanceCard(
+                'Total',
+                total,
+                const Color(0xFF2953A5),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildAttendanceCard('Presente', presentes, Colors.green),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildAttendanceCard('Ausente', ausentes, Colors.red),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Lista das últimas frequências
+        const Text(
+          'Últimas frequências:',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        ..._attendanceData
+            .take(5)
+            .map((attendance) => _buildAttendanceItem(attendance))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildAttendanceCard(String title, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(100)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            count.toString(),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(title, style: TextStyle(fontSize: 14, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceItem(Map<String, dynamic> attendance) {
+    final lesson = attendance['lesson'];
+    final subject = lesson?['subject']?['name'] ?? 'Disciplina não informada';
+    final date = lesson?['date'] ?? '';
+    final isPresent = attendance['present'] == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color:
+            isPresent ? Colors.green.withAlpha(30) : Colors.red.withAlpha(30),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color:
+              isPresent
+                  ? Colors.green.withAlpha(100)
+                  : Colors.red.withAlpha(100),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPresent ? Icons.check_circle : Icons.cancel,
+            color: isPresent ? Colors.green : Colors.red,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  subject,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  date,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            isPresent ? 'Presente' : 'Ausente',
+            style: TextStyle(
+              color: isPresent ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessagesSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.message, color: Color(0xFF2953A5)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Mensagens',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    '2',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Nenhuma mensagem nova',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayLessonsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.schedule, color: Color(0xFF2953A5)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Aulas do Dia',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (_loadingLessons)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_todayLessons.isNotEmpty) ...[
+              ..._todayLessons.map((lesson) => _buildLessonCard(lesson)),
+            ] else
+              const Text(
+                'Nenhuma aula programada para hoje',
+                style: TextStyle(color: Colors.grey),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLessonCard(Map<String, dynamic> lesson) {
+    final startTime = lesson['startTime'] ?? '';
+    final endTime = lesson['endTime'] ?? '';
+    final subject = lesson['subject']?['name'] ?? 'Disciplina não informada';
+    final teacher = lesson['teacher']?['name'] ?? 'Professor não informado';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2953A5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  subject,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  teacher,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$startTime - $endTime',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2953A5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClassesTab() {
+    if (_loadingClasses) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_subjectsError != null) {
+    if (_errorClasses != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+            const Icon(Icons.error, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(
-              _subjectsError!,
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              'Erro ao carregar turmas',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorClasses!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadSubjects,
+              onPressed: _loadClasses,
               child: const Text('Tentar novamente'),
             ),
           ],
@@ -422,16 +965,21 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       );
     }
 
-    if (_subjects.isEmpty) {
-      return Center(
+    if (_classes.isEmpty) {
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
+            Icon(Icons.class_, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
             Text(
-              'Nenhuma disciplina encontrada',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              'Nenhuma turma encontrada',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Você ainda não está matriculado em nenhuma turma.',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
           ],
@@ -439,674 +987,321 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       );
     }
 
-    return ListView.separated(
-      itemCount: _subjects.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 18),
-      itemBuilder: (context, i) {
-        final subject = _subjects[i];
-        final teacher = subject['teacher'] as Map<String, dynamic>?;
-        final teacherName = teacher?['name'] ?? 'Professor não definido';
-        final teacherPhoto = teacher?['photoUrl'] as String?;
-
-        return _SubjectCard(
-          data: _SubjectData(
-            name: subject['name'] ?? 'Disciplina sem nome',
-            teacher: teacherName,
-            teacherPhoto: teacherPhoto,
-            icon: _getSubjectIcon(subject['type'] ?? ''),
-            color: _getSubjectColor(subject['name'] ?? ''),
-            iconColor: _getSubjectIconColor(subject['name'] ?? ''),
-          ),
-        );
-      },
-    );
-  }
-
-  IconData _getSubjectIcon(String type) {
-    switch (type) {
-      case 'MATEMATICA':
-        return Icons.calculate;
-      case 'CIENCIAS':
-      case 'BIOLOGIA':
-      case 'FISICA':
-      case 'QUIMICA':
-        return Icons.science;
-      case 'HISTORIA':
-        return Icons.history;
-      case 'GEOGRAFIA':
-        return Icons.public;
-      case 'LINGUA_INGLESA':
-        return Icons.language;
-      case 'ARTE':
-        return Icons.palette;
-      case 'EDUCACAO_FISICA':
-        return Icons.sports_soccer;
-      case 'ENSINO_RELIGIOSO':
-        return Icons.church;
-      case 'FILOSOFIA':
-        return Icons.psychology;
-      case 'SOCIOLOGIA':
-        return Icons.people;
-      case 'CONTEUDO_INTERDISCIPLINAR':
-        return Icons.integration_instructions;
-      default:
-        return Icons.school;
-    }
-  }
-
-  Color _getSubjectColor(String name) {
-    final colors = [
-      const Color(0xFFF6DFA7), // Amarelo
-      const Color(0xFFE2D7FF), // Roxo
-      const Color(0xFFFFD7D7), // Rosa
-      const Color(0xFFD7E6FF), // Azul
-      const Color(0xFFD7F7E2), // Verde
-      const Color(0xFFFFE8D7), // Laranja
-      const Color(0xFFE8F7FF), // Azul claro
-      const Color(0xFFF7E8FF), // Roxo claro
-    ];
-
-    final index = name.hashCode % colors.length;
-    return colors[index];
-  }
-
-  Color _getSubjectIconColor(String name) {
-    final colors = [
-      const Color(0xFFD1A13C), // Amarelo escuro
-      const Color(0xFF6C4ED6), // Roxo escuro
-      const Color(0xFFE05A5A), // Rosa escuro
-      const Color(0xFF4E8ED6), // Azul escuro
-      const Color(0xFF4ED67A), // Verde escuro
-      const Color(0xFFD67A4E), // Laranja escuro
-      const Color(0xFF4E8ED6), // Azul escuro
-      const Color(0xFF8E4ED6), // Roxo escuro
-    ];
-
-    final index = name.hashCode % colors.length;
-    return colors[index];
-  }
-
-  Widget _buildAttendanceStatsCard() {
-    if (_isLoadingStats) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.green.withAlpha(26),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.check_circle, color: Colors.green, size: 28),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Text(
-                'Frequência',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_statsError != null) {
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.green.withAlpha(26),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.all(8),
-              child: Icon(Icons.check_circle, color: Colors.green, size: 28),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Frequência',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    'Erro ao carregar',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.refresh, size: 16, color: Colors.grey[600]),
-              onPressed: _loadAttendanceStats,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final total = _attendanceStats?['total'] as int? ?? 0;
-    final present = _attendanceStats?['present'] as int? ?? 0;
-    final percentage = _attendanceStats?['percentage'] as int? ?? 0;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(26),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.all(8),
-                child: Icon(Icons.check_circle, color: Colors.green, size: 28),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Text(
-                  'Frequência',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+          // Header com estatísticas
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.school, color: Color(0xFF2953A5)),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Minhas Turmas',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2953A5).withAlpha(30),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${_classes.length} turma${_classes.length > 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        color: Color(0xFF2953A5),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '$percentage%',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem('Total', total.toString(), Colors.blue),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatItem(
-                  'Presente',
-                  present.toString(),
-                  Colors.green,
+          const SizedBox(height: 16),
+          // Lista de turmas
+          ..._classes
+              .map(
+                (classData) => _ClassCard(
+                  classData: classData,
+                  onTap: () => _showClassDetails(classData),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatItem(
-                  'Faltas',
-                  (_attendanceStats?['absent'] ?? 0).toString(),
-                  Colors.red,
-                ),
-              ),
-            ],
-          ),
+              )
+              .toList(),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: color,
+  Widget _buildCalendarTab() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_today, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'Calendário em desenvolvimento',
+            style: TextStyle(fontSize: 18, color: Colors.grey),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-      ],
-    );
-  }
-
-  // Função para salvar alterações do perfil
-  Future<void> _saveProfileChanges(
-    String newEmail,
-    String? newImagePath,
-  ) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.user;
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro: Usuário não encontrado'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      // Atualizar email se foi alterado
-      if (newEmail != user.email) {
-        final updatedUser = await UserService.updateUser(user.id, {
-          'email': newEmail,
-        });
-        authProvider.updateUserData(updatedUser);
-      }
-
-      // Upload da nova imagem se foi selecionada
-      if (newImagePath != null) {
-        final photoUrl = await _uploadUserPhoto(user.id, File(newImagePath));
-
-        // Atualizar dados do usuário com a nova foto
-        final updatedUser = await UserService.updateUser(user.id, {
-          'photoUrl': photoUrl,
-        });
-        authProvider.updateUserData(updatedUser);
-
-        // Recarregar dados do aluno para atualizar a foto
-        await _loadStudentData();
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Perfil atualizado com sucesso!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao atualizar perfil: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Função para fazer upload da foto do usuário
-  Future<String> _uploadUserPhoto(String userId, File imageFile) async {
-    try {
-      // Determina o mimetype baseado na extensão do arquivo
-      String getMimeType(String filePath) {
-        final extension = filePath.split('.').last.toLowerCase();
-        switch (extension) {
-          case 'jpg':
-          case 'jpeg':
-            return 'image/jpeg';
-          case 'png':
-            return 'image/png';
-          case 'gif':
-            return 'image/gif';
-          default:
-            return 'image/jpeg'; // fallback
-        }
-      }
-
-      final mimeType = getMimeType(imageFile.path);
-
-      // Cria uma requisição multipart
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('http://localhost:3000/users/$userId/photo'),
-      );
-
-      // Adiciona o arquivo com mimetype correto
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'photo',
-          imageFile.path,
-          contentType: MediaType.parse(mimeType),
-        ),
-      );
-
-      // Envia a requisição
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
-        return data['photoUrl'] ?? '';
-      } else {
-        final error = jsonDecode(responseBody);
-        throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
-      }
-    } catch (e) {
-      throw Exception('Erro de conexão: $e');
-    }
-  }
-}
-
-class _SubjectData {
-  final String name;
-  final String teacher;
-  final String? teacherPhoto;
-  final IconData icon;
-  final Color color;
-  final Color iconColor;
-  _SubjectData({
-    required this.name,
-    required this.teacher,
-    this.teacherPhoto,
-    required this.icon,
-    required this.color,
-    required this.iconColor,
-  });
-}
-
-class _SubjectCard extends StatelessWidget {
-  final _SubjectData data;
-  const _SubjectCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (_) => SubjectDetailScreen(
-                  name: data.name,
-                  teacher: data.teacher,
-                  icon: data.icon,
-                  color: data.color,
-                  iconColor: data.iconColor,
-                ),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: data.color,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Icon(data.icon, color: data.iconColor, size: 32),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data.name,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (data.teacherPhoto != null)
-                        Container(
-                          width: 20,
-                          height: 20,
-                          margin: const EdgeInsets.only(right: 6),
-                          child: ClipOval(
-                            child: Image.network(
-                              'http://localhost:3000${data.teacherPhoto!}',
-                              width: 20,
-                              height: 20,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.grey[600],
-                                );
-                              },
-                            ),
-                          ),
-                        )
-                      else
-                        Icon(Icons.person, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          data.teacher,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
-class _InfoCard extends StatelessWidget {
+class _SidebarButton extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
   final String label;
-  final String value;
-  const _InfoCard({
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SidebarButton({
     required this.icon,
-    required this.iconColor,
     required this.label,
-    required this.value,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      child: Row(
-        children: [
-          Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: iconColor.withAlpha(26),
+              color: selected ? Colors.white.withAlpha(30) : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
-            padding: const EdgeInsets.all(8),
-            child: Icon(icon, color: iconColor, size: 28),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: selected ? Colors.white : Colors.white70,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white70,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _EditProfileDialog extends StatefulWidget {
-  final String currentEmail;
-  final void Function(String newEmail, String? newImage) onSave;
-  const _EditProfileDialog({required this.currentEmail, required this.onSave});
+class _ClassCard extends StatelessWidget {
+  final Map<String, dynamic> classData;
+  final VoidCallback onTap;
 
-  @override
-  State<_EditProfileDialog> createState() => _EditProfileDialogState();
-}
-
-class _EditProfileDialogState extends State<_EditProfileDialog> {
-  late TextEditingController _emailController;
-  String? _selectedImagePath;
-
-  @override
-  void initState() {
-    super.initState();
-    _emailController = TextEditingController(text: widget.currentEmail);
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-      );
-
-      if (result != null && result.files.single.path != null) {
-        setState(() {
-          _selectedImagePath = result.files.single.path;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao selecionar imagem: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+  const _ClassCard({required this.classData, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Editar Perfil'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Campo de email
-          TextField(
-            controller: _emailController,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              prefixIcon: Icon(Icons.email),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Upload de imagem
-          Row(
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.grey[200],
-                backgroundImage:
-                    _selectedImagePath != null
-                        ? FileImage(File(_selectedImagePath!))
-                        : null,
-                child:
-                    _selectedImagePath == null
-                        ? const Icon(Icons.person, size: 32, color: Colors.grey)
-                        : null,
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2953A5).withAlpha(30),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.class_,
+                  color: Color(0xFF2953A5),
+                  size: 30,
+                ),
               ),
               const SizedBox(width: 16),
-              ElevatedButton.icon(
-                onPressed: _pickImage,
-                icon: const Icon(Icons.upload),
-                label: const Text('Alterar foto'),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            classData['name'] ?? 'Turma sem nome',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        // Badge para turma atual
+                        if (classData['current'] == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'ATUAL',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Série: ${classData['grade'] ?? 'N/A'} - ${classData['letter'] ?? ''}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ano: ${classData['academicYear'] ?? 'N/A'} | Turno: ${classData['shift'] ?? 'N/A'}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassDetailsSheet extends StatelessWidget {
+  final Map<String, dynamic> classData;
+
+  const _ClassDetailsSheet({required this.classData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFF2953A5),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.class_, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    classData['name'] ?? 'Detalhes da Turma',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailItem('Nome', classData['name'] ?? 'N/A'),
+                  _buildDetailItem(
+                    'Série',
+                    '${classData['grade'] ?? 'N/A'} - ${classData['letter'] ?? ''}',
+                  ),
+                  _buildDetailItem(
+                    'Ano Letivo',
+                    classData['academicYear'] ?? 'N/A',
+                  ),
+                  _buildDetailItem('Turno', classData['shift'] ?? 'N/A'),
+                  _buildDetailItem(
+                    'Modelo de Avaliação',
+                    classData['evaluationModel'] ?? 'N/A',
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Disciplinas',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Funcionalidade em desenvolvimento...',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            widget.onSave(_emailController.text, _selectedImagePath);
-            Navigator.of(context).pop();
-          },
-          child: const Text('Salvar'),
-        ),
-      ],
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 }

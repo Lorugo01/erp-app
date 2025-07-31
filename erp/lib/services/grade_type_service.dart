@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class GradeTypeService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
 
   // Buscar todos os tipos de nota
   static Future<List<Map<String, dynamic>>> getAllGradeTypes() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/grade-types'),
-    );
+    final response = await http.get(Uri.parse('$baseUrl/grade-types'));
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
@@ -19,9 +17,7 @@ class GradeTypeService {
 
   // Buscar tipo de nota por ID
   static Future<Map<String, dynamic>> getGradeTypeById(String id) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/grade-types/$id'),
-    );
+    final response = await http.get(Uri.parse('$baseUrl/grade-types/$id'));
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -76,11 +72,9 @@ class GradeTypeService {
 
   // Deletar tipo de nota
   static Future<void> deleteGradeType(String id) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/grade-types/$id'),
-    );
+    final response = await http.delete(Uri.parse('$baseUrl/grade-types/$id'));
     if (response.statusCode != 204) {
       throw Exception('Erro ao deletar tipo de nota');
     }
   }
-} 
+}

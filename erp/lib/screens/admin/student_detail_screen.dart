@@ -45,7 +45,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/students/${widget.student.id}'),
+        Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -91,7 +91,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     for (final lessonId in lessonIds) {
       if (lessonId == null) continue;
       final response = await http.get(
-        Uri.parse('http://localhost:3000/lessons/$lessonId'),
+        Uri.parse('http://192.168.18.15:3000/lessons/$lessonId'),
         headers: {'Content-Type': 'application/json'},
       );
       if (response.statusCode == 200) {
@@ -106,7 +106,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   Future<void> _fetchPeriods() async {
     final response = await http.get(
-      Uri.parse('http://localhost:3000/grade-periods'),
+      Uri.parse('http://192.168.18.15:3000/grade-periods'),
     );
     if (response.statusCode == 200) {
       setState(() {
@@ -528,7 +528,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final photoUrl =
         widget.student.profilePicture != null &&
                 widget.student.profilePicture!.isNotEmpty
-            ? 'http://localhost:3000${widget.student.profilePicture}'
+            ? 'http://192.168.18.15:3000${widget.student.profilePicture}'
             : null;
     return Container(
       padding: const EdgeInsets.all(24.0),
@@ -908,7 +908,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://localhost:3000$currentPhotoUrl',
+                                              'http://192.168.18.15:3000$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -1123,7 +1123,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       try {
                         final response = await http.put(
                           Uri.parse(
-                            'http://localhost:3000/students/${widget.student.id}',
+                            'http://192.168.18.15:3000/students/${widget.student.id}',
                           ),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode(updatedData),
@@ -1233,7 +1233,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://localhost:3000/students/$studentId/photo'),
+        Uri.parse('http://192.168.18.15:3000/students/$studentId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto
@@ -1268,7 +1268,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://localhost:3000/students/${widget.student.id}'),
+        Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
         headers: {'Content-Type': 'application/json'},
       );
 

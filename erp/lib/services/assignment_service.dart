@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class AssignmentService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
 
   static Future<List<Map<String, dynamic>>> getAssignmentsByClass(
     String classId,
@@ -35,9 +35,7 @@ class AssignmentService {
     debugPrint('Buscando atividades da turma $classId e disciplina $subjectId');
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/classes/$classId/assignments?subjectId=$subjectId',
-        ),
+        Uri.parse('$baseUrl/classes/$classId/assignments?subjectId=$subjectId'),
       );
       debugPrint('Status da resposta: ${response.statusCode}');
       debugPrint('Corpo da resposta: ${response.body}');

@@ -70,7 +70,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         backgroundImage:
                             widget.user.photoUrl != null
                                 ? NetworkImage(
-                                  'http://localhost:3000${widget.user.photoUrl}',
+                                  'http://192.168.18.15:3000${widget.user.photoUrl}',
                                 )
                                 : null,
                         child:
@@ -345,7 +345,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://localhost:3000$currentPhotoUrl',
+                                              'http://192.168.18.15:3000$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -502,7 +502,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       try {
                         final response = await http.put(
                           Uri.parse(
-                            'http://localhost:3000/users/${widget.user.id}',
+                            'http://192.168.18.15:3000/users/${widget.user.id}',
                           ),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode(updatedData),
@@ -593,7 +593,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://localhost:3000/users/$userId/photo'),
+        Uri.parse('http://192.168.18.15:3000/users/$userId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto

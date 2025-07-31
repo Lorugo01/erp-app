@@ -40,7 +40,7 @@ class Student {
 }
 
 class StudentService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
 
   static Future<List<Student>> getAllStudents() async {
     final response = await http.get(Uri.parse('$baseUrl/students'));

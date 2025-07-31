@@ -76,7 +76,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _deleteTeacher(Map<String, dynamic> teacher) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://localhost:3000/teachers/${teacher['id']}'),
+        Uri.parse('http://192.168.18.15:3000/teachers/${teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -143,7 +143,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _deleteStudent(student_service.Student student) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://localhost:3000/students/${student.id}'),
+        Uri.parse('http://192.168.18.15:3000/students/${student.id}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -324,7 +324,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               });
               try {
                 final response = await http.post(
-                  Uri.parse('http://localhost:3000/teachers'),
+                  Uri.parse('http://192.168.18.15:3000/teachers'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'name': name,
@@ -334,7 +334,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 );
                 if (!context.mounted) return;
                 if (response.statusCode == 201 || response.statusCode == 200) {
-                  final newTeacher = jsonDecode(response.body);
+                  final responseData = jsonDecode(response.body);
+                  // Extrair os dados do professor da resposta da API
+                  final teacherData = responseData['teacher'] ?? responseData;
+                  
+                  // Garantir que o objeto tenha a estrutura esperada pelo widget
+                  final newTeacher = {
+                    'id': teacherData['id'],
+                    'name': teacherData['name'],
+                    'email': teacherData['email'],
+                    'photoUrl': teacherData['photoUrl'],
+                    'createdAt': teacherData['createdAt'],
+                    'user': teacherData['user'],
+                  };
+                  
                   setState(() {
                     _teachers.add(newTeacher);
                   });
@@ -381,7 +394,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               });
               try {
                 final response = await http.post(
-                  Uri.parse('http://localhost:3000/students'),
+                  Uri.parse('http://192.168.18.15:3000/students'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'name': name,
@@ -392,16 +405,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 );
                 if (!context.mounted) return;
                 if (response.statusCode == 201 || response.statusCode == 200) {
-                  final newStudent = jsonDecode(response.body);
+                  final responseData = jsonDecode(response.body);
+                  // Extrair os dados do aluno da resposta da API
+                  final studentData = responseData['student'] ?? responseData;
+                  
                   setState(() {
                     _students.add(
                       student_service.Student(
-                        id: newStudent['id'] ?? '',
-                        name: newStudent['name'] ?? name,
-                        email: newStudent['email'] ?? email,
+                        id: studentData['id'] ?? '',
+                        name: studentData['name'] ?? name,
+                        email: studentData['email'] ?? email,
                         registrationNumber:
-                            newStudent['registrationNumber'] ??
+                            studentData['registrationNumber'] ??
                             registrationNumber,
+                        profilePicture: studentData['profilePicture'],
                         subjects: [],
                         createdAt: null,
                         role: null,
@@ -449,7 +466,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               });
               try {
                 final response = await http.post(
-                  Uri.parse('http://localhost:3000/classes'),
+                  Uri.parse('http://192.168.18.15:3000/classes'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'grade': grade,
@@ -461,7 +478,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 );
                 if (!context.mounted) return;
                 if (response.statusCode == 201 || response.statusCode == 200) {
-                  final newClass = jsonDecode(response.body);
+                  final responseData = jsonDecode(response.body);
+                  // Extrair os dados da turma da resposta da API
+                  final classData = responseData['class'] ?? responseData;
+                  
+                  // Garantir que o objeto tenha a estrutura esperada pelo widget
+                  final newClass = {
+                    'id': classData['id'],
+                    'name': classData['name'],
+                    'grade': classData['grade'],
+                    'letter': classData['letter'],
+                    'academicYear': classData['academicYear'],
+                    'shift': classData['shift'],
+                    'evaluationModel': classData['evaluationModel'],
+                    'createdAt': classData['createdAt'],
+                  };
+                  
                   setState(() {
                     _classes.add(newClass);
                   });
@@ -1563,7 +1595,7 @@ class _TeacherCardGrid extends StatelessWidget {
                   backgroundImage:
                       teacher['photoUrl'] != null
                           ? NetworkImage(
-                            'http://localhost:3000${teacher['photoUrl']}',
+                            'http://192.168.18.15:3000${teacher['photoUrl']}',
                           )
                           : null,
                   child:
@@ -1746,7 +1778,7 @@ class _StudentCardGrid extends StatelessWidget {
                   backgroundImage:
                       student.profilePicture != null
                           ? NetworkImage(
-                            'http://localhost:3000${student.profilePicture}',
+                            'http://192.168.18.15:3000${student.profilePicture}',
                           )
                           : null,
                   child:
@@ -1959,7 +1991,7 @@ class _UserCardGrid extends StatelessWidget {
                           ? NetworkImage(
                             user.photoUrl!.startsWith('http')
                                 ? user.photoUrl!
-                                : 'http://localhost:3000${user.photoUrl}',
+                                : 'http://192.168.18.15:3000${user.photoUrl}',
                           )
                           : null,
                   child:

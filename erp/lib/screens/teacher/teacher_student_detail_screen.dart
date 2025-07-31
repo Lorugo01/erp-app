@@ -176,7 +176,7 @@ class _TeacherStudentDetailScreenState
   Widget _buildHeader() {
     final photoUrl =
         widget.student['profilePicture'] != null
-            ? 'http://localhost:3000${widget.student['profilePicture']}'
+            ? 'http://192.168.18.15:3000${widget.student['profilePicture']}'
             : null;
 
     return Container(

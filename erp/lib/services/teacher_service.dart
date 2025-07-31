@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class TeacherService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
 
   static Future<List<Map<String, dynamic>>> getAllTeachers() async {
     final response = await http.get(Uri.parse('$baseUrl/teachers'));

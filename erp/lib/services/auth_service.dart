@@ -1,16 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import '../config/api_config.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:3000'; // URL da API
-  static const String authEndpoint = '/auth';
-
   // Login
   static Future<User> login(String email, String password) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl$authEndpoint/login'),
+        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.authEndpoint}/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
@@ -36,7 +34,7 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl$authEndpoint/register'),
+        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.authEndpoint}/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
@@ -65,7 +63,9 @@ class AuthService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl$authEndpoint/register/admin'),
+        Uri.parse(
+          '${ApiConfig.baseUrl}${ApiConfig.authEndpoint}/register/admin',
+        ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
@@ -86,7 +86,7 @@ class AuthService {
   static Future<bool> checkApiConnection() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/'),
+        Uri.parse('${ApiConfig.baseUrl}/'),
         headers: {'Content-Type': 'application/json'},
       );
       return response.statusCode == 200;

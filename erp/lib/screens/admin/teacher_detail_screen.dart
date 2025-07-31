@@ -40,7 +40,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/teachers/${widget.teacher['id']}'),
+        Uri.parse('http://192.168.18.15:3000/teachers/${widget.teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -362,7 +362,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             backgroundColor: Colors.white,
             backgroundImage:
                 photoUrl != null
-                    ? NetworkImage('http://localhost:3000$photoUrl')
+                    ? NetworkImage('http://192.168.18.15:3000$photoUrl')
                     : null,
             child:
                 photoUrl == null
@@ -802,7 +802,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://localhost:3000/teachers/${widget.teacher['id']}'),
+        Uri.parse('http://192.168.18.15:3000/teachers/${widget.teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -870,7 +870,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://localhost:3000$currentPhotoUrl',
+                                              'http://192.168.18.15:3000$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -1087,7 +1087,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://localhost:3000/teachers/$teacherId/photo'),
+        Uri.parse('http://192.168.18.15:3000/teachers/$teacherId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto

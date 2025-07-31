@@ -134,7 +134,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
                           backgroundImage:
                               teacher['photoUrl'] != null
                                   ? NetworkImage(
-                                    'http://localhost:3000${teacher['photoUrl']}',
+                                    'http://192.168.18.15:3000${teacher['photoUrl']}',
                                   )
                                   : null,
                           child:

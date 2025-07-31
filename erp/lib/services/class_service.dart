@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ClassService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.18.15:3000';
 
   static Future<List<Map<String, dynamic>>> getAllClasses() async {
     final response = await http.get(Uri.parse('$baseUrl/classes'));
