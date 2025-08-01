@@ -13,6 +13,7 @@ import 'student_detail_screen.dart';
 import 'teacher_detail_screen.dart';
 import 'user_detail_screen.dart';
 import 'grade_management_screen.dart';
+import 'admin_settings_screen.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/admin_app_bar_menu.dart';
 
@@ -588,10 +589,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               crossAxisCount = 4;
             } else if (screenWidth > 800) {
               crossAxisCount = 3;
-            } else if (screenWidth > 600) {
-              crossAxisCount = 2;
             } else {
-              crossAxisCount = 1;
+              crossAxisCount = 2; // Sempre 2 colunas para mobile
             }
 
             return SingleChildScrollView(
@@ -612,7 +611,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: isSmall ? 12 : 16,
                     mainAxisSpacing: isSmall ? 12 : 16,
-                    childAspectRatio: isSmall ? 1.2 : 1.4,
+                    childAspectRatio: isSmall ? 1.0 : 1.4,
                     children: [
                       _DashboardInfoCard(
                         title: 'Usuários',
@@ -1207,7 +1206,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 actions: [
                   AdminAppBarMenu(
-                    onConfig: () => setState(() => _selectedIndex = 8),
+                    onConfig: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminSettingsScreen(),
+                        ),
+                      );
+                    },
                     onLogout: () => authProvider.logout(),
                   ),
                 ],

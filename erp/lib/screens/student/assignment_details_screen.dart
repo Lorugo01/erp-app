@@ -10,18 +10,15 @@ import 'package:provider/provider.dart';
 class AssignmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> assignment;
 
-  const AssignmentDetailsScreen({
-    super.key,
-    required this.assignment,
-  });
+  const AssignmentDetailsScreen({super.key, required this.assignment});
 
   @override
-  State<AssignmentDetailsScreen> createState() => _AssignmentDetailsScreenState();
+  State<AssignmentDetailsScreen> createState() =>
+      _AssignmentDetailsScreenState();
 }
 
 class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   bool _loading = false;
-  String? _error;
   String? _selectedFilePath;
   String? _selectedFileName;
   String? _description;
@@ -31,7 +28,8 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
     final assignment = widget.assignment;
     final description = assignment['description'] ?? 'Sem descrição';
     final dueDate = assignment['dueDate'] ?? '';
-    final subject = assignment['subject']?['name'] ?? 'Disciplina não informada';
+    final subject =
+        assignment['subject']?['name'] ?? 'Disciplina não informada';
     final fileUrl = assignment['fileUrl'];
 
     return Scaffold(
@@ -72,10 +70,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      description,
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    Text(description, style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 16),
                     _buildInfoRow('Disciplina', subject),
                     if (dueDate.isNotEmpty) ...[
@@ -107,7 +102,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Campo de descrição
                     TextField(
                       decoration: const InputDecoration(
@@ -131,7 +126,9 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                           child: ElevatedButton.icon(
                             onPressed: _pickFile,
                             icon: const Icon(Icons.attach_file),
-                            label: Text(_selectedFileName ?? 'Selecionar Arquivo'),
+                            label: Text(
+                              _selectedFileName ?? 'Selecionar Arquivo',
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2953A5),
                               foregroundColor: Colors.white,
@@ -164,25 +161,31 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _selectedFilePath != null ? _submitAssignment : null,
+                        onPressed:
+                            _selectedFilePath != null
+                                ? _submitAssignment
+                                : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2953A5),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: _loading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        child:
+                            _loading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : const Text(
+                                  'Enviar Entrega',
+                                  style: TextStyle(fontSize: 16),
                                 ),
-                              )
-                            : const Text(
-                                'Enviar Entrega',
-                                style: TextStyle(fontSize: 16),
-                              ),
                       ),
                     ),
                   ],
@@ -209,9 +212,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
             ),
           ),
         ),
-        Expanded(
-          child: Text(value),
-        ),
+        Expanded(child: Text(value)),
       ],
     );
   }
@@ -268,7 +269,6 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
 
     setState(() {
       _loading = true;
-      _error = null;
     });
 
     try {
@@ -298,7 +298,9 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       // Criar request multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiConfig.baseUrl}/assignments/${widget.assignment['id']}/submissions'),
+        Uri.parse(
+          '${ApiConfig.baseUrl}/assignments/${widget.assignment['id']}/submissions',
+        ),
       );
 
       // Adicionar headers
@@ -335,12 +337,12 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
         );
         Navigator.pop(context, true); // Retorna true para indicar sucesso
       } else {
-        throw Exception('Erro ao enviar entrega: ${response.statusCode} - $responseBody');
+        throw Exception(
+          'Erro ao enviar entrega: ${response.statusCode} - $responseBody',
+        );
       }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erro ao enviar entrega: $e'),
@@ -353,4 +355,4 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       });
     }
   }
-} 
+}

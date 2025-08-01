@@ -1002,7 +1002,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     final teacher = event['teacher']?['name'] ?? 'Professor não informado';
     final className = event['className'] ?? 'Turma não informada';
     final description = event['description'] ?? '';
-    final classId = event['classId'];
 
     return GestureDetector(
       onTap: () {

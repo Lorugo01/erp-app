@@ -30,7 +30,6 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
 
   // Data selecionada
   DateTime _selectedDate = DateTime.now();
-  DateTime _focusedDate = DateTime.now();
 
   // Calendário
   late PageController _pageController;
@@ -194,7 +193,6 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
   void _onDateSelected(DateTime selectedDate, DateTime focusedDate) {
     setState(() {
       _selectedDate = selectedDate;
-      _focusedDate = focusedDate;
     });
   }
 
