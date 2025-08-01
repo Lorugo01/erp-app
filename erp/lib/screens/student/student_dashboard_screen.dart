@@ -270,7 +270,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
     try {
       debugPrint('🔍 === CARREGANDO AULAS DO DIA ===');
-      
+
       // Primeiro, buscar as turmas do aluno
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
@@ -302,12 +302,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       );
 
       if (enrollmentsResponse.statusCode != 200) {
-        debugPrint('❌ Erro ao carregar matrículas: ${enrollmentsResponse.statusCode}');
+        debugPrint(
+          '❌ Erro ao carregar matrículas: ${enrollmentsResponse.statusCode}',
+        );
         return;
       }
 
       final List enrollments = jsonDecode(enrollmentsResponse.body);
-      final currentEnrollments = enrollments.where((e) => e['current'] == true).toList();
+      final currentEnrollments =
+          enrollments.where((e) => e['current'] == true).toList();
 
       if (currentEnrollments.isEmpty) {
         debugPrint('❌ Nenhuma matrícula atual encontrada');
@@ -317,7 +320,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       // Buscar eventos de todas as turmas do aluno
       List<Map<String, dynamic>> allTodayLessons = [];
       final today = DateTime.now();
-      final todayWeekday = today.weekday; // 1 = Segunda, 2 = Terça, ..., 7 = Domingo
+      final todayWeekday =
+          today.weekday; // 1 = Segunda, 2 = Terça, ..., 7 = Domingo
 
       for (final enrollment in currentEnrollments) {
         final classId = enrollment['class']['id'];
@@ -330,14 +334,18 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
         if (eventsResponse.statusCode == 200) {
           final List events = jsonDecode(eventsResponse.body);
-          
+
           // Filtrar eventos recorrentes para o dia da semana atual
-          final todayEvents = events.where((event) => 
-            event['date'] == null && 
-            event['dayOfWeek'] == todayWeekday &&
-            event['startTime'] != null &&
-            event['endTime'] != null
-          ).toList();
+          final todayEvents =
+              events
+                  .where(
+                    (event) =>
+                        event['date'] == null &&
+                        event['dayOfWeek'] == todayWeekday &&
+                        event['startTime'] != null &&
+                        event['endTime'] != null,
+                  )
+                  .toList();
 
           // Adicionar informações da turma aos eventos
           for (final event in todayEvents) {
@@ -360,7 +368,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       setState(() {
         _todayLessons = allTodayLessons;
       });
-
     } catch (e) {
       debugPrint('❌ Erro ao carregar aulas do dia: $e');
     } finally {
@@ -969,26 +976,16 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             ] else
               Column(
                 children: [
-                  Icon(
-                    Icons.event_busy,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
+                  Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 8),
                   Text(
                     'Nenhuma aula programada para hoje',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Verifique o calendário para ver o horário semanal',
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
                 ],
               ),
@@ -1074,7 +1071,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2953A5).withAlpha(30),
                     borderRadius: BorderRadius.circular(4),

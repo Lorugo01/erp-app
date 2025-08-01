@@ -415,11 +415,11 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
                                 ),
                               ),
 
-                              // Calendário (60% da altura)
-                              Expanded(flex: 6, child: _buildCalendar()),
+                              // Calendário (50% da altura)
+                              Expanded(flex: 5, child: _buildCalendar()),
 
-                              // Detalhes das aulas (40% da altura)
-                              Expanded(flex: 4, child: _buildLessonDetails()),
+                              // Detalhes das aulas (50% da altura)
+                              Expanded(flex: 5, child: _buildLessonDetails()),
                             ],
                           );
                         } else {
@@ -662,7 +662,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
         final isMobile = constraints.maxWidth < 600;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isMobile ? 12 : 16),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             border:
@@ -670,174 +670,204 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
                     ? null
                     : Border(left: BorderSide(color: Colors.grey[300]!)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      DateFormat(
-                        'EEEE, dd/MM/yyyy',
-                        'pt_BR',
-                      ).format(_selectedDate),
-                      style: TextStyle(
-                        fontSize: isMobile ? 16 : 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if (isMobile)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2953A5).withAlpha(30),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        '${lessonsForSelectedDate.length} aula${lessonsForSelectedDate.length != 1 ? 's' : ''}',
-                        style: const TextStyle(
-                          fontSize: 12,
+                        DateFormat(
+                          'EEEE, dd/MM/yyyy',
+                          'pt_BR',
+                        ).format(_selectedDate),
+                        style: TextStyle(
+                          fontSize: isMobile ? 14 : 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2953A5),
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (_loadingLessons)
-                const Center(child: CircularProgressIndicator())
-              else if (_errorLessons != null)
-                Center(
-                  child: Text(
-                    _errorLessons!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                )
-              else if (lessonsForSelectedDate.isEmpty)
-                Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.event_busy,
-                        size: isMobile ? 32 : 48,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Nenhuma aula programada\npara este dia da semana',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: isMobile ? 12 : 14,
+                    if (isMobile)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: lessonsForSelectedDate.length,
-                    itemBuilder: (context, index) {
-                      final event = lessonsForSelectedDate[index];
-                      final title = event['title'] ?? 'Aula';
-                      final description = event['description'] ?? '';
-                      final startTime = event['startTime'] ?? '';
-                      final endTime = event['endTime'] ?? '';
-                      final teacher = event['teacher'];
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: Padding(
-                          padding: EdgeInsets.all(isMobile ? 8 : 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: isMobile ? 32 : 40,
-                                    height: isMobile ? 32 : 40,
-                                    decoration: BoxDecoration(
-                                      color: const Color(
-                                        0xFF2953A5,
-                                      ).withAlpha(30),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.book,
-                                      color: const Color(0xFF2953A5),
-                                      size: isMobile ? 16 : 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          title
-                                              .replaceAll('_', ' ')
-                                              .toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 14 : 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        if (teacher != null &&
-                                            teacher['name'] != null)
-                                          Text(
-                                            'Prof. ${teacher['name']}',
-                                            style: TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: isMobile ? 12 : 14,
-                                            ),
-                                          ),
-                                        if (description.isNotEmpty)
-                                          Text(
-                                            description,
-                                            style: TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: isMobile ? 10 : 12,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.access_time,
-                                    size: isMobile ? 14 : 16,
-                                    color: Colors.grey,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '$startTime - $endTime',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: isMobile ? 10 : 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2953A5).withAlpha(30),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${lessonsForSelectedDate.length} aula${lessonsForSelectedDate.length != 1 ? 's' : ''}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2953A5),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                  ],
                 ),
-            ],
+                SizedBox(height: isMobile ? 12 : 16),
+                if (_loadingLessons)
+                  const Center(child: CircularProgressIndicator())
+                else if (_errorLessons != null)
+                  Center(
+                    child: Text(
+                      _errorLessons!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  )
+                else if (lessonsForSelectedDate.isEmpty)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_busy,
+                          size: isMobile ? 40 : 48,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Nenhuma aula programada',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: isMobile ? 14 : 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'para este dia da semana',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: isMobile ? 12 : 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Selecione outro dia para ver as aulas',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: isMobile ? 10 : 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Column(
+                    children:
+                        lessonsForSelectedDate.map((event) {
+                          final title = event['title'] ?? 'Aula';
+                          final description = event['description'] ?? '';
+                          final startTime = event['startTime'] ?? '';
+                          final endTime = event['endTime'] ?? '';
+                          final teacher = event['teacher'];
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Padding(
+                              padding: EdgeInsets.all(isMobile ? 8 : 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: isMobile ? 32 : 40,
+                                        height: isMobile ? 32 : 40,
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF2953A5,
+                                          ).withAlpha(30),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.book,
+                                          color: const Color(0xFF2953A5),
+                                          size: isMobile ? 16 : 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              title
+                                                  .replaceAll('_', ' ')
+                                                  .toUpperCase(),
+                                              style: TextStyle(
+                                                fontSize: isMobile ? 14 : 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (teacher != null &&
+                                                teacher['name'] != null)
+                                              Text(
+                                                'Prof. ${teacher['name']}',
+                                                style: TextStyle(
+                                                  color: Colors.grey,
+                                                  fontSize: isMobile ? 12 : 14,
+                                                ),
+                                              ),
+                                            if (description.isNotEmpty)
+                                              Text(
+                                                description,
+                                                style: TextStyle(
+                                                  color: Colors.grey,
+                                                  fontSize: isMobile ? 10 : 12,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: isMobile ? 14 : 16,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$startTime - $endTime',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: isMobile ? 10 : 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+              ],
+            ),
           ),
         );
       },

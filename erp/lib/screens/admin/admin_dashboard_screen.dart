@@ -337,7 +337,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   final responseData = jsonDecode(response.body);
                   // Extrair os dados do professor da resposta da API
                   final teacherData = responseData['teacher'] ?? responseData;
-                  
+
                   // Garantir que o objeto tenha a estrutura esperada pelo widget
                   final newTeacher = {
                     'id': teacherData['id'],
@@ -347,7 +347,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'createdAt': teacherData['createdAt'],
                     'user': teacherData['user'],
                   };
-                  
+
                   setState(() {
                     _teachers.add(newTeacher);
                   });
@@ -408,7 +408,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   final responseData = jsonDecode(response.body);
                   // Extrair os dados do aluno da resposta da API
                   final studentData = responseData['student'] ?? responseData;
-                  
+
                   setState(() {
                     _students.add(
                       student_service.Student(
@@ -481,7 +481,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   final responseData = jsonDecode(response.body);
                   // Extrair os dados da turma da resposta da API
                   final classData = responseData['class'] ?? responseData;
-                  
+
                   // Garantir que o objeto tenha a estrutura esperada pelo widget
                   final newClass = {
                     'id': classData['id'],
@@ -493,7 +493,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'evaluationModel': classData['evaluationModel'],
                     'createdAt': classData['createdAt'],
                   };
-                  
+
                   setState(() {
                     _classes.add(newClass);
                   });

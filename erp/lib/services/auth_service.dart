@@ -2,25 +2,30 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../config/api_config.dart';
+import 'package:flutter/material.dart';
 
 class AuthService {
   // Login
   static Future<User> login(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.authEndpoint}/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}${ApiConfig.authEndpoint}/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(const Duration(seconds: ApiConfig.requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return User.fromJson(data);
       } else {
+        debugPrint('❌ Erro HTTP: ${response.statusCode} - ${response.body}');
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Erro no login');
       }
     } catch (e) {
+      debugPrint('❌ Erro de conexão: $e');
       throw Exception('Erro de conexão: $e');
     }
   }
