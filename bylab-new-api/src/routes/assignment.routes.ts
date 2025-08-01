@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as AssignmentController from '../controllers/assignment.controller';
+import { upload } from '../middlewares/upload.middleware';
 
 const router = Router();
 
@@ -10,6 +11,6 @@ router.delete('/:id', AssignmentController.deleteAssignment); // Deletar assignm
 
 // Entregas dos alunos
 router.get('/:id/submissions', AssignmentController.getSubmissionsByAssignment);
-router.post('/:id/submissions', AssignmentController.createSubmission);
+router.post('/:id/submissions', upload.single('file'), AssignmentController.createSubmission);
 
 export default router; 

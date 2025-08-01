@@ -33,6 +33,7 @@ export const getClassById = async (id: string) => {
     where: { id },
     include: {
       enrollments: {
+        where: { current: true }, // Filtrar apenas matrículas atuais
         include: { student: true }
       },
       subjects: {
@@ -190,6 +191,7 @@ export const getClassStudents = async (classId: string) => {
     where: { id: classId },
     include: {
       enrollments: {
+        where: { current: true }, // Filtrar apenas matrículas atuais
         include: {
           student: {
             include: {

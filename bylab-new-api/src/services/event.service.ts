@@ -7,6 +7,20 @@ export const createEvent = async (data: any) => {
 export const getEventsByClassId = async (classId: string) => {
   return prisma.event.findMany({
     where: { classId },
+    include: {
+      teacher: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              createdAt: true
+            }
+          }
+        }
+      }
+    },
     orderBy: { startTime: 'asc' }
   });
 };

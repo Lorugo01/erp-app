@@ -70,7 +70,19 @@ export const getSubmissionsByAssignment = async (req: Request, res: Response, ne
 export const createSubmission = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const assignmentId = req.params.id;
-    const submission = await AssignmentService.createSubmission(assignmentId, req.body);
+    const { studentId, description } = req.body;
+    
+    let fileUrl = null;
+    if (req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
+    }
+    
+    const submission = await AssignmentService.createSubmission(assignmentId, {
+      studentId,
+      description,
+      fileUrl
+    });
+    
     res.status(201).json(submission);
   } catch (error) {
     console.error('Erro ao criar submission:', error);

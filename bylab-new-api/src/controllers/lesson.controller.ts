@@ -64,3 +64,13 @@ export const getOrCreateByClassDate = async (req: Request, res: Response, next: 
     next(error);
   }
 };
+
+export const getByClass = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const classId = req.params.classId;
+    const lessons = await LessonService.getLessonsByClass(classId);
+    res.json(lessons);
+  } catch (error) {
+    next(error);
+  }
+};

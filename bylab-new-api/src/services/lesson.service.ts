@@ -100,3 +100,20 @@ export const getOrCreateLessonByClassDate = async (data: {
   
   return lesson;
 };
+
+export const getLessonsByClass = async (classId: string) => {
+  if (!classId || typeof classId !== 'string' || classId.length < 10) {
+    throw new Error('ID da turma inválido');
+  }
+
+  return prisma.lesson.findMany({
+    where: { classId },
+    include: {
+      class: true,
+      subject: true,
+      teacher: true,
+      attendances: true,
+    },
+    orderBy: { date: 'asc' }
+  });
+};

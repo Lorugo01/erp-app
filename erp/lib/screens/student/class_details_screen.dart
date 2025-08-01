@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../config/api_config.dart';
-import 'package:erp/providers/auth_provider.dart'; // Added missing import
-import 'package:provider/provider.dart'; // Added missing import
+import '../../providers/auth_provider.dart';
+import 'package:provider/provider.dart';
+import 'assignment_details_screen.dart';
 
 class ClassDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -33,14 +34,21 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
   bool _loadingGrades = false;
   String? _errorGrades;
 
+  // Dados dos períodos
+  List<Map<String, dynamic>> _gradePeriods = [];
+  bool _loadingPeriods = false;
+  String? _errorPeriods;
+
   // Disciplina selecionada
   Map<String, dynamic>? _selectedSubject;
+  Map<String, dynamic>? _selectedPeriod;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadSubjects();
+    _loadGradePeriods();
   }
 
   @override
@@ -101,6 +109,50 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     }
   }
 
+  Future<void> _loadGradePeriods() async {
+    setState(() {
+      _loadingPeriods = true;
+      _errorPeriods = null;
+    });
+
+    try {
+      debugPrint('🔍 === CARREGANDO PERÍODOS ===');
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/grade-periods'),
+        headers: ApiConfig.defaultHeaders,
+      );
+
+      debugPrint('🔍 Status da resposta dos períodos: ${response.statusCode}');
+      debugPrint('🔍 Corpo da resposta dos períodos: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        debugPrint('🔍 Dados dos períodos: $data');
+        setState(() {
+          _gradePeriods = List<Map<String, dynamic>>.from(data);
+          // Selecionar o primeiro período por padrão
+          if (_gradePeriods.isNotEmpty) {
+            _selectedPeriod = _gradePeriods.first;
+          }
+        });
+      } else {
+        debugPrint('❌ Erro ao carregar períodos: ${response.statusCode}');
+        setState(() {
+          _errorPeriods = 'Erro ao carregar períodos';
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar períodos: $e');
+      setState(() {
+        _errorPeriods = e.toString();
+      });
+    } finally {
+      setState(() {
+        _loadingPeriods = false;
+      });
+    }
+  }
+
   Future<void> _loadAssignments(String subjectId) async {
     setState(() {
       _loadingAssignments = true;
@@ -110,9 +162,12 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     try {
       debugPrint('🔍 === CARREGANDO ATIVIDADES ===');
       debugPrint('🔍 Subject ID: $subjectId');
+      debugPrint('🔍 Class ID: ${widget.classData['id']}');
 
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/assignments/subject/$subjectId'),
+        Uri.parse(
+          '${ApiConfig.baseUrl}/classes/${widget.classData['id']}/assignments?subjectId=$subjectId',
+        ),
         headers: ApiConfig.defaultHeaders,
       );
 
@@ -154,6 +209,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     try {
       debugPrint('🔍 === CARREGANDO NOTAS ===');
       debugPrint('🔍 Subject ID: $subjectId');
+      debugPrint('🔍 Period ID: ${_selectedPeriod?['id']}');
 
       // Buscar notas do aluno para esta disciplina
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -185,18 +241,22 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
 
         if (response.statusCode == 200) {
           final List data = jsonDecode(response.body);
-          // Filtrar notas da disciplina selecionada
-          final subjectGrades =
-              data
-                  .where(
-                    (grade) =>
-                        grade['subjectId'] == subjectId ||
-                        grade['subject']?['id'] == subjectId,
-                  )
-                  .toList();
-          debugPrint('🔍 Dados das notas: $subjectGrades');
+          // Filtrar notas da disciplina e período selecionados
+          final filteredGrades =
+              data.where((grade) {
+                final isSubjectMatch =
+                    grade['subjectId'] == subjectId ||
+                    grade['subject']?['id'] == subjectId;
+                final isPeriodMatch =
+                    _selectedPeriod == null ||
+                    grade['periodId'] == _selectedPeriod!['id'] ||
+                    grade['gradePeriod']?['id'] == _selectedPeriod!['id'];
+                return isSubjectMatch && isPeriodMatch;
+              }).toList();
+
+          debugPrint('🔍 Dados das notas filtradas: $filteredGrades');
           setState(() {
-            _grades = List<Map<String, dynamic>>.from(subjectGrades);
+            _grades = List<Map<String, dynamic>>.from(filteredGrades);
           });
         } else {
           debugPrint('❌ Erro ao carregar notas: ${response.statusCode}');
@@ -225,8 +285,23 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     setState(() {
       _selectedSubject = subject;
     });
-    _loadAssignments(subject['id']);
-    _loadGrades(subject['id']);
+    final subjectId = subject['id']?.toString();
+    if (subjectId != null && subjectId.isNotEmpty) {
+      _loadAssignments(subjectId);
+      if (_selectedPeriod != null) {
+        _loadGrades(subjectId);
+      }
+    }
+  }
+
+  void _selectPeriod(Map<String, dynamic> period) {
+    setState(() {
+      _selectedPeriod = period;
+    });
+    final subjectId = _selectedSubject?['id']?.toString();
+    if (subjectId != null && subjectId.isNotEmpty) {
+      _loadGrades(subjectId);
+    }
   }
 
   @override
@@ -453,6 +528,136 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
       );
     }
 
+    return Column(
+      children: [
+        // Seletor de período
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Período',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              if (_loadingPeriods)
+                const Center(child: CircularProgressIndicator())
+              else if (_errorPeriods != null)
+                Center(
+                  child: Text(
+                    _errorPeriods!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                )
+              else if (_gradePeriods.isEmpty)
+                const Center(
+                  child: Text(
+                    'Nenhum período encontrado',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 50,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _gradePeriods.length,
+                    itemBuilder: (context, index) {
+                      final period = _gradePeriods[index];
+                      final isSelected = _selectedPeriod?['id'] == period['id'];
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(period['name'] ?? 'Período'),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            if (selected) {
+                              _selectPeriod(period);
+                            }
+                          },
+                          backgroundColor: Colors.grey[200],
+                          selectedColor: const Color(0xFF2953A5),
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black,
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // Média atual
+        if (_selectedPeriod != null && _grades.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Card(
+              color: const Color(0xFF2953A5).withAlpha(30),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calculate,
+                      color: Color(0xFF2953A5),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Média do ${_selectedPeriod!['name']}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2953A5),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _calculateAverage(),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2953A5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Lista de notas
+        Expanded(child: _buildGradesList()),
+      ],
+    );
+  }
+
+  Widget _buildGradesList() {
+    if (_selectedPeriod == null) {
+      return const Center(
+        child: Text(
+          'Selecione um período para ver as notas',
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
     if (_loadingGrades) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -494,7 +699,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
             ),
             SizedBox(height: 8),
             Text(
-              'Não há notas cadastradas para esta disciplina.',
+              'Não há notas cadastradas para este período.',
               style: TextStyle(fontSize: 14, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
@@ -512,6 +717,24 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
       },
     );
   }
+
+  String _calculateAverage() {
+    if (_grades.isEmpty) return '0.0';
+
+    double total = 0.0;
+    int count = 0;
+
+    for (final grade in _grades) {
+      final value = grade['value'];
+      if (value != null) {
+        total += (value is int ? value.toDouble() : value);
+        count++;
+      }
+    }
+
+    if (count == 0) return '0.0';
+    return (total / count).toStringAsFixed(1);
+  }
 }
 
 class _AssignmentCard extends StatelessWidget {
@@ -521,98 +744,84 @@ class _AssignmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = assignment['title'] ?? 'Atividade sem título';
-    final description = assignment['description'] ?? 'Sem descrição';
+    final description = assignment['description'] ?? 'Atividade sem descrição';
     final dueDate = assignment['dueDate'] ?? '';
-    final status = assignment['status'] ?? 'pending';
+    final subject =
+        assignment['subject']?['name'] ?? 'Disciplina não informada';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(status),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _getStatusText(status),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(description, style: const TextStyle(color: Colors.grey)),
-            if (dueDate.isNotEmpty) ...[
-              const SizedBox(height: 8),
+      child: InkWell(
+        onTap: () => _openAssignmentDetails(context),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  const Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: Colors.grey,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subject,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Entrega: $dueDate',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.grey,
+                    size: 16,
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              if (dueDate.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Entrega: ${DateTime.parse(dueDate).toLocal().toString().split(' ')[0]}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'overdue':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'CONCLUÍDA';
-      case 'pending':
-        return 'PENDENTE';
-      case 'overdue':
-        return 'ATRASADA';
-      default:
-        return 'DESCONHECIDO';
-    }
+  void _openAssignmentDetails(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AssignmentDetailsScreen(assignment: assignment),
+      ),
+    );
   }
 }
 
@@ -623,10 +832,26 @@ class _GradeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final value = grade['value'] ?? 0.0;
-    final type = grade['gradeType']?['name'] ?? 'Nota';
-    final period = grade['gradePeriod']?['name'] ?? 'Período não informado';
+    final value = (grade['value'] ?? 0).toDouble();
+    final type = grade['type']?['name'] ?? 'Nota';
+    final period = grade['period']?['name'] ?? 'Período não informado';
     final subject = grade['subject']?['name'] ?? 'Disciplina não informada';
+
+    // Determinar o tipo específico da nota
+    String gradeTypeText = type;
+    if (type.toLowerCase().contains('prova')) {
+      gradeTypeText =
+          type; // Manter como está se já for "Prova 1", "Prova 2", etc.
+    } else if (type.toLowerCase().contains('trabalho')) {
+      gradeTypeText = type;
+    } else if (type.toLowerCase().contains('média')) {
+      gradeTypeText = type;
+    } else if (type.toLowerCase().contains('recuperação')) {
+      gradeTypeText = type;
+    } else {
+      gradeTypeText =
+          type; // Usar o nome original se não for um dos tipos conhecidos
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -658,7 +883,7 @@ class _GradeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    type,
+                    gradeTypeText,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -683,7 +908,7 @@ class _GradeCard extends StatelessWidget {
     );
   }
 
-  Color _getGradeColor(double value) {
+  Color _getGradeColor(num value) {
     if (value >= 7.0) return Colors.green;
     if (value >= 5.0) return Colors.orange;
     return Colors.red;

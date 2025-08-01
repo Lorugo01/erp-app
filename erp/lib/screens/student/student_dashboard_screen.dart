@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../providers/auth_provider.dart';
 import '../../config/api_config.dart';
 import 'class_details_screen.dart';
+import 'student_calendar_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -44,6 +44,17 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     _loadAttendanceData();
     _loadTodayLessons();
     _loadGrades();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recarregar aulas do dia quando a tela for focada novamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadTodayLessons();
+      }
+    });
   }
 
   Future<void> _loadStudentData() async {
@@ -258,24 +269,100 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     });
 
     try {
-      // Buscar aulas do dia atual
-      final now = DateTime.now();
-      final today =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      debugPrint('🔍 === CARREGANDO AULAS DO DIA ===');
+      
+      // Primeiro, buscar as turmas do aluno
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+      String? studentId;
 
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/lessons/date/$today'),
+      if (user?.student?.id != null) {
+        studentId = user!.student!.id;
+      } else if (user?.id != null) {
+        final studentResponse = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
+          headers: ApiConfig.defaultHeaders,
+        );
+
+        if (studentResponse.statusCode == 200) {
+          final studentData = jsonDecode(studentResponse.body);
+          studentId = studentData['id'];
+        }
+      }
+
+      if (studentId == null) {
+        debugPrint('❌ ID do aluno não encontrado para carregar aulas do dia');
+        return;
+      }
+
+      // Buscar matrículas do aluno
+      final enrollmentsResponse = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/enrollments/student/$studentId'),
         headers: ApiConfig.defaultHeaders,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        setState(() {
-          _todayLessons = List<Map<String, dynamic>>.from(data);
-        });
+      if (enrollmentsResponse.statusCode != 200) {
+        debugPrint('❌ Erro ao carregar matrículas: ${enrollmentsResponse.statusCode}');
+        return;
       }
+
+      final List enrollments = jsonDecode(enrollmentsResponse.body);
+      final currentEnrollments = enrollments.where((e) => e['current'] == true).toList();
+
+      if (currentEnrollments.isEmpty) {
+        debugPrint('❌ Nenhuma matrícula atual encontrada');
+        return;
+      }
+
+      // Buscar eventos de todas as turmas do aluno
+      List<Map<String, dynamic>> allTodayLessons = [];
+      final today = DateTime.now();
+      final todayWeekday = today.weekday; // 1 = Segunda, 2 = Terça, ..., 7 = Domingo
+
+      for (final enrollment in currentEnrollments) {
+        final classId = enrollment['class']['id'];
+        debugPrint('🔍 Buscando eventos da turma: $classId');
+
+        final eventsResponse = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/classes/$classId/events'),
+          headers: ApiConfig.defaultHeaders,
+        );
+
+        if (eventsResponse.statusCode == 200) {
+          final List events = jsonDecode(eventsResponse.body);
+          
+          // Filtrar eventos recorrentes para o dia da semana atual
+          final todayEvents = events.where((event) => 
+            event['date'] == null && 
+            event['dayOfWeek'] == todayWeekday &&
+            event['startTime'] != null &&
+            event['endTime'] != null
+          ).toList();
+
+          // Adicionar informações da turma aos eventos
+          for (final event in todayEvents) {
+            event['className'] = enrollment['class']['name'];
+            event['classId'] = classId;
+          }
+
+          allTodayLessons.addAll(List<Map<String, dynamic>>.from(todayEvents));
+        }
+      }
+
+      // Ordenar por horário de início
+      allTodayLessons.sort((a, b) {
+        final timeA = a['startTime'] ?? '';
+        final timeB = b['startTime'] ?? '';
+        return timeA.compareTo(timeB);
+      });
+
+      debugPrint('🔍 Aulas do dia encontradas: ${allTodayLessons.length}');
+      setState(() {
+        _todayLessons = allTodayLessons;
+      });
+
     } catch (e) {
-      // Ignorar erro de aulas por enquanto
+      debugPrint('❌ Erro ao carregar aulas do dia: $e');
     } finally {
       setState(() {
         _loadingLessons = false;
@@ -298,7 +385,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         );
 
         if (response.statusCode == 200) {
-          final List data = jsonDecode(response.body);
+          jsonDecode(response.body);
           setState(() {});
         }
       }
@@ -709,8 +796,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         const SizedBox(height: 8),
         ..._attendanceData
             .take(5)
-            .map((attendance) => _buildAttendanceItem(attendance))
-            .toList(),
+            .map((attendance) => _buildAttendanceItem(attendance)),
       ],
     );
   }
@@ -869,10 +955,42 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             const SizedBox(height: 16),
             if (_todayLessons.isNotEmpty) ...[
               ..._todayLessons.map((lesson) => _buildLessonCard(lesson)),
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'Toque em uma aula para ver o calendário completo',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
             ] else
-              const Text(
-                'Nenhuma aula programada para hoje',
-                style: TextStyle(color: Colors.grey),
+              Column(
+                children: [
+                  Icon(
+                    Icons.event_busy,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Nenhuma aula programada para hoje',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Verifique o calendário para ver o horário semanal',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
           ],
         ),
@@ -880,53 +998,106 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     );
   }
 
-  Widget _buildLessonCard(Map<String, dynamic> lesson) {
-    final startTime = lesson['startTime'] ?? '';
-    final endTime = lesson['endTime'] ?? '';
-    final subject = lesson['subject']?['name'] ?? 'Disciplina não informada';
-    final teacher = lesson['teacher']?['name'] ?? 'Professor não informado';
+  Widget _buildLessonCard(Map<String, dynamic> event) {
+    final startTime = event['startTime'] ?? '';
+    final endTime = event['endTime'] ?? '';
+    final title = event['title'] ?? 'Aula';
+    final teacher = event['teacher']?['name'] ?? 'Professor não informado';
+    final className = event['className'] ?? 'Turma não informada';
+    final description = event['description'] ?? '';
+    final classId = event['classId'];
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2953A5),
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return GestureDetector(
+      onTap: () {
+        // Navegar para o calendário com a turma selecionada
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const StudentCalendarScreen(),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2953A5),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title.replaceAll('_', ' ').toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Prof. $teacher',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  Text(
+                    className,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                  if (description.isNotEmpty)
+                    Text(
+                      description,
+                      style: const TextStyle(color: Colors.grey, fontSize: 10),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  subject,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  '$startTime - $endTime',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2953A5),
+                    fontSize: 12,
+                  ),
                 ),
-                Text(
-                  teacher,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2953A5).withAlpha(30),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Hoje',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF2953A5),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: const Color(0xFF2953A5).withAlpha(150),
                 ),
               ],
             ),
-          ),
-          Text(
-            '$startTime - $endTime',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2953A5),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1028,32 +1199,24 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
           const SizedBox(height: 16),
           // Lista de turmas
-          ..._classes
-              .map(
-                (classData) => _ClassCard(
-                  classData: classData,
-                  onTap: () => _showClassDetails(classData),
-                ),
-              )
-              .toList(),
+          ..._classes.map(
+            (classData) => _ClassCard(
+              classData: classData,
+              onTap: () => _showClassDetails(classData),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildCalendarTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.calendar_today, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'Calendário em desenvolvimento',
-            style: TextStyle(fontSize: 18, color: Colors.grey),
-          ),
-        ],
-      ),
+    return Navigator(
+      onGenerateRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const StudentCalendarScreen(),
+        );
+      },
     );
   }
 }

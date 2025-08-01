@@ -159,6 +159,40 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                       e['student']['id'] == studentId &&
                                       e['year'] == year,
                                 );
+
+                                // Verifica se o aluno já está matriculado na mesma turma
+                                final jaMatriculadoMesmaTurma = _enrollments
+                                    .any(
+                                      (e) =>
+                                          e['student']['id'] == studentId &&
+                                          e['classId'] == classId,
+                                    );
+                                if (jaMatriculadoMesmaTurma) {
+                                  if (!mounted) return;
+                                  if (!context.mounted) return;
+                                  showDialog(
+                                    context: context,
+                                    builder:
+                                        (warningContext) => AlertDialog(
+                                          title: const Text('Aviso'),
+                                          content: const Text(
+                                            'O aluno já está matriculado nesta turma.',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                      Navigator.of(
+                                                        warningContext,
+                                                      ).pop(),
+                                              child: const Text('OK'),
+                                            ),
+                                          ],
+                                        ),
+                                  );
+                                  continue;
+                                }
+
                                 if (jaMatriculadoMesmoAno) {
                                   if (!mounted) return;
                                   if (!context.mounted) return;
@@ -194,6 +228,8 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                     'studentId': studentId,
                                     'classId': classId,
                                     'year': year,
+                                    'current':
+                                        true, // Marcar como matrícula atual
                                   }),
                                 );
 

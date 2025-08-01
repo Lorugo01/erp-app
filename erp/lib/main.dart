@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'providers/auth_provider.dart';
 import 'providers/data_provider.dart';
 import 'screens/login_screen.dart';
@@ -9,7 +10,10 @@ import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'config/environment.dart';
 
-void main() {
+void main() async {
+  // Inicializar dados de localização para formatação de datas
+  await initializeDateFormatting('pt_BR', null);
+
   // Configurar ambiente de desenvolvimento
   EnvironmentConfig.setEnvironment(Environment.development);
 
