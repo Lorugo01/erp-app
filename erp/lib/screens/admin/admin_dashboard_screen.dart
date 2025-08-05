@@ -14,6 +14,7 @@ import 'teacher_detail_screen.dart';
 import 'user_detail_screen.dart';
 import 'grade_management_screen.dart';
 import 'admin_settings_screen.dart';
+import 'tecaai_demo_screen.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/admin_app_bar_menu.dart';
 
@@ -1091,6 +1092,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 7:
         return const GradeManagementScreen();
       case 8:
+        return const TecaAIDemoScreen();
+      case 9:
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1226,7 +1229,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   AdminResponsiveNavigation(
                     selectedIndex: _selectedIndex,
                     onSelect: (index) {
-                      if (index == 8) {
+                      if (index == 9) {
                         authProvider.logout();
                       } else {
                         setState(() => _selectedIndex = index);

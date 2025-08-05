@@ -1,0 +1,14 @@
+2025-03-12 17:40:01,789 - ERROR - Erro ao processar conexão com ('192.168.100.32', 64543): Error opening 'voz/Teca.wav': System error.
+2025-03-12 17:42:31,103 - ERROR - Erro ao processar conexão com ('192.168.100.32', 64560): Error opening 'voz/Teca.wav': System error.
+2025-03-21 09:12:28,618 - ERROR - Erro ao processar conexão com ('127.0.0.1', 49802): Error opening 'voz/Teca_v2.wav': System error.
+2025-03-21 09:13:42,757 - ERROR - Erro ao processar conexão com ('127.0.0.1', 49825): Error opening 'voz/Teca_v2.wav': System error.
+2025-03-21 09:16:51,107 - ERROR - Erro ao processar conexão com ('127.0.0.1', 49975): Error opening 'voz/Teca_v2.wav': System error.
+2025-03-21 09:21:59,293 - ERROR - Erro ao processar conexão com ('127.0.0.1', 50013): Error opening 'C:/Users/User/Desktop/Teca Versão Atualizada/Servidor/TecaAI/vozTeca_v2.wav': System error.
+2025-03-21 10:10:33,491 - ERROR - Erro ao processar conexão com ('127.0.0.1', 50698): [WinError 3] O sistema não pode encontrar o caminho especificado: 'BD/Itens'
+2025-03-21 10:50:19,645 - ERROR - Erro ao processar conexão com ('127.0.0.1', 51258): [WinError 3] O sistema não pode encontrar o caminho especificado: 'BD/Itens'
+2025-03-26 13:15:43,879 - ERROR - Erro ao processar conexão com ('192.168.100.171', 50904): Error opening 'voz/Teca_v2.wav': System error.
+2025-03-26 13:19:10,246 - ERROR - Erro ao processar conexão com ('192.168.100.171', 51083): Error opening 'voz/Teca_v2.wav': System error.
+2025-03-26 13:31:05,338 - ERROR - Erro ao processar conexão com ('192.168.100.171', 51249): Error opening 'voz/Teca_v2.wav': System error.
+2025-04-16 16:07:21,287 - ERROR - Erro ao processar conexão com ('192.168.100.171', 50770): Error opening 'voz/Teca.wav': System error.
+2025-04-16 16:08:11,745 - ERROR - Erro ao processar conexão com ('192.168.100.171', 50781): Error opening 'voz/Teca.wav': System error.
+2025-04-16 16:09:22,696 - ERROR - Erro ao processar conexão com ('192.168.100.171', 50794): Error opening 'voz/Teca.wav': System error.

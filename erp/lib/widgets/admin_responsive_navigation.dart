@@ -105,13 +105,19 @@ class _AdminSidebar extends StatelessWidget {
             selected: selectedIndex == 7,
             onTap: () => onSelect(7),
           ),
+          _SidebarButton(
+            icon: Icons.smart_toy,
+            label: 'TecaAI',
+            selected: selectedIndex == 8,
+            onTap: () => onSelect(8),
+          ),
           const Spacer(),
           const Divider(color: Colors.white54, indent: 16, endIndent: 16),
           _SidebarButton(
             icon: Icons.settings,
             label: 'Configurações',
-            selected: selectedIndex == 8,
-            onTap: () => onSelect(8),
+            selected: selectedIndex == 9,
+            onTap: () => onSelect(9),
           ),
           _SidebarButton(
             icon: Icons.logout,
@@ -165,6 +171,7 @@ class _AdminBottomNavBar extends StatelessWidget {
           icon: Icon(Icons.bar_chart),
           label: 'Relatórios',
         ),
+        BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: 'TecaAI'),
       ],
     );
   }

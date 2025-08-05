@@ -1,0 +1,9 @@
+2025-05-02 15:13:23,579 - INFO - Pergunta: 'fale sobre o brasil' — nível Bloom: 'lembrar'
+2025-05-02 15:13:25,816 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/generate "HTTP/1.1 200 OK"
+2025-05-02 15:13:47,172 - INFO - Segmento 0 gerado em 18.115s - texto: 'Claro, aqui está uma definição...'
+2025-05-02 15:14:38,718 - INFO - Pergunta: 'liste os principais' — nível Bloom: 'lembrar'
+2025-05-02 15:14:39,210 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/generate "HTTP/1.1 200 OK"
+2025-05-02 15:14:48,283 - INFO - Segmento 0 gerado em 7.760s - texto: 'Claro, aqui está uma definição...'
+2025-05-02 15:15:18,006 - INFO - Pergunta: 'descreva uma reação química' — nível Bloom: 'lembrar'
+2025-05-02 15:15:18,284 - INFO - HTTP Request: POST http://127.0.0.1:11434/api/generate "HTTP/1.1 200 OK"
+2025-05-02 15:15:32,101 - INFO - Segmento 0 gerado em 11.309s - texto: 'Claro, aqui está uma definição...'
