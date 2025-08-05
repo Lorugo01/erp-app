@@ -68,7 +68,7 @@ class _TecaAIDemoScreenState extends State<TecaAIDemoScreen> {
     setState(() {
       _selectedArmario = armario;
       _selectedItem = null; // Reset selected item when filtering
-      
+
       if (armario == null || armario.isEmpty) {
         _filteredItems = _items;
       } else {
