@@ -14,7 +14,7 @@ import 'teacher_detail_screen.dart';
 import 'user_detail_screen.dart';
 import 'grade_management_screen.dart';
 import 'admin_settings_screen.dart';
-import 'tecaai_demo_screen.dart';
+import 'tecaai_equipamentos_screen.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/admin_app_bar_menu.dart';
 
@@ -55,23 +55,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _fetchTeachers([String? name]) async {
-    setState(() {
-      _loadingTeachers = true;
-      _errorTeachers = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingTeachers = true;
+        _errorTeachers = null;
+      });
+    }
     try {
       final teachers = await TeacherService.getAllTeachers();
-      setState(() {
-        _teachers = teachers;
-      });
+      if (mounted) {
+        setState(() {
+          _teachers = teachers;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorTeachers = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorTeachers = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loadingTeachers = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingTeachers = false;
+        });
+      }
     }
   }
 
@@ -83,9 +91,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        setState(() {
-          _teachers.removeWhere((t) => t['id'] == teacher['id']);
-        });
+        if (mounted) {
+          setState(() {
+            _teachers.removeWhere((t) => t['id'] == teacher['id']);
+          });
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -122,23 +132,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _fetchStudents([String? name]) async {
-    setState(() {
-      _loadingStudents = true;
-      _errorStudents = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingStudents = true;
+        _errorStudents = null;
+      });
+    }
     try {
       final students = await student_service.StudentService.getAllStudents();
-      setState(() {
-        _students = students;
-      });
+      if (mounted) {
+        setState(() {
+          _students = students;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorStudents = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorStudents = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loadingStudents = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingStudents = false;
+        });
+      }
     }
   }
 
@@ -189,32 +207,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _fetchClasses() async {
-    setState(() {
-      _loadingClasses = true;
-      _errorClasses = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingClasses = true;
+        _errorClasses = null;
+      });
+    }
     try {
       final classes = await ClassService.getAllClasses();
-      setState(() {
-        _classes = classes;
-      });
+      if (mounted) {
+        setState(() {
+          _classes = classes;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorClasses = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorClasses = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loadingClasses = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingClasses = false;
+        });
+      }
     }
   }
 
   Future<void> _deleteClass(Map<String, dynamic> turma) async {
     try {
       await ClassService.deleteClass(turma['id']);
-      setState(() {
-        _classes.removeWhere((c) => c['id'] == turma['id']);
-      });
+      if (mounted) {
+        setState(() {
+          _classes.removeWhere((c) => c['id'] == turma['id']);
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -236,32 +264,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _fetchUsers() async {
-    setState(() {
-      _loadingUsers = true;
-      _errorUsers = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingUsers = true;
+        _errorUsers = null;
+      });
+    }
     try {
       final users = await UserService.getAllUsers();
-      setState(() {
-        _users = users;
-      });
+      if (mounted) {
+        setState(() {
+          _users = users;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorUsers = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorUsers = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loadingUsers = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingUsers = false;
+        });
+      }
     }
   }
 
   Future<void> _deleteUser(User user) async {
     try {
       await UserService.deleteUser(user.id);
-      setState(() {
-        _users.removeWhere((u) => u.id == user.id);
-      });
+      if (mounted) {
+        setState(() {
+          _users.removeWhere((u) => u.id == user.id);
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -320,10 +358,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder:
           (context) => _AddTeacherDialog(
             onAdd: (name, email, password) async {
-              setState(() {
-                _loadingTeachers = true;
-                _errorTeachers = null;
-              });
+              if (mounted) {
+                setState(() {
+                  _loadingTeachers = true;
+                  _errorTeachers = null;
+                });
+              }
               try {
                 final response = await http.post(
                   Uri.parse('http://192.168.18.15:3000/teachers'),
@@ -350,9 +390,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'user': teacherData['user'],
                   };
 
-                  setState(() {
-                    _teachers.add(newTeacher);
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _teachers.add(newTeacher);
+                    });
+                  }
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -375,9 +417,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 );
               } finally {
-                setState(() {
-                  _loadingTeachers = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _loadingTeachers = false;
+                  });
+                }
               }
             },
           ),
@@ -390,10 +434,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder:
           (context) => _AddStudentDialog(
             onAdd: (name, email, registrationNumber, password) async {
-              setState(() {
-                _loadingStudents = true;
-                _errorStudents = null;
-              });
+              if (mounted) {
+                setState(() {
+                  _loadingStudents = true;
+                  _errorStudents = null;
+                });
+              }
               try {
                 final response = await http.post(
                   Uri.parse('http://192.168.18.15:3000/students'),
@@ -411,22 +457,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   // Extrair os dados do aluno da resposta da API
                   final studentData = responseData['student'] ?? responseData;
 
-                  setState(() {
-                    _students.add(
-                      student_service.Student(
-                        id: studentData['id'] ?? '',
-                        name: studentData['name'] ?? name,
-                        email: studentData['email'] ?? email,
-                        registrationNumber:
-                            studentData['registrationNumber'] ??
-                            registrationNumber,
-                        profilePicture: studentData['profilePicture'],
-                        subjects: [],
-                        createdAt: null,
-                        role: null,
-                      ),
-                    );
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _students.add(
+                        student_service.Student(
+                          id: studentData['id'] ?? '',
+                          name: studentData['name'] ?? name,
+                          email: studentData['email'] ?? email,
+                          registrationNumber:
+                              studentData['registrationNumber'] ??
+                              registrationNumber,
+                          profilePicture: studentData['profilePicture'],
+                          subjects: [],
+                          createdAt: null,
+                          role: null,
+                        ),
+                      );
+                    });
+                  }
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -447,9 +495,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 );
               } finally {
-                setState(() {
-                  _loadingStudents = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _loadingStudents = false;
+                  });
+                }
               }
             },
           ),
@@ -462,10 +512,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder:
           (context) => _AddClassDialog(
             onAdd: (grade, letter, academicYear, shift, evaluationModel) async {
-              setState(() {
-                _loadingClasses = true;
-                _errorClasses = null;
-              });
+              if (mounted) {
+                setState(() {
+                  _loadingClasses = true;
+                  _errorClasses = null;
+                });
+              }
               try {
                 final response = await http.post(
                   Uri.parse('http://192.168.18.15:3000/classes'),
@@ -496,9 +548,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'createdAt': classData['createdAt'],
                   };
 
-                  setState(() {
-                    _classes.add(newClass);
-                  });
+                  if (mounted) {
+                    setState(() {
+                      _classes.add(newClass);
+                    });
+                  }
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -519,9 +573,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 );
               } finally {
-                setState(() {
-                  _loadingClasses = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _loadingClasses = false;
+                  });
+                }
               }
             },
           ),
@@ -534,10 +590,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder:
           (context) => _AddUserDialog(
             onAdd: (name, email, password, role) async {
-              setState(() {
-                _loadingUsers = true;
-                _errorUsers = null;
-              });
+              if (mounted) {
+                setState(() {
+                  _loadingUsers = true;
+                  _errorUsers = null;
+                });
+              }
               try {
                 final user = await UserService.createUser(
                   name: name,
@@ -545,9 +603,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   password: password,
                   role: role,
                 );
-                setState(() {
-                  _users.add(user);
-                });
+                if (mounted) {
+                  setState(() {
+                    _users.add(user);
+                  });
+                }
                 // ignore: use_build_context_synchronously
                 Navigator.of(context).pop();
                 // ignore: use_build_context_synchronously
@@ -567,9 +627,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 );
               } finally {
-                setState(() {
-                  _loadingUsers = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _loadingUsers = false;
+                  });
+                }
               }
             },
           ),
@@ -672,7 +734,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
                   ),
                 ),
                 IconButton(
@@ -742,7 +808,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
                   ),
                 ),
                 IconButton(
@@ -812,7 +882,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
                   ),
                 ),
                 IconButton(
@@ -880,7 +954,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) {
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
                   ),
                 ),
                 IconButton(
@@ -926,34 +1004,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         );
       case 5:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.computer, size: 80, color: Color(0xFF2953A5)),
-              SizedBox(height: 24),
-              Text(
-                'Gestão de Equipamentos',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2953A5),
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Funcionalidade em desenvolvimento',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Aqui você poderá gerenciar:\n• Inventário de equipamentos\n• Manutenções\n• Empréstimos\n• Relatórios de uso',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-        );
+        return const TecaAIEquipamentosScreen();
       case 6:
         return SingleChildScrollView(
           child: Column(
@@ -1092,8 +1143,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 7:
         return const GradeManagementScreen();
       case 8:
-        return const TecaAIDemoScreen();
-      case 9:
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1229,9 +1278,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   AdminResponsiveNavigation(
                     selectedIndex: _selectedIndex,
                     onSelect: (index) {
-                      if (index == 9) {
-                        authProvider.logout();
-                      } else {
+                      if (mounted) {
                         setState(() => _selectedIndex = index);
                       }
                     },
@@ -1262,7 +1309,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               : AdminResponsiveNavigation(
                 selectedIndex: _selectedIndex,
                 onSelect: (index) {
-                  setState(() => _selectedIndex = index);
+                  if (mounted) {
+                    setState(() => _selectedIndex = index);
+                  }
                 },
                 onLogout: () => authProvider.logout(),
                 isWide: false,
@@ -1406,9 +1455,11 @@ class _AddTeacherDialogState extends State<_AddTeacherDialog> {
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   ),
-                  onPressed:
-                      () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () {
+                    if (mounted) {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    }
+                  },
                 ),
               ),
               obscureText: _obscurePassword,
@@ -1511,9 +1562,11 @@ class _AddStudentDialogState extends State<_AddStudentDialog> {
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   ),
-                  onPressed:
-                      () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () {
+                    if (mounted) {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    }
+                  },
                 ),
               ),
               obscureText: _obscurePassword,
@@ -2404,7 +2457,11 @@ class _AddClassDialogState extends State<_AddClassDialog> {
               ],
               validator:
                   (v) => v == null || v.isEmpty ? 'Selecione o turno' : null,
-              onChanged: (v) => setState(() => _shift = v),
+              onChanged: (v) {
+                if (mounted) {
+                  setState(() => _shift = v);
+                }
+              },
               onSaved: (v) => _shift = v ?? 'MATUTINO',
             ),
             const SizedBox(height: 12),
@@ -2419,7 +2476,11 @@ class _AddClassDialogState extends State<_AddClassDialog> {
                 DropdownMenuItem(value: 'HYBRID', child: Text('Híbrido')),
               ],
               validator: (v) => v == null ? 'Selecione a metodologia' : null,
-              onChanged: (v) => setState(() => _evaluationModel = v),
+              onChanged: (v) {
+                if (mounted) {
+                  setState(() => _evaluationModel = v);
+                }
+              },
               onSaved: (v) => _evaluationModel = v,
             ),
           ],
@@ -3007,9 +3068,11 @@ class _AddUserDialogState extends State<_AddUserDialog> {
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   ),
-                  onPressed:
-                      () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () {
+                    if (mounted) {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    }
+                  },
                 ),
               ),
               obscureText: _obscurePassword,
@@ -3030,7 +3093,7 @@ class _AddUserDialogState extends State<_AddUserDialog> {
                     );
                   }).toList(),
               onChanged: (value) {
-                if (value != null) {
+                if (value != null && mounted) {
                   setState(() => _selectedRole = value);
                 }
               },

@@ -38,67 +38,84 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
   }
 
   Future<void> _fetchPeriods() async {
-    setState(() {
-      _loadingPeriods = true;
-      _errorPeriods = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingPeriods = true;
+        _errorPeriods = null;
+      });
+    }
     try {
       final periods = await GradePeriodService.getAllGradePeriods();
-      setState(() {
-        _periods = periods;
-      });
+      if (mounted) {
+        setState(() {
+          _periods = periods;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorPeriods = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorPeriods = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loadingPeriods = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingPeriods = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchGradeTypes() async {
-    setState(() {
-      _loadingGradeTypes = true;
-      _errorGradeTypes = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingGradeTypes = true;
+        _errorGradeTypes = null;
+      });
+    }
     try {
       final types = await GradeTypeService.getAllGradeTypes();
-      setState(() {
-        _gradeTypes = types;
-      });
+      if (mounted) {
+        setState(() {
+          _gradeTypes = types;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorGradeTypes = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorGradeTypes = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loadingGradeTypes = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingGradeTypes = false;
+        });
+      }
     }
   }
 
   Future<void> _deletePeriod(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Exclusão'),
-        content: const Text(
-          'Tem certeza que deseja excluir este período? Esta ação não pode ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirmar Exclusão'),
+            content: const Text(
+              'Tem certeza que deseja excluir este período? Esta ação não pode ser desfeita.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Excluir'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Excluir'),
-          ),
-        ],
-      ),
     );
 
     if (confirm == true) {
@@ -129,23 +146,24 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
   Future<void> _deleteGradeType(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Exclusão'),
-        content: const Text(
-          'Tem certeza que deseja excluir este tipo de nota? Esta ação não pode ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirmar Exclusão'),
+            content: const Text(
+              'Tem certeza que deseja excluir este tipo de nota? Esta ação não pode ser desfeita.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Excluir'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Excluir'),
-          ),
-        ],
-      ),
     );
 
     if (confirm == true) {
@@ -232,10 +250,7 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _buildPeriodsTab(),
-          _buildGradeTypesTab(),
-        ],
+        children: [_buildPeriodsTab(), _buildGradeTypesTab()],
       ),
     );
   }
@@ -265,77 +280,75 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _loadingPeriods
-                ? const Center(child: CircularProgressIndicator())
-                : _errorPeriods != null
+            child:
+                _loadingPeriods
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorPeriods != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
-                            const SizedBox(height: 16),
-                            Text(
-                              _errorPeriods!,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _fetchPeriods,
-                              child: const Text('Tentar novamente'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _periods.isEmpty
-                        ? const Center(
-                            child: Text('Nenhum período cadastrado'),
-                          )
-                        : ListView.builder(
-                            itemCount: _periods.length,
-                            itemBuilder: (context, index) {
-                              final period = _periods[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: const Color(0xFF2953A5),
-                                    child: Text(
-                                      '${period['order'] ?? ''}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    period['name'] ?? 'Período',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Text('Ordem: ${period['order']}'),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        onPressed: () =>
-                                            _showEditPeriodDialog(period),
-                                        icon: const Icon(Icons.edit),
-                                        color: Colors.blue,
-                                      ),
-                                      IconButton(
-                                        onPressed: () =>
-                                            _deletePeriod(period['id']),
-                                        icon: const Icon(Icons.delete),
-                                        color: Colors.red,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorPeriods!,
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
                           ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchPeriods,
+                            child: const Text('Tentar novamente'),
+                          ),
+                        ],
+                      ),
+                    )
+                    : _periods.isEmpty
+                    ? const Center(child: Text('Nenhum período cadastrado'))
+                    : ListView.builder(
+                      itemCount: _periods.length,
+                      itemBuilder: (context, index) {
+                        final period = _periods[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFF2953A5),
+                              child: Text(
+                                '${period['order'] ?? ''}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              period['name'] ?? 'Período',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text('Ordem: ${period['order']}'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed:
+                                      () => _showEditPeriodDialog(period),
+                                  icon: const Icon(Icons.edit),
+                                  color: Colors.blue,
+                                ),
+                                IconButton(
+                                  onPressed: () => _deletePeriod(period['id']),
+                                  icon: const Icon(Icons.delete),
+                                  color: Colors.red,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -367,93 +380,95 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _loadingGradeTypes
-                ? const Center(child: CircularProgressIndicator())
-                : _errorGradeTypes != null
+            child:
+                _loadingGradeTypes
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorGradeTypes != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error, size: 64, color: Colors.red),
-                            const SizedBox(height: 16),
-                            Text(
-                              _errorGradeTypes!,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _fetchGradeTypes,
-                              child: const Text('Tentar novamente'),
-                            ),
-                          ],
-                        ),
-                      )
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorGradeTypes!,
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchGradeTypes,
+                            child: const Text('Tentar novamente'),
+                          ),
+                        ],
+                      ),
+                    )
                     : _gradeTypes.isEmpty
-                        ? const Center(
-                            child: Text('Nenhum tipo de nota cadastrado'),
-                          )
-                        : ListView.builder(
-                            itemCount: _gradeTypes.length,
-                            itemBuilder: (context, index) {
-                              final gradeType = _gradeTypes[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: gradeType['isConcept'] == true
-                                        ? Colors.orange
-                                        : const Color(0xFF2953A5),
-                                    child: Icon(
-                                      gradeType['isConcept'] == true
-                                          ? Icons.abc
-                                          : Icons.numbers,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    gradeType['name'] ?? 'Tipo',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (gradeType['description'] != null)
-                                        Text(gradeType['description']),
-                                      Text(
-                                        gradeType['isConcept'] == true
-                                            ? 'Conceito (A, B, C, D...)'
-                                            : 'Nota numérica (0-10)',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        onPressed: () =>
-                                            _showEditGradeTypeDialog(gradeType),
-                                        icon: const Icon(Icons.edit),
-                                        color: Colors.blue,
-                                      ),
-                                      IconButton(
-                                        onPressed: () =>
-                                            _deleteGradeType(gradeType['id']),
-                                        icon: const Icon(Icons.delete),
-                                        color: Colors.red,
-                                      ),
-                                    ],
+                    ? const Center(
+                      child: Text('Nenhum tipo de nota cadastrado'),
+                    )
+                    : ListView.builder(
+                      itemCount: _gradeTypes.length,
+                      itemBuilder: (context, index) {
+                        final gradeType = _gradeTypes[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                                  gradeType['isConcept'] == true
+                                      ? Colors.orange
+                                      : const Color(0xFF2953A5),
+                              child: Icon(
+                                gradeType['isConcept'] == true
+                                    ? Icons.abc
+                                    : Icons.numbers,
+                                color: Colors.white,
+                              ),
+                            ),
+                            title: Text(
+                              gradeType['name'] ?? 'Tipo',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (gradeType['description'] != null)
+                                  Text(gradeType['description']),
+                                Text(
+                                  gradeType['isConcept'] == true
+                                      ? 'Conceito (A, B, C, D...)'
+                                      : 'Nota numérica (0-10)',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
                                   ),
                                 ),
-                              );
-                            },
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed:
+                                      () => _showEditGradeTypeDialog(gradeType),
+                                  icon: const Icon(Icons.edit),
+                                  color: Colors.blue,
+                                ),
+                                IconButton(
+                                  onPressed:
+                                      () => _deleteGradeType(gradeType['id']),
+                                  icon: const Icon(Icons.delete),
+                                  color: Colors.red,
+                                ),
+                              ],
+                            ),
                           ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -486,10 +501,12 @@ class _AddPeriodDialogState extends State<AddPeriodDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       await GradePeriodService.createGradePeriod(
@@ -498,13 +515,17 @@ class _AddPeriodDialogState extends State<AddPeriodDialog> {
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -520,7 +541,8 @@ class _AddPeriodDialogState extends State<AddPeriodDialog> {
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Nome do Período'),
-              validator: (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -548,13 +570,14 @@ class _AddPeriodDialogState extends State<AddPeriodDialog> {
         ),
         ElevatedButton(
           onPressed: _loading ? null : _submit,
-          child: _loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Salvar'),
+          child:
+              _loading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Text('Salvar'),
         ),
       ],
     );
@@ -595,10 +618,12 @@ class _EditPeriodDialogState extends State<EditPeriodDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       await GradePeriodService.updateGradePeriod(
@@ -608,13 +633,17 @@ class _EditPeriodDialogState extends State<EditPeriodDialog> {
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -630,7 +659,8 @@ class _EditPeriodDialogState extends State<EditPeriodDialog> {
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Nome do Período'),
-              validator: (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -658,13 +688,14 @@ class _EditPeriodDialogState extends State<EditPeriodDialog> {
         ),
         ElevatedButton(
           onPressed: _loading ? null : _submit,
-          child: _loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Salvar'),
+          child:
+              _loading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Text('Salvar'),
         ),
       ],
     );
@@ -697,28 +728,35 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       await GradeTypeService.createGradeType(
         name: _nameController.text,
-        description: _descriptionController.text.isNotEmpty
-            ? _descriptionController.text
-            : null,
+        description:
+            _descriptionController.text.isNotEmpty
+                ? _descriptionController.text
+                : null,
         isConcept: _isConcept,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -734,12 +772,15 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Nome do Tipo'),
-              validator: (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Descrição (opcional)'),
+              decoration: const InputDecoration(
+                labelText: 'Descrição (opcional)',
+              ),
             ),
             const SizedBox(height: 16),
             CheckboxListTile(
@@ -747,9 +788,11 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
               subtitle: const Text('Se desmarcado, será nota numérica (0-10)'),
               value: _isConcept,
               onChanged: (value) {
-                setState(() {
-                  _isConcept = value ?? false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _isConcept = value ?? false;
+                  });
+                }
               },
             ),
             if (_error != null)
@@ -767,13 +810,14 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
         ),
         ElevatedButton(
           onPressed: _loading ? null : _submit,
-          child: _loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Salvar'),
+          child:
+              _loading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Text('Salvar'),
         ),
       ],
     );
@@ -818,29 +862,36 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       await GradeTypeService.updateGradeType(
         id: widget.gradeType['id'],
         name: _nameController.text,
-        description: _descriptionController.text.isNotEmpty
-            ? _descriptionController.text
-            : null,
+        description:
+            _descriptionController.text.isNotEmpty
+                ? _descriptionController.text
+                : null,
         isConcept: _isConcept,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -856,12 +907,15 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Nome do Tipo'),
-              validator: (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
+              validator:
+                  (v) => v == null || v.isEmpty ? 'Informe o nome' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Descrição (opcional)'),
+              decoration: const InputDecoration(
+                labelText: 'Descrição (opcional)',
+              ),
             ),
             const SizedBox(height: 16),
             CheckboxListTile(
@@ -869,9 +923,11 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
               subtitle: const Text('Se desmarcado, será nota numérica (0-10)'),
               value: _isConcept,
               onChanged: (value) {
-                setState(() {
-                  _isConcept = value ?? false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _isConcept = value ?? false;
+                  });
+                }
               },
             ),
             if (_error != null)
@@ -889,15 +945,16 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
         ),
         ElevatedButton(
           onPressed: _loading ? null : _submit,
-          child: _loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Salvar'),
+          child:
+              _loading
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Text('Salvar'),
         ),
       ],
     );
   }
-} 
+}

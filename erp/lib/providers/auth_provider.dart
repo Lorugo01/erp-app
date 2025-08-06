@@ -104,11 +104,18 @@ class AuthProvider extends ChangeNotifier {
 
   // Carregar usuário do storage
   Future<void> loadUserFromStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userJson = prefs.getString('user');
-    if (userJson != null) {
-      final userData = jsonDecode(userJson);
-      _user = User.fromJson(userData);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString('user');
+      if (userJson != null) {
+        final userData = jsonDecode(userJson);
+        _user = User.fromJson(userData);
+        notifyListeners();
+      }
+    } catch (e) {
+      // Se houver erro ao carregar usuário do storage, limpar dados corrompidos
+      await _clearUserFromStorage();
+      _user = null;
       notifyListeners();
     }
   }

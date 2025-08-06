@@ -84,6 +84,7 @@ class TecaAIStats {
 }
 
 class TecaAIItem {
+  final int? id;
   final String nome;
   final String posicao;
   final String posicaoOriginal;
@@ -91,6 +92,7 @@ class TecaAIItem {
   final String espIpOriginal;
 
   TecaAIItem({
+    this.id,
     required this.nome,
     required this.posicao,
     required this.posicaoOriginal,
@@ -100,6 +102,7 @@ class TecaAIItem {
 
   factory TecaAIItem.fromJson(Map<String, dynamic> json) {
     return TecaAIItem(
+      id: json['id'],
       nome: json['nome'] ?? '',
       posicao: json['posicao'] ?? '',
       posicaoOriginal: json['posicao_original'] ?? '',
@@ -359,6 +362,128 @@ class TecaAIService {
       return [];
     } catch (e) {
       return [];
+    }
+  }
+
+  /// Adiciona um novo item
+  static Future<TecaAIResponse> addItem({
+    required String nome,
+    required String posicao,
+    required String espIp,
+    required User user,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/items'),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'nome': nome,
+              'posicao': posicao,
+              'esp_ip': espIp,
+              'user_id': user.id,
+              'user_role': user.role.toString().split('.').last,
+            }),
+          )
+          .timeout(const Duration(seconds: requestTimeout));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return TecaAIResponse.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        return TecaAIResponse(
+          success: false,
+          error: error['error'] ?? 'Erro ao adicionar item',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+      }
+    } catch (e) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Erro de conexão: $e',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
+  }
+
+  /// Edita um item existente
+  static Future<TecaAIResponse> editItem({
+    required int itemId,
+    required String nome,
+    required String posicao,
+    required String espIp,
+    required User user,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/items/$itemId'),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'nome': nome,
+              'posicao': posicao,
+              'esp_ip': espIp,
+              'user_id': user.id,
+              'user_role': user.role.toString().split('.').last,
+            }),
+          )
+          .timeout(const Duration(seconds: requestTimeout));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return TecaAIResponse.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        return TecaAIResponse(
+          success: false,
+          error: error['error'] ?? 'Erro ao editar item',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+      }
+    } catch (e) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Erro de conexão: $e',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
+  }
+
+  /// Remove um item
+  static Future<TecaAIResponse> deleteItem({
+    required int itemId,
+    required User user,
+  }) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$baseUrl/items/$itemId'),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'user_id': user.id,
+              'user_role': user.role.toString().split('.').last,
+            }),
+          )
+          .timeout(const Duration(seconds: requestTimeout));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return TecaAIResponse.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        return TecaAIResponse(
+          success: false,
+          error: error['error'] ?? 'Erro ao remover item',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+      }
+    } catch (e) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Erro de conexão: $e',
+        timestamp: DateTime.now().toIso8601String(),
+      );
     }
   }
 

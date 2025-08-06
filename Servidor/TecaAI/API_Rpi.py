@@ -1,4 +1,4 @@
-1# API_Rpi.py
+# API_Rpi.py
 
 import socket
 import threading
@@ -13,6 +13,17 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import Dict, List, Optional, Tuple, Any, Callable
+from datetime import datetime
+
+# Tentativa de importar Flask (opcional para ERP API)
+try:
+    from flask import Flask, request, jsonify
+    from flask_cors import CORS
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    print("⚠️  Flask não disponível. ERP API não será iniciado.")
+    print("   Execute: pip install flask flask-cors")
 
 # Módulos locais
 import comandos
@@ -669,11 +680,537 @@ def servidor_tcp(host: str, porta: int) -> None:
         logger.info("Servidor encerrado.")
 
 if __name__ == "__main__":
-    try:
-        servidor_tcp(HOST, PORT)
-    except KeyboardInterrupt:
-        print("\nServidor encerrado pelo usuário.")
-        thread_pool.shutdown(wait=False)
-    except Exception as e:
-        print(f"Erro ao iniciar servidor: {e}")
-        logger.critical(f"Erro ao iniciar servidor: {e}")
+    def main():
+        try:
+            # Inicia o servidor TCP em uma thread separada
+            def start_tcp_server():
+                """Inicia o servidor TCP em uma thread separada"""
+                try:
+                    servidor_tcp(HOST, PORT)
+                except Exception as e:
+                    print(f"Erro no servidor TCP: {e}")
+                    logger.critical(f"Erro no servidor TCP: {e}")
+            
+            # Verifica se Flask está disponível
+            if not FLASK_AVAILABLE:
+                print("❌ Flask não está disponível. ERP API não será iniciado.")
+                print("   Execute: pip install flask flask-cors")
+                # Continua apenas com o servidor TCP
+                start_tcp_server()
+                return
+            
+            # Inicia o servidor TCP em background
+            tcp_thread = threading.Thread(target=start_tcp_server, daemon=True)
+            tcp_thread.start()
+            
+            # Aguarda um pouco para o servidor TCP inicializar
+            time.sleep(2)
+            
+            # ============================================================================
+            # INTEGRAÇÃO DO ERP API - SERVIDOR FLASK
+            # ============================================================================
+            
+            print("🚀 Iniciando integração com ERP API...")
+            
+            # Cria a aplicação Flask
+            app = Flask(__name__)
+            CORS(app)  # Permite CORS para o frontend
+        
+            # Configurações do TecaAI para o ERP
+            TECAAI_HOST = "localhost"
+            TECAAI_PORT = 5000
+            
+            class TecaAIClient:
+                """Cliente para comunicação com o TecaAI via TCP"""
+                
+                def __init__(self, host="localhost", port=5000):
+                    self.host = host
+                    self.port = port
+                
+                def send_command(self, funcao, parametro, voice="Teca"):
+                    """Envia comando para o TecaAI e retorna resposta"""
+                    try:
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+                            client.settimeout(10)  # Timeout de 10 segundos
+                            client.connect((self.host, self.port))
+                            
+                            # Prepara dados JSON
+                            dados = {
+                                "ID": f"erp_{int(time.time())}",
+                                "funcao": funcao,
+                                "parametro": parametro,
+                                "voice": voice
+                            }
+                            
+                            # Envia dados
+                            client.sendall(json.dumps(dados).encode('utf-8'))
+                            
+                            # Recebe resposta seguindo o protocolo do API_Rpi.py
+                            # Primeiro recebe o tamanho (10 dígitos)
+                            size_data = client.recv(10)
+                            if not size_data:
+                                raise Exception("Conexão fechada pelo servidor")
+                            
+                            try:
+                                size = int(size_data.decode('utf-8'))
+                            except ValueError:
+                                raise Exception("Formato de resposta inválido")
+                            
+                            # Agora recebe os dados
+                            response_data = b""
+                            while len(response_data) < size:
+                                chunk = client.recv(size - len(response_data))
+                                if not chunk:
+                                    raise Exception("Conexão fechada durante recebimento")
+                                response_data += chunk
+                            
+                            response = response_data.decode('utf-8')
+                            
+                            return {
+                                "success": True,
+                                "response": response,
+                                "timestamp": datetime.now().isoformat()
+                            }
+                            
+                    except Exception as e:
+                        logger.error(f"Erro na comunicação com TecaAI: {e}")
+                        return {
+                            "success": False,
+                            "error": str(e),
+                            "timestamp": datetime.now().isoformat()
+                        }
+            
+            # Instância do cliente
+            teca_client = TecaAIClient(TECAAI_HOST, TECAAI_PORT)
+            
+            # Banco de dados para histórico de comandos do ERP
+            def init_erp_db():
+                """Inicializa banco de dados para histórico do ERP"""
+                conn = sqlite3.connect('erp_tecaai.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS erp_commands (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        user_role TEXT,
+                        command_type TEXT,
+                        parameter TEXT,
+                        response TEXT,
+                        success BOOLEAN,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                conn.commit()
+                conn.close()
+            
+            def log_command(user_id, user_role, command_type, parameter, response, success):
+                """Registra comando no histórico"""
+                conn = sqlite3.connect('erp_tecaai.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO erp_commands 
+                    (user_id, user_role, command_type, parameter, response, success)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (user_id, user_role, command_type, parameter, response, success))
+                conn.commit()
+                conn.close()
+            
+            # Inicializa banco de dados do ERP
+            init_erp_db()
+            
+            # ============================================================================
+            # ROTAS DO ERP API
+            # ============================================================================
+            
+            @app.route('/health', methods=['GET'])
+            def health_check():
+                """Verifica se a API está funcionando"""
+                return jsonify({
+                    "status": "online",
+                    "service": "ERP-TecaAI Bridge",
+                    "timestamp": datetime.now().isoformat()
+                })
+            
+            @app.route('/ask', methods=['POST'])
+            def ask_question():
+                """Faz uma pergunta para a IA"""
+                try:
+                    data = request.get_json()
+                    
+                    if not data or 'question' not in data:
+                        return jsonify({"error": "Campo 'question' é obrigatório"}), 400
+                    
+                    question = data['question']
+                    voice = data.get('voice', 'Teca')
+                    user_id = data.get('user_id', 'unknown')
+                    user_role = data.get('user_role', 'unknown')
+                    
+                    # Validações
+                    if len(question) > 500:
+                        return jsonify({"error": "Pergunta muito longa (máximo 500 caracteres)"}), 400
+                    
+                    if voice not in ['Teca', 'Einstein', 'Curie', 'Frida']:
+                        return jsonify({"error": "Voz inválida"}), 400
+                    
+                    # Envia comando para TecaAI
+                    result = teca_client.send_command("responda", question, voice)
+                    
+                    # Registra no histórico
+                    log_command(user_id, user_role, "ask", question, result.get('response', ''), result['success'])
+                    
+                    return jsonify(result)
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /ask: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/locate', methods=['POST'])
+            def locate_item():
+                """Localiza um item no laboratório"""
+                try:
+                    data = request.get_json()
+                    
+                    if not data or 'item' not in data:
+                        return jsonify({"error": "Campo 'item' é obrigatório"}), 400
+                    
+                    item = data['item']
+                    user_id = data.get('user_id', 'unknown')
+                    user_role = data.get('user_role', 'unknown')
+                    
+                    # Validações
+                    if len(item) > 100:
+                        return jsonify({"error": "Nome do item muito longo"}), 400
+                    
+                    # Envia comando para TecaAI
+                    result = teca_client.send_command("localizar", item)
+                    
+                    # Registra no histórico
+                    log_command(user_id, user_role, "locate", item, result.get('response', ''), result['success'])
+                    
+                    return jsonify(result)
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /locate: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/control', methods=['POST'])
+            def control_device():
+                """Controla dispositivos (LEDs, etc.)"""
+                try:
+                    data = request.get_json()
+                    
+                    if not data or 'command' not in data:
+                        return jsonify({"error": "Campo 'command' é obrigatório"}), 400
+                    
+                    command = data['command']
+                    user_id = data.get('user_id', 'unknown')
+                    user_role = data.get('user_role', 'unknown')
+                    
+                    # Validações
+                    if len(command) > 100:
+                        return jsonify({"error": "Comando muito longo"}), 400
+                    
+                    # Envia comando para TecaAI
+                    result = teca_client.send_command("comando", command)
+                    
+                    # Registra no histórico
+                    log_command(user_id, user_role, "control", command, result.get('response', ''), result['success'])
+                    
+                    return jsonify(result)
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /control: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/item-info', methods=['POST'])
+            def get_item_info():
+                """Obtém informações sobre um item"""
+                try:
+                    data = request.get_json()
+                    
+                    if not data or 'item' not in data:
+                        return jsonify({"error": "Campo 'item' é obrigatório"}), 400
+                    
+                    item = data['item']
+                    user_id = data.get('user_id', 'unknown')
+                    user_role = data.get('user_role', 'unknown')
+                    
+                    # Validações
+                    if len(item) > 100:
+                        return jsonify({"error": "Nome do item muito longo"}), 400
+                    
+                    # Envia comando para TecaAI
+                    result = teca_client.send_command("IA_item", item)
+                    
+                    # Registra no histórico
+                    log_command(user_id, user_role, "item_info", item, result.get('response', ''), result['success'])
+                    
+                    return jsonify(result)
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /item-info: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/items', methods=['GET'])
+            def get_all_items():
+                """Retorna todos os itens disponíveis no banco de dados de localizações"""
+                try:
+                    # Caminho para o banco de dados de localizações
+                    db_path = os.path.join(os.path.dirname(__file__), "localizações", "localizacoes.db")
+                    
+                    if not os.path.exists(db_path):
+                        logger.error(f"Banco de dados não encontrado em: {db_path}")
+                        return jsonify({
+                            "success": False,
+                            "error": "Banco de dados de localizações não encontrado"
+                        }), 404
+                    
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT nome, posicao, esp_ip FROM itens ORDER BY nome")
+                    items = cursor.fetchall()
+                    conn.close()
+                    
+                    # Mapeamento de IPs para letras
+                    ip_mapping = {
+                        "192.168.100.184": "A",
+                        "192.168.100.185": "B",
+                        "192.168.100.186": "C",
+                    }
+                    
+                    items_list = []
+                    for nome, posicao, esp_ip in items:
+                        # Traduzir posição (f1s1 -> Fileira 1, Segmento 1)
+                        posicao_traduzida = ""
+                        if posicao.startswith('f') and 's' in posicao:
+                            try:
+                                partes = posicao.replace('f', '').split('s')
+                                if len(partes) == 2:
+                                    fileira = partes[0]
+                                    segmento = partes[1]
+                                    posicao_traduzida = f"Fileira {fileira}, Segmento {segmento}"
+                                else:
+                                    posicao_traduzida = posicao
+                            except:
+                                posicao_traduzida = posicao
+                        else:
+                            posicao_traduzida = posicao
+                        
+                        # Traduzir IP para letra
+                        esp_ip_traduzido = ip_mapping.get(esp_ip, esp_ip)
+                        
+                        items_list.append({
+                            "nome": nome,
+                            "posicao": posicao_traduzida,
+                            "posicao_original": posicao,
+                            "esp_ip": esp_ip_traduzido,
+                            "esp_ip_original": esp_ip
+                        })
+                    
+                    logger.info(f"Retornando {len(items_list)} itens")
+                    return jsonify({
+                        "success": True,
+                        "items": items_list,
+                        "count": len(items_list)
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /items: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/items', methods=['POST'])
+            def add_item():
+                """Adiciona um novo item ao banco de dados"""
+                try:
+                    data = request.get_json()
+                    nome = data.get('nome')
+                    posicao = data.get('posicao')
+                    esp_ip = data.get('esp_ip')
+                    user_id = data.get('user_id')
+                    user_role = data.get('user_role')
+                    
+                    if not all([nome, posicao, esp_ip]):
+                        return jsonify({
+                            "success": False,
+                            "error": "Nome, posição e IP são obrigatórios"
+                        }), 400
+                    
+                    # Caminho para o banco de dados
+                    db_path = os.path.join(os.path.dirname(__file__), "localizações", "localizacoes.db")
+                    
+                    if not os.path.exists(db_path):
+                        return jsonify({
+                            "success": False,
+                            "error": "Banco de dados não encontrado"
+                        }), 404
+                    
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+                    
+                    # Verificar se já existe um item na posição
+                    cursor.execute("SELECT nome FROM itens WHERE posicao = ? AND esp_ip = ?", (posicao, esp_ip))
+                    existing_item = cursor.fetchone()
+                    
+                    if existing_item:
+                        # Se existe item na posição, fazer a troca
+                        old_item_name = existing_item[0]
+                        cursor.execute("UPDATE itens SET nome = ? WHERE posicao = ? AND esp_ip = ?", (nome, posicao, esp_ip))
+                        action = "trocado"
+                        message = f"Item '{old_item_name}' foi substituído por '{nome}' na posição {posicao}"
+                    else:
+                        # Adicionar novo item
+                        cursor.execute("INSERT INTO itens (nome, posicao, esp_ip) VALUES (?, ?, ?)", (nome, posicao, esp_ip))
+                        action = "adicionado"
+                        message = f"Item '{nome}' foi adicionado na posição {posicao}"
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    # Log da ação
+                    log_command(user_id, user_role, "add_item", f"{nome} - {posicao} - {esp_ip}", message, True)
+                    
+                    return jsonify({
+                        "success": True,
+                        "message": message,
+                        "action": action,
+                        "item": {
+                            "nome": nome,
+                            "posicao": posicao,
+                            "esp_ip": esp_ip
+                        }
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /items POST: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/history', methods=['GET'])
+            def get_command_history():
+                """Retorna histórico de comandos"""
+                try:
+                    user_id = request.args.get('user_id')
+                    limit = int(request.args.get('limit', 50))
+                    
+                    conn = sqlite3.connect('erp_tecaai.db')
+                    cursor = conn.cursor()
+                    
+                    if user_id:
+                        cursor.execute('''
+                            SELECT * FROM erp_commands 
+                            WHERE user_id = ? 
+                            ORDER BY timestamp DESC 
+                            LIMIT ?
+                        ''', (user_id, limit))
+                    else:
+                        cursor.execute('''
+                            SELECT * FROM erp_commands 
+                            ORDER BY timestamp DESC 
+                            LIMIT ?
+                        ''', (limit,))
+                    
+                    rows = cursor.fetchall()
+                    conn.close()
+                    
+                    history = []
+                    for row in rows:
+                        history.append({
+                            "id": row[0],
+                            "user_id": row[1],
+                            "user_role": row[2],
+                            "command_type": row[3],
+                            "parameter": row[4],
+                            "response": row[5],
+                            "success": bool(row[6]),
+                            "timestamp": row[7]
+                        })
+                    
+                    return jsonify({
+                        "success": True,
+                        "history": history,
+                        "count": len(history)
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /history: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/stats', methods=['GET'])
+            def get_stats():
+                """Retorna estatísticas de uso"""
+                try:
+                    conn = sqlite3.connect('erp_tecaai.db')
+                    cursor = conn.cursor()
+                    
+                    # Total de comandos
+                    cursor.execute("SELECT COUNT(*) FROM erp_commands")
+                    total_commands = cursor.fetchone()[0]
+                    
+                    # Comandos por tipo
+                    cursor.execute("""
+                        SELECT command_type, COUNT(*) 
+                        FROM erp_commands 
+                        GROUP BY command_type
+                    """)
+                    commands_by_type = dict(cursor.fetchall())
+                    
+                    # Comandos por usuário
+                    cursor.execute("""
+                        SELECT user_role, COUNT(*) 
+                        FROM erp_commands 
+                        GROUP BY user_role
+                    """)
+                    commands_by_user = dict(cursor.fetchall())
+                    
+                    # Taxa de sucesso
+                    cursor.execute("""
+                        SELECT 
+                            COUNT(*) as total,
+                            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful
+                        FROM erp_commands
+                    """)
+                    success_data = cursor.fetchone()
+                    success_rate = (success_data[1] / success_data[0] * 100) if success_data[0] > 0 else 0
+                    
+                    conn.close()
+                    
+                    return jsonify({
+                        "success": True,
+                        "stats": {
+                            "total_commands": total_commands,
+                            "commands_by_type": commands_by_type,
+                            "commands_by_user": commands_by_user,
+                            "success_rate": round(success_rate, 2)
+                        }
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /stats: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            # ============================================================================
+            # INICIA O SERVIDOR FLASK
+            # ============================================================================
+            
+            print("🌐 Iniciando servidor Flask ERP API na porta 5001...")
+            print("📊 Endpoints disponíveis:")
+            print("   - GET  /health     - Status do servidor")
+            print("   - POST /ask        - Perguntas para IA")
+            print("   - POST /locate     - Localizar itens")
+            print("   - POST /control    - Controlar dispositivos")
+            print("   - GET  /items      - Listar itens")
+            print("   - POST /items      - Adicionar item")
+            print("   - GET  /history    - Histórico de comandos")
+            print("   - GET  /stats      - Estatísticas")
+            print("🔗 URL: http://localhost:5001")
+            
+            # Inicia o servidor Flask
+            app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
+            
+        except KeyboardInterrupt:
+            print("\n�� Servidor encerrado pelo usuário.")
+            thread_pool.shutdown(wait=False)
+        except Exception as e:
+            print(f"❌ Erro ao iniciar servidor: {e}")
+            logger.critical(f"Erro ao iniciar servidor: {e}")
+
+    main()

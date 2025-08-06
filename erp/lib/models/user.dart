@@ -15,8 +15,8 @@ class Student {
 
   factory Student.fromJson(Map<String, dynamic> json) {
     return Student(
-      id: json['id'],
-      name: json['name'],
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
       registrationNumber: json['registrationNumber'],
       profilePicture: json['profilePicture'],
     );
@@ -39,7 +39,10 @@ class Teacher {
   Teacher({required this.id, required this.name});
 
   factory Teacher.fromJson(Map<String, dynamic> json) {
-    return Teacher(id: json['id'], name: json['name']);
+    return Teacher(
+      id: json['id'] ?? '', 
+      name: json['name'] ?? ''
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -68,8 +71,8 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'],
-      email: json['email'],
+      id: json['id'] ?? '',
+      email: json['email'] ?? '',
       role: Role.values.firstWhere(
         (e) =>
             e.toString().split('.').last.toLowerCase() ==
@@ -81,7 +84,9 @@ class User {
           json['student'] != null ? Student.fromJson(json['student']) : null,
       teacher:
           json['teacher'] != null ? Teacher.fromJson(json['teacher']) : null,
-      createdAt: DateTime.parse(json['createdAt']),
+      createdAt: json['createdAt'] != null 
+          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 

@@ -49,8 +49,26 @@ class TecaAIClient:
                 # Envia dados
                 client.sendall(json.dumps(dados).encode('utf-8'))
                 
-                # Recebe resposta
-                response = client.recv(4096).decode('utf-8')
+                # Recebe resposta seguindo o protocolo do API_Rpi.py
+                # Primeiro recebe o tamanho (10 dígitos)
+                size_data = client.recv(10)
+                if not size_data:
+                    raise Exception("Conexão fechada pelo servidor")
+                
+                try:
+                    size = int(size_data.decode('utf-8'))
+                except ValueError:
+                    raise Exception("Formato de resposta inválido")
+                
+                # Agora recebe os dados
+                response_data = b""
+                while len(response_data) < size:
+                    chunk = client.recv(size - len(response_data))
+                    if not chunk:
+                        raise Exception("Conexão fechada durante recebimento")
+                    response_data += chunk
+                
+                response = response_data.decode('utf-8')
                 
                 return {
                     "success": True,
@@ -163,7 +181,7 @@ def locate_item():
             return jsonify({"error": "Nome do item muito longo"}), 400
         
         # Envia comando para TecaAI
-        result = teca_client.send_command("localizar_item", item)
+        result = teca_client.send_command("localizar", item)
         
         # Registra no histórico
         log_command(user_id, user_role, "locate", item, result.get('response', ''), result['success'])
@@ -221,7 +239,7 @@ def get_item_info():
             return jsonify({"error": "Nome do item muito longo"}), 400
         
         # Envia comando para TecaAI
-        result = teca_client.send_command("Item_ID", item)
+        result = teca_client.send_command("IA_item", item)
         
         # Registra no histórico
         log_command(user_id, user_role, "item_info", item, result.get('response', ''), result['success'])
@@ -302,6 +320,203 @@ def get_all_items():
         
     except Exception as e:
         logger.error(f"Erro na rota /items: {e}")
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+@app.route('/items', methods=['POST'])
+def add_item():
+    """Adiciona um novo item ao banco de dados"""
+    try:
+        data = request.get_json()
+        nome = data.get('nome')
+        posicao = data.get('posicao')
+        esp_ip = data.get('esp_ip')
+        user_id = data.get('user_id')
+        user_role = data.get('user_role')
+        
+        if not all([nome, posicao, esp_ip]):
+            return jsonify({
+                "success": False,
+                "error": "Nome, posição e IP são obrigatórios"
+            }), 400
+        
+        # Caminho para o banco de dados
+        db_path = os.path.join(os.path.dirname(__file__), "localizações", "localizacoes.db")
+        
+        if not os.path.exists(db_path):
+            return jsonify({
+                "success": False,
+                "error": "Banco de dados não encontrado"
+            }), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Verificar se já existe um item na posição
+        cursor.execute("SELECT nome FROM itens WHERE posicao = ? AND esp_ip = ?", (posicao, esp_ip))
+        existing_item = cursor.fetchone()
+        
+        if existing_item:
+            # Se existe item na posição, fazer a troca
+            old_item_name = existing_item[0]
+            cursor.execute("UPDATE itens SET nome = ? WHERE posicao = ? AND esp_ip = ?", (nome, posicao, esp_ip))
+            action = "trocado"
+            message = f"Item '{old_item_name}' foi substituído por '{nome}' na posição {posicao}"
+        else:
+            # Adicionar novo item
+            cursor.execute("INSERT INTO itens (nome, posicao, esp_ip) VALUES (?, ?, ?)", (nome, posicao, esp_ip))
+            action = "adicionado"
+            message = f"Item '{nome}' foi adicionado na posição {posicao}"
+        
+        conn.commit()
+        conn.close()
+        
+        # Log da ação
+        log_command(user_id, user_role, "add_item", f"{nome} - {posicao} - {esp_ip}", message, True)
+        
+        return jsonify({
+            "success": True,
+            "message": message,
+            "action": action,
+            "item": {
+                "nome": nome,
+                "posicao": posicao,
+                "esp_ip": esp_ip
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro na rota /items POST: {e}")
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+@app.route('/items/<int:item_id>', methods=['PUT'])
+def edit_item(item_id):
+    """Edita um item existente"""
+    try:
+        data = request.get_json()
+        nome = data.get('nome')
+        posicao = data.get('posicao')
+        esp_ip = data.get('esp_ip')
+        user_id = data.get('user_id')
+        user_role = data.get('user_role')
+        
+        if not all([nome, posicao, esp_ip]):
+            return jsonify({
+                "success": False,
+                "error": "Nome, posição e IP são obrigatórios"
+            }), 400
+        
+        # Caminho para o banco de dados
+        db_path = os.path.join(os.path.dirname(__file__), "localizações", "localizacoes.db")
+        
+        if not os.path.exists(db_path):
+            return jsonify({
+                "success": False,
+                "error": "Banco de dados não encontrado"
+            }), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Verificar se o item existe
+        cursor.execute("SELECT nome, posicao, esp_ip FROM itens WHERE id = ?", (item_id,))
+        existing_item = cursor.fetchone()
+        
+        if not existing_item:
+            conn.close()
+            return jsonify({
+                "success": False,
+                "error": "Item não encontrado"
+            }), 404
+        
+        old_nome, old_posicao, old_esp_ip = existing_item
+        
+        # Verificar se a nova posição já está ocupada por outro item
+        cursor.execute("SELECT nome FROM itens WHERE posicao = ? AND esp_ip = ? AND id != ?", (posicao, esp_ip, item_id))
+        conflicting_item = cursor.fetchone()
+        
+        if conflicting_item:
+            # Se existe conflito, fazer a troca
+            conflicting_name = conflicting_item[0]
+            cursor.execute("UPDATE itens SET nome = ? WHERE posicao = ? AND esp_ip = ? AND id != ?", (nome, posicao, esp_ip, item_id))
+            cursor.execute("UPDATE itens SET nome = ?, posicao = ?, esp_ip = ? WHERE id = ?", (conflicting_name, old_posicao, old_esp_ip, item_id))
+            action = "trocado"
+            message = f"Item '{nome}' foi trocado com '{conflicting_name}'"
+        else:
+            # Atualizar o item
+            cursor.execute("UPDATE itens SET nome = ?, posicao = ?, esp_ip = ? WHERE id = ?", (nome, posicao, esp_ip, item_id))
+            action = "editado"
+            message = f"Item '{nome}' foi atualizado"
+        
+        conn.commit()
+        conn.close()
+        
+        # Log da ação
+        log_command(user_id, user_role, "edit_item", f"{nome} - {posicao} - {esp_ip}", message, True)
+        
+        return jsonify({
+            "success": True,
+            "message": message,
+            "action": action,
+            "item": {
+                "id": item_id,
+                "nome": nome,
+                "posicao": posicao,
+                "esp_ip": esp_ip
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro na rota /items PUT: {e}")
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+@app.route('/items/<int:item_id>', methods=['DELETE'])
+def delete_item(item_id):
+    """Remove um item do banco de dados"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        user_role = data.get('user_role')
+        
+        # Caminho para o banco de dados
+        db_path = os.path.join(os.path.dirname(__file__), "localizações", "localizacoes.db")
+        
+        if not os.path.exists(db_path):
+            return jsonify({
+                "success": False,
+                "error": "Banco de dados não encontrado"
+            }), 404
+        
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Verificar se o item existe
+        cursor.execute("SELECT nome FROM itens WHERE id = ?", (item_id,))
+        existing_item = cursor.fetchone()
+        
+        if not existing_item:
+            conn.close()
+            return jsonify({
+                "success": False,
+                "error": "Item não encontrado"
+            }), 404
+        
+        item_name = existing_item[0]
+        
+        # Remover o item
+        cursor.execute("DELETE FROM itens WHERE id = ?", (item_id,))
+        conn.commit()
+        conn.close()
+        
+        # Log da ação
+        log_command(user_id, user_role, "delete_item", f"ID: {item_id} - {item_name}", f"Item '{item_name}' foi removido", True)
+        
+        return jsonify({
+            "success": True,
+            "message": f"Item '{item_name}' foi removido"
+        })
+        
+    except Exception as e:
+        logger.error(f"Erro na rota /items DELETE: {e}")
         return jsonify({"error": "Erro interno do servidor"}), 500
 
 @app.route('/history', methods=['GET'])
