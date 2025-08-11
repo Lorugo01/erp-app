@@ -89,7 +89,7 @@ class _AdminSidebar extends StatelessWidget {
           ),
           _SidebarButton(
             icon: Icons.computer,
-            label: 'Equipamentos',
+            label: 'Armários',
             selected: selectedIndex == 5,
             onTap: () => onSelect(5),
           ),
@@ -157,10 +157,7 @@ class _AdminBottomNavBar extends StatelessWidget {
         BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Professores'),
         BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Alunos'),
         BottomNavigationBarItem(icon: Icon(Icons.class_), label: 'Turmas'),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.computer),
-          label: 'Equipamentos',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.computer), label: 'Armários'),
         BottomNavigationBarItem(
           icon: Icon(Icons.bar_chart),
           label: 'Relatórios',

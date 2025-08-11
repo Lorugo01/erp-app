@@ -7,59 +7,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  STUDENT
-  TEACHER
-}
-
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  role      Role
-  photoUrl  String?
-  student   Student?
-  teacher   Teacher?
+  id               String            @id @default(uuid())
+  email            String            @unique
+  password         String
+  role             Role
+  createdAt        DateTime          @default(now())
+  photoUrl         String?
+  student          Student?
+  teacher          Teacher?
   chatParticipants chatparticipant[]
-  messages  message[]
-  createdAt DateTime @default(now())
+  messages         message[]
 }
 
 model Student {
-  id                String        @id @default(uuid())
-  userId            String?       @unique
-  name              String
-  email             String        @unique
-  registrationNumber String?      @unique
-  profilePicture    String?
-  phone             String?
-  address           String?
-  birthDate         DateTime?
-  enrollments       Enrollment[]
-  attendances       Attendance[]
-  grades            Grade[]
-  createdAt         DateTime      @default(now())
-  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                    String                 @id @default(uuid())
+  name                  String
+  email                 String                 @unique
+  createdAt             DateTime               @default(now())
+  profilePicture        String?
+  registrationNumber    String?                @unique
+  userId                String?                @unique
+  address               String?
+  birthDate             DateTime?
+  phone                 String?
   assignmentSubmissions AssignmentSubmission[]
+  attendances           Attendance[]
+  enrollments           Enrollment[]
+  grades                Grade[]
+  user                  User?                  @relation(fields: [userId], references: [id])
 }
 
-
 model chat {
-  id           String           @id @default(uuid())
+  id           String            @id @default(uuid())
   title        String
-  created_at   DateTime         @default(now())
+  created_at   DateTime          @default(now())
   participants chatparticipant[]
   messages     message[]
 }
 
 model chatparticipant {
-  id        String   @id @default(uuid())
-  chat_id   String
-  user_id   String
-
-  chat      chat     @relation(fields: [chat_id], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id      String @id @default(uuid())
+  chat_id String
+  user_id String
+  chat    chat   @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model message {
@@ -68,10 +60,10 @@ model message {
   user_id    String?
   content    String
   created_at DateTime @default(now())
-
+  personagem String?
+  files      File[]
   chat       chat     @relation(fields: [chat_id], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  files      File[]
 }
 
 model File {
@@ -81,21 +73,168 @@ model File {
   file_name   String
   file_type   String
   uploaded_at DateTime @default(now())
-
   message     message  @relation(fields: [message_id], references: [id], onDelete: Cascade)
 }
 
 model Enrollment {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   studentId String
   classId   String
   year      Int
-  current   Boolean  @default(false)
-
-  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  current   Boolean @default(false)
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, classId, year])
+}
+
+model Class {
+  id              String       @id @default(uuid())
+  name            String
+  grade           Int
+  academicYear    Int
+  shift           Shift
+  letter          String
+  evaluationModel String
+  assignments     Assignment[]
+  enrollments     Enrollment[]
+  events          Event[]
+  lessons         Lesson[]
+  subjects        Subject[]
+}
+
+model Teacher {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  userId    String?   @unique
+  photoUrl  String?
+  events    Event[]   @relation("TeacherToEvent")
+  lessons   Lesson[]
+  subjects  Subject[]
+  user      User?     @relation(fields: [userId], references: [id])
+}
+
+model Subject {
+  id          String       @id @default(uuid())
+  name        String
+  classId     String
+  teacherId   String
+  createdAt   DateTime     @default(now())
+  type        SubjectType
+  updatedAt   DateTime     @updatedAt
+  assignments Assignment[]
+  grades      Grade[]
+  lessons     Lesson[]
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher     Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model Lesson {
+  id          String       @id @default(uuid())
+  date        DateTime
+  subjectId   String
+  classId     String
+  teacherId   String
+  attendances Attendance[]
+  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher     Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model Attendance {
+  id        String  @id @default(uuid())
+  studentId String
+  lessonId  String
+  present   Boolean
+  lesson    Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model GradePeriod {
+  id     String  @id @default(uuid())
+  name   String
+  order  Int
+  grades Grade[]
+}
+
+model GradeType {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  isConcept   Boolean @default(false)
+  grades      Grade[]
+}
+
+model Grade {
+  id        String      @id @default(uuid())
+  studentId String
+  subjectId String
+  typeId    String
+  value     Float?
+  date      DateTime    @default(now())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  concept   String?
+  periodId  String
+  period    GradePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  student   Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject   Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  type      GradeType   @relation(fields: [typeId], references: [id], onDelete: Cascade)
+}
+
+model Config {
+  id              Int    @id @default(1)
+  evaluationModel String
+  minGrade        Float  @default(5.0)
+  minAttendance   Float  @default(75.0)
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  classId     String
+  title       String
+  description String?
+  dayOfWeek   Int?
+  startTime   String?
+  endTime     String?
+  date        DateTime?
+  createdAt   DateTime  @default(now())
+  teacherId   String
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher     Teacher   @relation("TeacherToEvent", fields: [teacherId], references: [id])
+}
+
+model Assignment {
+  id          String                 @id @default(uuid())
+  classId     String
+  description String
+  dueDate     DateTime
+  sentDate    DateTime               @default(now())
+  fileUrl     String?
+  createdAt   DateTime               @default(now())
+  subjectId   String
+  class       Class                  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String     @id @default(uuid())
+  assignmentId String
+  studentId    String
+  fileUrl      String?
+  description  String?
+  submittedAt  DateTime   @default(now())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+  TEACHER
 }
 
 enum Shift {
@@ -103,50 +242,6 @@ enum Shift {
   VESPERTINO
   NOTURNO
   INTEGRAL
-}
-
-model Class {
-  id            String        @id @default(uuid())
-  grade         Int
-  letter        String        // ← novo campo (ex: A, B, C)
-  academicYear  Int
-  shift         Shift
-  name          String
-  evaluationModel String      // "NUMERIC", "CONCEPT", "HYBRID"
-
-  enrollments   Enrollment[]
-  subjects      Subject[]
-  lessons       Lesson[]
-  events        Event[]
-  assignments   Assignment[]
-}
-
-model Teacher {
-  id        String      @id @default(uuid())
-  userId    String?     @unique
-  name      String
-  email     String      @unique
-  photoUrl  String?
-  subjects  Subject[]
-  lessons   Lesson[]
-  createdAt DateTime    @default(now())
-  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  events    Event[]     @relation("TeacherToEvent")
-}
-
-model Subject {
-  id         String      @id @default(uuid())
-  name       String
-  type       SubjectType
-  class      Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId    String
-  teacher    Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  teacherId  String
-  lessons    Lesson[]
-  grades     Grade[]
-  assignments Assignment[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
 }
 
 enum SubjectType {
@@ -164,109 +259,4 @@ enum SubjectType {
   FILOSOFIA
   SOCIOLOGIA
   CONTEUDO_INTERDISCIPLINAR
-}
-
-model Lesson {
-  id        String      @id @default(uuid())
-  date      DateTime
-  subjectId String
-  classId   String
-  teacherId String
-  subject   Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  class     Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
-  teacher   Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  attendances Attendance[]
-}
-
-model Attendance {
-  id        String      @id @default(uuid())
-  studentId String
-  lessonId  String
-  present   Boolean
-  student   Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  lesson    Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-}
-
-model GradePeriod {
-  id     String  @id @default(uuid())
-  name   String  // Ex: "1º Bimestre", "2º Trimestre"
-  order  Int
-  grades Grade[]
-}
-
-model GradeType {
-  id          String   @id @default(uuid())
-  name        String   // Ex: "Prova", "Trabalho", "Média Final", "Recuperação"
-  description String?
-  isConcept   Boolean  @default(false) // true se for conceito, false se for nota numérica
-  grades      Grade[]
-}
-
-model Grade {
-  id         String      @id @default(uuid())
-  student    Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  studentId  String
-  subject    Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  subjectId  String
-  type       GradeType   @relation(fields: [typeId], references: [id], onDelete: Cascade)
-  typeId     String
-  period     GradePeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  periodId   String
-  value      Float?      // Para nota numérica
-  concept    String?     // Para conceito (MB, B, R, I, etc)
-  date       DateTime    @default(now())
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-}
-
-model Config {
-  id                Int     @id @default(1)
-  evaluationModel   String  // "NUMERIC", "CONCEPT", "HYBRID"
-  minGrade          Float   @default(5.0)
-  minAttendance     Float   @default(75.0) // porcentagem
-}
-
-model Event {
-  id          String   @id @default(uuid())
-  classId     String
-  teacherId   String
-  title       String
-  description String?
-  dayOfWeek   Int?      //
-  startTime   String?   // "08:00"
-  endTime     String?   // "09:00"
-  date        DateTime? // Opcional: para eventos únicos
-  createdAt   DateTime @default(now())
-
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  teacher     Teacher  @relation("TeacherToEvent", fields: [teacherId], references: [id])
-}
-
-// Adicionar modelos para atividades e entregas dos alunos
-
-model Assignment {
-  id          String   @id @default(uuid())
-  classId     String
-  subjectId   String
-  description String
-  dueDate     DateTime
-  sentDate    DateTime @default(now())
-  fileUrl     String?
-  createdAt   DateTime @default(now())
-
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  submissions AssignmentSubmission[]
-}
-
-model AssignmentSubmission {
-  id           String   @id @default(uuid())
-  assignmentId String
-  studentId    String
-  fileUrl      String?
-  description  String?
-  submittedAt  DateTime @default(now())
-
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }

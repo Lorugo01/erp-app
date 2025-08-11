@@ -35,6 +35,54 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     _loadInitialData();
   }
 
+  // Método para mostrar diálogo de confirmação antes de sair
+  Future<void> _showLogoutConfirmation() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Confirmar Saída'),
+            ],
+          ),
+          content: const Text(
+            'Tem certeza que deseja sair da sua conta?\n\n'
+            'Você será redirecionado para a tela de login.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Executar logout após confirmação
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                authProvider.logout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sair'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _loadInitialData() async {
     await _loadTeacherClasses();
     await _loadAllStudents();
@@ -310,184 +358,334 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isWide = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
       backgroundColor: const Color(0xFFEFEFEF),
-      body: Row(
-        children: [
-          // Menu lateral azul
-          Container(
-            width: 220,
-            color: const Color(0xFF2953A5),
-            child: Column(
-              children: [
-                const SizedBox(height: 24),
-                // Avatar
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.white,
-                  backgroundImage:
-                      authProvider.user?.photoUrl != null
-                          ? NetworkImage(
-                            'http://192.168.18.15:3000${authProvider.user!.photoUrl}',
-                          )
-                          : null,
-                  child:
-                      authProvider.user?.photoUrl == null
-                          ? const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Color(0xFF2953A5),
-                          )
-                          : null,
-                ),
-                const SizedBox(height: 24),
-                // Nome do professor
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    authProvider.user?.displayName ?? 'Professor',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
+      appBar:
+          isWide
+              ? null
+              : AppBar(
+                backgroundColor: const Color(0xFF2953A5),
+                elevation: 0,
+                title: Text(
+                  _tabController.index == 0 ? 'Minhas Turmas' : 'Meus Alunos',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  authProvider.user?.email ?? '',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                // Menu
-                _SidebarButton(
-                  icon: Icons.class_,
-                  label: 'Minhas Turmas',
-                  selected: _tabController.index == 0,
-                  onTap: () => setState(() => _tabController.animateTo(0)),
-                ),
-                _SidebarButton(
-                  icon: Icons.groups,
-                  label: 'Meus Alunos',
-                  selected: _tabController.index == 1,
-                  onTap: () => setState(() => _tabController.animateTo(1)),
-                ),
-                const Spacer(),
-                const Divider(color: Colors.white54, indent: 16, endIndent: 16),
-                _SidebarButton(
-                  icon: Icons.help_outline,
-                  label: 'Ajuda',
-                  selected: false,
-                  onTap: () {
-                    _showHelpDialog();
-                  },
-                ),
-                _SidebarButton(
-                  icon: Icons.settings,
-                  label: 'Configurações',
-                  selected: false,
-                  onTap: () {
-                    _showSettingsDialog();
-                  },
-                ),
-                _SidebarButton(
-                  icon: Icons.logout,
-                  label: 'Sair',
-                  selected: false,
-                  onTap: () => authProvider.logout(),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-          // Área principal
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                  // Header com título e busca
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _tabController.index == 0
-                              ? 'Minhas Turmas'
-                              : 'Meus Alunos',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2953A5),
-                          ),
-                        ),
-                      ),
-                      if (_tabController.index == 1)
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    decoration: const InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: 'Buscar aluno...',
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.search,
-                                    color: Colors.grey,
-                                  ),
-                                  onPressed: () => setState(() {}),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () {
-                          if (_tabController.index == 0) {
-                            _fetchTeacherClasses();
-                          } else {
-                            _fetchStudentsFromClasses();
-                          }
-                        },
-                        tooltip: 'Atualizar',
-                      ),
-                    ],
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.help_outline, color: Colors.white),
+                    onPressed: _showHelpDialog,
+                    tooltip: 'Ajuda',
                   ),
-                  const SizedBox(height: 24),
-                  // Conteúdo das abas
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [_buildClassesTab(), _buildStudentsTab()],
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.white),
+                    onPressed: _showSettingsDialog,
+                    tooltip: 'Configurações',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    onPressed: _showLogoutConfirmation,
+                    tooltip: 'Sair',
                   ),
                 ],
               ),
+      body:
+          isWide
+              ? _buildWideLayout(authProvider)
+              : _buildMobileLayout(authProvider),
+      bottomNavigationBar: isWide ? null : _buildBottomNavigation(),
+    );
+  }
+
+  Widget _buildWideLayout(AuthProvider authProvider) {
+    return Row(
+      children: [
+        // Menu lateral azul
+        Container(
+          width: 220,
+          color: const Color(0xFF2953A5),
+          child: Column(
+            children: [
+              const SizedBox(height: 24),
+              // Avatar
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.white,
+                backgroundImage:
+                    authProvider.user?.photoUrl != null
+                        ? NetworkImage(
+                          'http://192.168.18.15:3000${authProvider.user!.photoUrl}',
+                        )
+                        : null,
+                child:
+                    authProvider.user?.photoUrl == null
+                        ? const Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Color(0xFF2953A5),
+                        )
+                        : null,
+              ),
+              const SizedBox(height: 24),
+              // Nome do professor
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  authProvider.user?.displayName ?? 'Professor',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                authProvider.user?.email ?? '',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              // Menu
+              _SidebarButton(
+                icon: Icons.class_,
+                label: 'Minhas Turmas',
+                selected: _tabController.index == 0,
+                onTap: () => setState(() => _tabController.animateTo(0)),
+              ),
+              _SidebarButton(
+                icon: Icons.groups,
+                label: 'Meus Alunos',
+                selected: _tabController.index == 1,
+                onTap: () => setState(() => _tabController.animateTo(1)),
+              ),
+              const Spacer(),
+              const Divider(color: Colors.white54, indent: 16, endIndent: 16),
+              _SidebarButton(
+                icon: Icons.help_outline,
+                label: 'Ajuda',
+                selected: false,
+                onTap: () {
+                  _showHelpDialog();
+                },
+              ),
+              _SidebarButton(
+                icon: Icons.settings,
+                label: 'Configurações',
+                selected: false,
+                onTap: () {
+                  _showSettingsDialog();
+                },
+              ),
+              _SidebarButton(
+                icon: Icons.logout,
+                label: 'Sair',
+                selected: false,
+                onTap: () => _showLogoutConfirmation(),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+        // Área principal
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: _buildMainContent(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout(AuthProvider authProvider) {
+    return Column(
+      children: [
+        // Header com informações do professor
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: Color(0xFF2953A5),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
             ),
           ),
-        ],
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.white,
+                backgroundImage:
+                    authProvider.user?.photoUrl != null
+                        ? NetworkImage(
+                          'http://192.168.18.15:3000${authProvider.user!.photoUrl}',
+                        )
+                        : null,
+                child:
+                    authProvider.user?.photoUrl == null
+                        ? const Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Color(0xFF2953A5),
+                        )
+                        : null,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                authProvider.user?.displayName ?? 'Professor',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                authProvider.user?.email ?? '',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        // Conteúdo principal
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildMainContent(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMainContent() {
+    return Column(
+      children: [
+        // Header com título e busca
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _tabController.index == 0 ? 'Minhas Turmas' : 'Meus Alunos',
+                style: TextStyle(
+                  fontSize: MediaQuery.of(context).size.width > 600 ? 28 : 24,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF2953A5),
+                ),
+              ),
+            ),
+            if (_tabController.index == 1)
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(left: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Buscar aluno...',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.search, color: Colors.grey),
+                        onPressed: () => setState(() {}),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(width: 16),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                if (_tabController.index == 0) {
+                  _fetchTeacherClasses();
+                } else {
+                  _fetchStudentsFromClasses();
+                }
+              },
+              tooltip: 'Atualizar',
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        // Conteúdo das abas
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [_buildClassesTab(), _buildStudentsTab()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF2953A5),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _BottomNavItem(
+                icon: Icons.class_,
+                label: 'Turmas',
+                isSelected: _tabController.index == 0,
+                onTap: () => setState(() => _tabController.animateTo(0)),
+              ),
+              _BottomNavItem(
+                icon: Icons.groups,
+                label: 'Alunos',
+                isSelected: _tabController.index == 1,
+                onTap: () => setState(() => _tabController.animateTo(1)),
+              ),
+              _BottomNavItem(
+                icon: Icons.help_outline,
+                label: 'Ajuda',
+                isSelected: false,
+                onTap: _showHelpDialog,
+              ),
+              _BottomNavItem(
+                icon: Icons.settings,
+                label: 'Config',
+                isSelected: false,
+                onTap: _showSettingsDialog,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -546,17 +744,39 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       );
     }
 
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 24,
-        mainAxisSpacing: 24,
-        childAspectRatio: 1.2,
-      ),
-      itemCount: _teacherClasses.length,
-      itemBuilder: (context, index) {
-        final classData = _teacherClasses[index];
-        return _ClassCard(classData: classData);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        int crossAxisCount;
+        double childAspectRatio;
+
+        if (screenWidth > 1200) {
+          crossAxisCount = 4;
+          childAspectRatio = 1.4;
+        } else if (screenWidth > 800) {
+          crossAxisCount = 3;
+          childAspectRatio = 1.2;
+        } else if (screenWidth > 600) {
+          crossAxisCount = 2;
+          childAspectRatio = 1.1;
+        } else {
+          crossAxisCount = 1;
+          childAspectRatio = 1.0;
+        }
+
+        return GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: screenWidth > 600 ? 24 : 16,
+            mainAxisSpacing: screenWidth > 600 ? 24 : 16,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: _teacherClasses.length,
+          itemBuilder: (context, index) {
+            final classData = _teacherClasses[index];
+            return _ClassCard(classData: classData);
+          },
+        );
       },
     );
   }
@@ -637,17 +857,42 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       );
     }
 
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 24,
-        mainAxisSpacing: 24,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: _filteredStudents.length,
-      itemBuilder: (context, index) {
-        final student = _filteredStudents[index];
-        return _StudentCard(student: student);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        int crossAxisCount;
+        double childAspectRatio;
+
+        if (screenWidth > 1200) {
+          crossAxisCount = 5;
+          childAspectRatio = 0.9;
+        } else if (screenWidth > 800) {
+          crossAxisCount = 4;
+          childAspectRatio = 0.85;
+        } else if (screenWidth > 600) {
+          crossAxisCount = 3;
+          childAspectRatio = 0.8;
+        } else if (screenWidth > 400) {
+          crossAxisCount = 2;
+          childAspectRatio = 0.75;
+        } else {
+          crossAxisCount = 1;
+          childAspectRatio = 0.7;
+        }
+
+        return GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: screenWidth > 600 ? 24 : 16,
+            mainAxisSpacing: screenWidth > 600 ? 24 : 16,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: _filteredStudents.length,
+          itemBuilder: (context, index) {
+            final student = _filteredStudents[index];
+            return _StudentCard(student: student);
+          },
+        );
       },
     );
   }
@@ -692,6 +937,47 @@ class _SidebarButton extends StatelessWidget {
   }
 }
 
+class _BottomNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback? onTap;
+
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    this.isSelected = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : Colors.white54,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white54,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ClassCard extends StatelessWidget {
   final Map<String, dynamic> classData;
 
@@ -712,6 +998,9 @@ class _ClassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 600;
+    final isVerySmall = MediaQuery.of(context).size.width < 400;
+
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 4,
@@ -725,34 +1014,100 @@ class _ClassCard extends StatelessWidget {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(
+            isVerySmall
+                ? 8.0
+                : isSmall
+                ? 12.0
+                : 16.0,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircleAvatar(
-                radius: 32,
-                backgroundColor: Color(0xFF2953A5),
-                child: Icon(Icons.class_, size: 40, color: Colors.white),
+              CircleAvatar(
+                radius:
+                    isVerySmall
+                        ? 20
+                        : isSmall
+                        ? 24
+                        : 32,
+                backgroundColor: const Color(0xFF2953A5),
+                child: Icon(
+                  Icons.class_,
+                  size:
+                      isVerySmall
+                          ? 24
+                          : isSmall
+                          ? 28
+                          : 40,
+                  color: Colors.white,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(
+                height:
+                    isVerySmall
+                        ? 8
+                        : isSmall
+                        ? 12
+                        : 16,
+              ),
               Text(
                 classData['name'] ?? 'Turma',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize:
+                      isVerySmall
+                          ? 12
+                          : isSmall
+                          ? 14
+                          : 16,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              SizedBox(
+                height:
+                    isVerySmall
+                        ? 4
+                        : isSmall
+                        ? 6
+                        : 8,
+              ),
               Text(
                 'Ano: ${classData['year'] ?? ''}',
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize:
+                      isVerySmall
+                          ? 10
+                          : isSmall
+                          ? 12
+                          : 14,
+                ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(
+                height:
+                    isVerySmall
+                        ? 2
+                        : isSmall
+                        ? 3
+                        : 4,
+              ),
               Text(
                 _getShiftText(classData['shift']),
-                style: const TextStyle(color: Colors.blueGrey, fontSize: 13),
+                style: TextStyle(
+                  color: Colors.blueGrey,
+                  fontSize:
+                      isVerySmall
+                          ? 9
+                          : isSmall
+                          ? 11
+                          : 13,
+                ),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -997,6 +1352,9 @@ class _StudentCardState extends State<_StudentCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 600;
+    final isVerySmall = MediaQuery.of(context).size.width < 400;
+
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
@@ -1023,34 +1381,102 @@ class _StudentCardState extends State<_StudentCard> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 4,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(
+            isVerySmall
+                ? 8.0
+                : isSmall
+                ? 12.0
+                : 16.0,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircleAvatar(
-                radius: 32,
-                backgroundColor: Color(0xFF2953A5),
-                child: Icon(Icons.person, size: 40, color: Colors.white),
+              CircleAvatar(
+                radius:
+                    isVerySmall
+                        ? 20
+                        : isSmall
+                        ? 24
+                        : 32,
+                backgroundColor: const Color(0xFF2953A5),
+                child: Icon(
+                  Icons.person,
+                  size:
+                      isVerySmall
+                          ? 24
+                          : isSmall
+                          ? 28
+                          : 40,
+                  color: Colors.white,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(
+                height:
+                    isVerySmall
+                        ? 8
+                        : isSmall
+                        ? 12
+                        : 16,
+              ),
               Text(
                 widget.student['name'] ?? 'Aluno',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize:
+                      isVerySmall
+                          ? 12
+                          : isSmall
+                          ? 14
+                          : 16,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              SizedBox(
+                height:
+                    isVerySmall
+                        ? 4
+                        : isSmall
+                        ? 6
+                        : 8,
+              ),
               Text(
                 widget.student['registrationNumber'] ?? '',
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize:
+                      isVerySmall
+                          ? 10
+                          : isSmall
+                          ? 12
+                          : 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
+              SizedBox(
+                height:
+                    isVerySmall
+                        ? 4
+                        : isSmall
+                        ? 6
+                        : 8,
+              ),
               Text(
                 widget.student['email'] ?? '',
-                style: const TextStyle(color: Colors.blueGrey, fontSize: 13),
+                style: TextStyle(
+                  color: Colors.blueGrey,
+                  fontSize:
+                      isVerySmall
+                          ? 9
+                          : isSmall
+                          ? 11
+                          : 13,
+                ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

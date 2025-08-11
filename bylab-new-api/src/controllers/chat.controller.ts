@@ -108,7 +108,7 @@ export const getChatMessages = async (req: Request, res: Response) => {
 export const sendMessage = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { content, userId, isAI } = req.body;
+    const { content, userId, isAI, personagem } = req.body;
     
     if (!content) {
       return res.status(400).json({ error: 'Conteúdo é obrigatório' });
@@ -140,7 +140,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     // userId deve ser null para IA
     const realUserId = isAI ? null : userId;
 
-    const message = await ChatService.sendMessage(id, realUserId, content, fileData);
+    const message = await ChatService.sendMessage(id, realUserId, content, fileData, personagem);
     res.status(201).json(message);
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });

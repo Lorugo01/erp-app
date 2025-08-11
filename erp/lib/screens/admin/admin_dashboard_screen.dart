@@ -14,7 +14,7 @@ import 'teacher_detail_screen.dart';
 import 'user_detail_screen.dart';
 import 'grade_management_screen.dart';
 import 'admin_settings_screen.dart';
-import 'tecaai_equipamentos_screen.dart';
+import 'armario.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/admin_app_bar_menu.dart';
 
@@ -1004,7 +1004,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         );
       case 5:
-        return const TecaAIEquipamentosScreen();
+        return const ArmariosScreen();
       case 6:
         return SingleChildScrollView(
           child: Column(
@@ -1266,7 +1266,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       );
                     },
-                    onLogout: () => authProvider.logout(),
+                    onLogout: () => _showLogoutConfirmation(),
                   ),
                 ],
                 iconTheme: const IconThemeData(color: Color(0xFF2953A5)),
@@ -1282,7 +1282,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         setState(() => _selectedIndex = index);
                       }
                     },
-                    onLogout: () => authProvider.logout(),
+                    onLogout: () => _showLogoutConfirmation(),
                     isWide: true,
                   ),
                   Expanded(
@@ -1313,7 +1313,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     setState(() => _selectedIndex = index);
                   }
                 },
-                onLogout: () => authProvider.logout(),
+                onLogout: () => _showLogoutConfirmation(),
                 isWide: false,
               ),
       floatingActionButton:
@@ -1347,6 +1347,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               )
               : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+    );
+  }
+
+  // Método para mostrar diálogo de confirmação antes de sair
+  Future<void> _showLogoutConfirmation() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Confirmar Saída'),
+            ],
+          ),
+          content: const Text(
+            'Tem certeza que deseja sair da sua conta?\n\n'
+            'Você será redirecionado para a tela de login.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Executar logout após confirmação
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                authProvider.logout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sair'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

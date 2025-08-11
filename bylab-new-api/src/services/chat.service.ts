@@ -176,7 +176,11 @@ export const createChat = async (data: {
   // Adiciona participantes se fornecidos
   if (data.participants && data.participants.length > 0) {
     for (const userId of data.participants) {
-      await addParticipant(chat.id, userId);
+      try {
+        await addParticipant(chat.id, userId);
+      } catch (error) {
+        throw error;
+      }
     }
   }
 
@@ -298,7 +302,11 @@ export const addParticipant = async (chatId: string, userId: string) => {
 
   // Verifica se o usuário existe
   const user = await prisma.user.findUnique({
-    where: { id: userId }
+    where: { id: userId },
+    include: {
+      student: true,
+      teacher: true
+    }
   });
 
   if (!user) {
@@ -318,7 +326,7 @@ export const addParticipant = async (chatId: string, userId: string) => {
   }
 
   // Adiciona o participante
-  return prisma.chatparticipant.create({
+  const participant = await prisma.chatparticipant.create({
     data: {
       chat_id: chatId,
       user_id: userId
@@ -345,6 +353,8 @@ export const addParticipant = async (chatId: string, userId: string) => {
       }
     }
   });
+
+  return participant;
 };
 
 export const removeParticipant = async (chatId: string, userId: string) => {
@@ -419,7 +429,8 @@ export const sendMessage = async (
     file_path: string;
     file_name: string;
     file_type: string;
-  }
+  },
+  personagem?: string // Novo parâmetro para o personagem
 ) => {
   // Verifica se o chat existe
   const chat = await prisma.chat.findUnique({
@@ -447,6 +458,9 @@ export const sendMessage = async (
   };
   if (userId) {
     messageData.user_id = userId;
+  }
+  if (personagem) {
+    messageData.personagem = personagem;
   }
   const message = await prisma.message.create({
     data: messageData,
@@ -571,6 +585,19 @@ export const deleteMessage = async (messageId: string) => {
 
 // User Chat Services
 export const getUserChats = async (userId: string) => {
+  // Primeiro, vamos verificar se o usuário existe
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      student: true,
+      teacher: true
+    }
+  });
+  
+  if (!user) {
+    throw new Error('Usuário não encontrado');
+  }
+  
   const chats = await prisma.chat.findMany({
     where: {
       participants: {
