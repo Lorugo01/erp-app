@@ -80,9 +80,19 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
   Future<void> _fetchSubjects() async {
     try {
-      final subjects = await TeacherService.getSubjectsByClassId(
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final teacherId = authProvider.user?.teacher?.id;
+
+      if (teacherId == null) {
+        throw Exception('Professor não encontrado');
+      }
+
+      // Buscar apenas as disciplinas que o professor leciona nesta turma
+      final subjects = await TeacherService.getSubjectsByClassIdAndTeacher(
         widget.classData['id'],
+        teacherId,
       );
+
       setState(() {
         _subjects = subjects;
         if (subjects.isNotEmpty) {
@@ -95,6 +105,15 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       }
     } catch (e) {
       debugPrint('Erro ao carregar disciplinas: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar disciplinas: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 

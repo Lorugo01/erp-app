@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/data_provider.dart';
 import '../../widgets/data_refresh_widget.dart';
 import '../../services/teacher_service.dart';
+import '../../services/tecaai_service.dart';
 import 'dart:async';
 import 'teacher_class_detail_screen.dart';
 import 'teacher_student_detail_screen.dart';
@@ -28,11 +29,34 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   String? _errorStudents;
   Timer? _debounce;
 
+  // Variáveis para controle dos armários
+  bool _isLoadingArmarios = false;
+  bool _isConnected = false;
+  List<TecaAIItem> _armarioItems = [];
+  List<TecaAIItem> _filteredArmarioItems = [];
+  String? _selectedArmario;
+  final TextEditingController _armarioSearchController =
+      TextEditingController();
+
+  // Variáveis para filtragem de armários
+  String? _selectedArmarioFilter;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+
+    // Debug inicial
+    debugPrint('=== INIT STATE ===');
+    debugPrint('_selectedArmario inicial: "$_selectedArmario"');
+
+    // Garantir que comece como null
+    _selectedArmario = null;
+    debugPrint('_selectedArmario após reset: "$_selectedArmario"');
+    debugPrint('========================');
+
     _loadInitialData();
+    _loadArmarioData();
   }
 
   // Método para mostrar diálogo de confirmação antes de sair
@@ -86,6 +110,123 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   Future<void> _loadInitialData() async {
     await _loadTeacherClasses();
     await _loadAllStudents();
+  }
+
+  Future<void> _loadArmarioData() async {
+    await _checkArmarioConnection();
+    await _loadArmarioItems();
+  }
+
+  Future<void> _checkArmarioConnection() async {
+    try {
+      final connected = await TecaAIService.checkConnection();
+      if (mounted) {
+        setState(() {
+          _isConnected = connected;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadArmarioItems() async {
+    if (mounted) {
+      setState(() => _isLoadingArmarios = true);
+    }
+    try {
+      final items = await TecaAIService.getAllItems();
+      if (mounted) {
+        setState(() {
+          _armarioItems = items;
+          _filteredArmarioItems = items;
+
+          // Debug dos itens carregados
+          debugPrint('=== ITENS CARREGADOS ===');
+          debugPrint('Total de itens: ${items.length}');
+          debugPrint('_selectedArmario: "$_selectedArmario"');
+
+          if (items.isNotEmpty) {
+            debugPrint('Primeiro item:');
+            debugPrint('  Nome: ${items.first.nome}');
+            debugPrint('  Posição: ${items.first.posicao}');
+            debugPrint('  espIp: "${items.first.espIp}"');
+            debugPrint('  espIpOriginal: "${items.first.espIpOriginal}"');
+
+            if (items.length > 1) {
+              debugPrint('Segundo item:');
+              debugPrint('  Nome: ${items[1].nome}');
+              debugPrint('  Posição: ${items[1].posicao}');
+              debugPrint('  espIp: "${items[1].espIp}"');
+              debugPrint('  espIpOriginal: "${items[1].espIpOriginal}"');
+            }
+          }
+          debugPrint('========================');
+        });
+
+        // Aplicar filtros após carregar os itens
+        _applyFilters();
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar itens: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingArmarios = false);
+      }
+    }
+  }
+
+  void _filterArmarioItems(String query) {
+    debugPrint('=== FILTRANDO ITENS ===');
+    debugPrint('Query: "$query"');
+    debugPrint('Filtro de armário: $_selectedArmarioFilter');
+    debugPrint('_selectedArmario: "$_selectedArmario"');
+
+    setState(() {
+      // Primeiro aplicar filtro de armário
+      List<TecaAIItem> armarioFiltered;
+      if (_selectedArmarioFilter == null) {
+        armarioFiltered = _armarioItems;
+      } else {
+        armarioFiltered =
+            _armarioItems.where((item) {
+              // Usar o campo esp_ip que já vem traduzido da API
+              return item.espIp == _selectedArmarioFilter;
+            }).toList();
+      }
+
+      // Depois aplicar filtro de texto
+      if (query.isEmpty) {
+        _filteredArmarioItems = armarioFiltered;
+      } else {
+        _filteredArmarioItems =
+            armarioFiltered.where((item) {
+              return item.nome.toLowerCase().contains(query.toLowerCase()) ||
+                  item.posicao.toLowerCase().contains(query.toLowerCase());
+            }).toList();
+      }
+    });
+
+    debugPrint('Itens filtrados: ${_filteredArmarioItems.length}');
+    debugPrint('========================');
+  }
+
+  void _filterArmarioItemsByArmario(String? armario) {
+    setState(() {
+      _selectedArmario = armario;
+      if (armario == null) {
+        _filteredArmarioItems = _armarioItems;
+      } else {
+        _filteredArmarioItems =
+            _armarioItems.where((item) {
+              return item.posicao.startsWith(armario);
+            }).toList();
+      }
+    });
   }
 
   Future<void> _loadTeacherClasses() async {
@@ -250,6 +391,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     _tabController.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _armarioSearchController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
@@ -369,7 +511,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                 backgroundColor: const Color(0xFF2953A5),
                 elevation: 0,
                 title: Text(
-                  _tabController.index == 0 ? 'Minhas Turmas' : 'Meus Alunos',
+                  _getTabTitle(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -463,6 +605,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                 label: 'Meus Alunos',
                 selected: _tabController.index == 1,
                 onTap: () => setState(() => _tabController.animateTo(1)),
+              ),
+              _SidebarButton(
+                icon: Icons.inventory_2,
+                label: 'Armários',
+                selected: _tabController.index == 2,
+                onTap: () => setState(() => _tabController.animateTo(2)),
               ),
               const Spacer(),
               const Divider(color: Colors.white54, indent: 16, endIndent: 16),
@@ -575,7 +723,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           children: [
             Expanded(
               child: Text(
-                _tabController.index == 0 ? 'Minhas Turmas' : 'Meus Alunos',
+                _getTabTitle(),
                 style: TextStyle(
                   fontSize: MediaQuery.of(context).size.width > 600 ? 28 : 24,
                   fontWeight: FontWeight.bold,
@@ -618,14 +766,52 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   ),
                 ),
               ),
+            if (_tabController.index == 2)
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(left: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _armarioSearchController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Buscar item...',
+                          ),
+                          onChanged: _filterArmarioItems,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.search, color: Colors.grey),
+                        onPressed: () => setState(() {}),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(width: 16),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
                 if (_tabController.index == 0) {
                   _fetchTeacherClasses();
-                } else {
+                } else if (_tabController.index == 1) {
                   _fetchStudentsFromClasses();
+                } else if (_tabController.index == 2) {
+                  _loadArmarioItems();
                 }
               },
               tooltip: 'Atualizar',
@@ -637,11 +823,28 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: [_buildClassesTab(), _buildStudentsTab()],
+            children: [
+              _buildClassesTab(),
+              _buildStudentsTab(),
+              _buildArmariosTab(),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  String _getTabTitle() {
+    switch (_tabController.index) {
+      case 0:
+        return 'Minhas Turmas';
+      case 1:
+        return 'Meus Alunos';
+      case 2:
+        return 'Controle dos Armários';
+      default:
+        return 'Dashboard';
+    }
   }
 
   Widget _buildBottomNavigation() {
@@ -670,6 +873,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                 label: 'Alunos',
                 isSelected: _tabController.index == 1,
                 onTap: () => setState(() => _tabController.animateTo(1)),
+              ),
+              _BottomNavItem(
+                icon: Icons.inventory_2,
+                label: 'Armários',
+                isSelected: _tabController.index == 2,
+                onTap: () => setState(() => _tabController.animateTo(2)),
               ),
               _BottomNavItem(
                 icon: Icons.help_outline,
@@ -895,6 +1104,695 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         );
       },
     );
+  }
+
+  Widget _buildArmariosTab() {
+    // Debug inicial
+    debugPrint('=== BUILD ARMARIOS TAB ===');
+    debugPrint('_selectedArmario: "$_selectedArmario"');
+    debugPrint('_armarioItems.length: ${_armarioItems.length}');
+    debugPrint('_filteredArmarioItems.length: ${_filteredArmarioItems.length}');
+    debugPrint('========================');
+
+    if (_isLoadingArmarios) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (!_isConnected) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.signal_wifi_off, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Não foi possível conectar ao armário.',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Verifique sua conexão com a internet e tente novamente.',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadArmarioData,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título da seção
+          Row(
+            children: [
+              Icon(Icons.computer, size: 32, color: Color(0xFF2953A5)),
+              SizedBox(width: 12),
+              Text(
+                'Controle dos Armários - TecaAI',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2953A5),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 24),
+
+          // Status de conexão
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    _isConnected ? Icons.check_circle : Icons.error,
+                    color: _isConnected ? Colors.green : Colors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isConnected ? 'TecaAI Conectado' : 'TecaAI Desconectado',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Spacer(),
+                  IconButton(
+                    icon: Icon(_isConnected ? Icons.wifi : Icons.wifi_off),
+                    onPressed: _checkArmarioConnection,
+                    tooltip: _isConnected ? 'Conectado' : 'Desconectado',
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Seção: Localizar Item
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Localizar Item',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed:
+                            _isLoadingArmarios ? null : _loadArmarioItems,
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Recarregar Itens',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Selecione um item para localizá-lo no laboratório',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Campo de busca
+                  TextFormField(
+                    controller: _armarioSearchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por nome ou posição...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onChanged: _filterArmarioItems,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Filtro por Armário
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: 'Filtrar por Armário',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            prefixIcon: const Icon(Icons.inventory),
+                          ),
+                          value: _selectedArmarioFilter,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('Todos os Armários'),
+                            ),
+                            ..._getAvailableArmarios().map((armario) {
+                              return DropdownMenuItem<String>(
+                                value: armario,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.inventory, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text('Armário $armario'),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (String? value) {
+                            setState(() {
+                              _selectedArmarioFilter = value;
+                              _applyFilters();
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: _clearFilters,
+                        icon: const Icon(Icons.clear),
+                        label: const Text('Limpar Filtros'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[600],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Lista de itens
+                  if (_filteredArmarioItems.isEmpty)
+                    const Center(child: Text('Nenhum item encontrado'))
+                  else
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListView.builder(
+                        itemCount: _filteredArmarioItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _filteredArmarioItems[index];
+
+                          // Criar um identificador único para cada item
+                          final itemId = '${item.nome}_${item.posicao}';
+
+                          // Debug simplificado
+                          debugPrint(
+                            'Item $index: ${item.nome} - ID: "$itemId" - selected: "$_selectedArmario"',
+                          );
+
+                          // Comparação usando o ID único do item
+                          final isSelected = _selectedArmario == itemId;
+
+                          debugPrint('  isSelected: $isSelected');
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color:
+                                    isSelected
+                                        ? Colors.blue
+                                        : Colors.grey.shade700,
+                                width: isSelected ? 2.0 : 1.5,
+                              ),
+                              borderRadius: BorderRadius.circular(50),
+                              color:
+                                  isSelected
+                                      ? Colors.blue.withAlpha(30)
+                                      : Colors.transparent,
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(50),
+                                onTap: () {
+                                  debugPrint('=== CLIQUE NO ITEM ===');
+                                  debugPrint('Item clicado: ${item.nome}');
+                                  debugPrint('ID do item: "$itemId"');
+                                  debugPrint(
+                                    '_selectedArmario atual: "$_selectedArmario"',
+                                  );
+
+                                  setState(() {
+                                    if (_selectedArmario == itemId) {
+                                      // Se já está selecionado, deseleciona
+                                      _selectedArmario = null;
+                                      debugPrint('Item DESELECIONADO');
+                                    } else {
+                                      // Seleciona o novo item
+                                      _selectedArmario = itemId;
+                                      debugPrint(
+                                        'Item SELECIONADO: "$_selectedArmario"',
+                                      );
+                                    }
+                                  });
+                                },
+                                child: ListTile(
+                                  title: Text(
+                                    item.nome,
+                                    style: TextStyle(
+                                      fontWeight:
+                                          isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '${item.posicao} - Armário ${item.espIp}',
+                                  ),
+                                  selected:
+                                      false, // Sempre false para evitar conflitos
+                                  selectedTileColor: Colors.transparent,
+                                  trailing:
+                                      isSelected
+                                          ? Icon(
+                                            Icons.check_circle,
+                                            color: Colors.blue,
+                                            size: 20,
+                                          )
+                                          : null,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+
+                  // Item Selecionado
+                  if (_selectedArmario != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        border: Border.all(color: Colors.blue.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Item Selecionado:',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Builder(
+                            builder: (context) {
+                              final selectedItem = _filteredArmarioItems
+                                  .firstWhere(
+                                    (item) =>
+                                        '${item.nome}_${item.posicao}' ==
+                                        _selectedArmario,
+                                    orElse:
+                                        () => _armarioItems.firstWhere(
+                                          (item) =>
+                                              '${item.nome}_${item.posicao}' ==
+                                              _selectedArmario,
+                                          orElse:
+                                              () => TecaAIItem(
+                                                id: null,
+                                                nome: 'Item não encontrado',
+                                                posicao: '',
+                                                posicaoOriginal: '',
+                                                espIp: '',
+                                                espIpOriginal: '',
+                                              ),
+                                        ),
+                                  );
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Nome: ${selectedItem.nome}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Posição: ${selectedItem.posicao}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Armário: ${selectedItem.espIp}',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Botão de localizar (se houver item selecionado)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () => _locateSelectedItem(),
+                        icon: const Icon(Icons.search),
+                        label: const Text('Localizar Item Selecionado'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Comandos Pré-definidos
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Comandos de Controle',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Controle as funcionalidades dos armários',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () => _executePredefinedCommand('ligar_luz'),
+                        icon: const Icon(Icons.lightbulb),
+                        label: const Text('Ligar Luz'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () =>
+                                    _executePredefinedCommand('desligar_luz'),
+                        icon: const Icon(Icons.lightbulb_outline),
+                        label: const Text('Desligar Luz'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[700],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () =>
+                                    _executePredefinedCommand('modo_festa_on'),
+                        icon: const Icon(Icons.celebration),
+                        label: const Text('Modo Festa ON'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () =>
+                                    _executePredefinedCommand('modo_festa_off'),
+                        icon: const Icon(Icons.celebration_outlined),
+                        label: const Text('Modo Festa OFF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[600],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Informações do Sistema
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Informações do Sistema',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InfoCard(
+                          title: 'Total de Itens',
+                          value: _armarioItems.length.toString(),
+                          icon: Icons.inventory_2,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _InfoCard(
+                          title: 'Itens Filtrados',
+                          value: _filteredArmarioItems.length.toString(),
+                          icon: Icons.filter_list,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Status: ${_isConnected ? "Sistema Operacional" : "Sistema Offline"}',
+                    style: TextStyle(
+                      color: _isConnected ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _executePredefinedCommand(String commandKey) async {
+    if (mounted) {
+      setState(() {
+        _isLoadingArmarios = true;
+      });
+    }
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final response = await TecaAIService.executePredefinedCommand(
+        commandKey: commandKey,
+        user: user,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingArmarios = false;
+        });
+      }
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Comando executado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: ${response.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingArmarios = false;
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao executar comando: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _locateSelectedItem() async {
+    if (_selectedArmario == null) return;
+
+    // Extrair o nome do item do ID único
+    final itemName = _selectedArmario!.split('_')[0];
+
+    final selectedItem = _filteredArmarioItems.firstWhere(
+      (item) => '${item.nome}_${item.posicao}' == _selectedArmario,
+      orElse:
+          () => _armarioItems.firstWhere(
+            (item) => '${item.nome}_${item.posicao}' == _selectedArmario,
+            orElse:
+                () => TecaAIItem(
+                  id: null,
+                  nome: itemName,
+                  posicao: '',
+                  posicaoOriginal: '',
+                  espIp: '',
+                  espIpOriginal: '',
+                ),
+          ),
+    );
+
+    debugPrint('Item selecionado para localização: ${selectedItem.nome}');
+    debugPrint('ID único: $_selectedArmario');
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final response = await TecaAIService.locateItem(
+        item: selectedItem.nome,
+        user: user,
+      );
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Item localizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao localizar item: ${response.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao localizar item: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  List<String> _getAvailableArmarios() {
+    final uniqueArmarios = <String>{};
+    for (final item in _armarioItems) {
+      // Usar o campo esp_ip que já vem traduzido da API (ex: "A", "B", "C")
+      if (item.espIp.isNotEmpty) {
+        uniqueArmarios.add(item.espIp);
+      }
+    }
+
+    debugPrint('=== ARMÁRIOS DISPONÍVEIS ===');
+    debugPrint('Armários encontrados: ${uniqueArmarios.toList()}');
+    debugPrint('========================');
+
+    return uniqueArmarios.toList()..sort();
+  }
+
+  void _applyFilters() {
+    setState(() {
+      if (_selectedArmarioFilter == null) {
+        _filteredArmarioItems = _armarioItems;
+      } else {
+        _filteredArmarioItems =
+            _armarioItems.where((item) {
+              // Usar o campo esp_ip que já vem traduzido da API
+              return item.espIp == _selectedArmarioFilter;
+            }).toList();
+      }
+    });
+
+    debugPrint('=== FILTROS APLICADOS ===');
+    debugPrint('Filtro de armário: $_selectedArmarioFilter');
+    debugPrint('Itens filtrados: ${_filteredArmarioItems.length}');
+    debugPrint('========================');
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedArmarioFilter = null;
+      _armarioSearchController.clear();
+      _filteredArmarioItems = _armarioItems;
+    });
+
+    debugPrint('=== FILTROS LIMPOS ===');
+    debugPrint('Filtros resetados para valores padrão');
+    debugPrint('Itens filtrados: ${_filteredArmarioItems.length}');
+    debugPrint('========================');
   }
 }
 
@@ -1480,6 +2378,50 @@ class _StudentCardState extends State<_StudentCard> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _InfoCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

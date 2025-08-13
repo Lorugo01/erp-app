@@ -64,6 +64,20 @@ export const getSubjectsByClassId = async (classId: string) => {
   });
 };
 
+export const getSubjectsByClassIdAndTeacher = async (classId: string, teacherId: string) => {
+  return prisma.subject.findMany({
+    where: { 
+      classId,
+      teacherId 
+    },
+    include: {
+      class: true,
+      teacher: true,
+      lessons: true,
+    },
+  });
+};
+
 function getSubjectLabel(type: string): string {
   const map = {
     LINGUA_INGLESA: "Língua Inglesa",

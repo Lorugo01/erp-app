@@ -124,4 +124,25 @@ class TeacherService {
       throw Exception('Erro ao buscar disciplinas da turma');
     }
   }
+
+  // Buscar disciplinas de uma turma que são lecionadas por um professor específico
+  static Future<List<Map<String, dynamic>>> getSubjectsByClassIdAndTeacher(
+    String classId,
+    String teacherId,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/subjects/class/$classId/teacher/$teacherId'),
+      );
+      
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception('Erro ao buscar disciplinas do professor na turma');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
+  }
 }

@@ -9,5 +9,6 @@ router.post('/', SubjectController.create);
 router.put('/:id', SubjectController.update);
 router.delete('/:id', SubjectController.remove);
 router.get('/class/:classId', SubjectController.getByClassId);
+router.get('/class/:classId/teacher/:teacherId', SubjectController.getByClassIdAndTeacher);
 
 export default router;

@@ -1239,7 +1239,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    Provider.of<AuthProvider>(context, listen: false);
     final isWide = MediaQuery.of(context).size.width > 900;
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),

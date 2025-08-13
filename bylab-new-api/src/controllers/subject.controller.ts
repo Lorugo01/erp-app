@@ -42,3 +42,18 @@ export const getByClassId = async (req: Request, res: Response, next: NextFuncti
     next(error);
   }
 };
+
+export const getByClassIdAndTeacher = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const classId = req.params.classId;
+    const teacherId = req.params.teacherId;
+    
+    if (!classId) return res.status(400).json({ error: 'classId é obrigatório' });
+    if (!teacherId) return res.status(400).json({ error: 'teacherId é obrigatório' });
+    
+    const subjects = await SubjectService.getSubjectsByClassIdAndTeacher(classId, teacherId);
+    res.json(subjects);
+  } catch (error) {
+    next(error);
+  }
+};
