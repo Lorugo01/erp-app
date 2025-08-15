@@ -293,10 +293,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         final studentId = attendance['studentId'];
         // Determinar status baseado nos novos campos ou compatibilidade
         String? status = attendance['status'];
-        if (status == null) {
-          // Compatibilidade com sistema antigo
-          status = attendance['present'] == true ? 'PRESENT' : 'ABSENT';
-        }
+        status ??= attendance['present'] == true ? 'PRESENT' : 'ABSENT';
         newAttendanceMap[studentId] = status;
         newJustificationMap[studentId] = attendance['justification'] ?? '';
       }

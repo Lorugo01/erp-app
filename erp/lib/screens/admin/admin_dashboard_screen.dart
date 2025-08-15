@@ -17,6 +17,7 @@ import 'admin_settings_screen.dart';
 import 'armario.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/admin_app_bar_menu.dart';
+import 'subjects_management_tab.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -636,6 +637,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Widget _buildSubjectsManagementTab() {
+    return const SubjectsManagementTab();
+  }
+
   Widget _buildTabContent() {
     switch (_selectedIndex) {
       case 0:
@@ -1141,6 +1146,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 7:
         return const GradeManagementScreen();
       case 8:
+        return _buildSubjectsManagementTab();
+      case 9:
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1319,7 +1326,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _selectedIndex == 2 ||
                   _selectedIndex == 3 ||
                   _selectedIndex == 4 ||
-                  _selectedIndex == 5)
+                  _selectedIndex == 5 ||
+                  _selectedIndex == 8)
               ? Padding(
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).size.width < 600 ? 80 : 24,
@@ -1338,6 +1346,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       _showAddClassDialog();
                     } else if (_selectedIndex == 5) {
                       // Funcionalidade de equipamentos em desenvolvimento
+                    } else if (_selectedIndex == 8) {
+                      // A função de adicionar matéria está dentro da própria aba
                     }
                   },
                   child: const Icon(Icons.add, size: 36, color: Colors.white),

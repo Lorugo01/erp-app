@@ -105,13 +105,19 @@ class _AdminSidebar extends StatelessWidget {
             selected: selectedIndex == 7,
             onTap: () => onSelect(7),
           ),
+          _SidebarButton(
+            icon: Icons.book,
+            label: 'Gerenciar\nMatérias',
+            selected: selectedIndex == 8,
+            onTap: () => onSelect(8),
+          ),
           const Spacer(),
           const Divider(color: Colors.white54, indent: 16, endIndent: 16),
           _SidebarButton(
             icon: Icons.settings,
             label: 'Configurações',
-            selected: selectedIndex == 8,
-            onTap: () => onSelect(8),
+            selected: selectedIndex == 9,
+            onTap: () => onSelect(9),
           ),
           _SidebarButton(
             icon: Icons.logout,
@@ -144,7 +150,7 @@ class _AdminBottomNavBar extends StatelessWidget {
       backgroundColor: const Color(0xFF2953A5),
       selectedItemColor: Colors.white,
       unselectedItemColor: Colors.white70,
-      currentIndex: selectedIndex > 4 ? 0 : selectedIndex,
+      currentIndex: selectedIndex > 5 ? 0 : selectedIndex,
       onTap: (index) {
         onSelect(index);
       },
@@ -187,17 +193,21 @@ class _SidebarButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           child: Row(
             children: [
               Icon(icon, color: Colors.white, size: 24),
               const SizedBox(width: 16),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withAlpha(selected ? 255 : 180),
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(selected ? 255 : 180),
+                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.left,
+                  overflow: TextOverflow.visible,
                 ),
               ),
             ],
