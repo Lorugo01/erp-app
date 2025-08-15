@@ -32,6 +32,7 @@ class _TeacherStudentDetailScreenState
   List<Map<String, dynamic>> _grades = [];
   List<Map<String, dynamic>> _attendances = [];
   List<Map<String, dynamic>> _gradeTypes = [];
+  bool _showAllAttendances = false;
 
   @override
   void initState() {
@@ -582,39 +583,98 @@ class _TeacherStudentDetailScreenState
       );
     }
 
+    // Calcular estatísticas
+    final totalLessons = _attendances.length;
+    final presentCount = _attendances.where((a) => a['present'] == true).length;
+    final absentCount = totalLessons - presentCount;
+    final attendanceRate =
+        totalLessons > 0 ? (presentCount / totalLessons * 100) : 0.0;
+
+    // Ordenar por data mais recente
+    final sortedAttendances = List<Map<String, dynamic>>.from(_attendances);
+    sortedAttendances.sort((a, b) {
+      final dateA = DateTime.parse(a['lesson']['date']);
+      final dateB = DateTime.parse(b['lesson']['date']);
+      return dateB.compareTo(dateA); // Mais recente primeiro
+    });
+
+    // Determinar quantos registros mostrar
+    final maxRecords = _showAllAttendances ? totalLessons : 5;
+    final visibleAttendances = sortedAttendances.take(maxRecords).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text(
-            'Frequência',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2953A5),
-            ),
+        // Header com título e estatísticas
+        Container(
+          margin: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(16.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2953A5).withAlpha(15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF2953A5).withAlpha(50)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Frequência',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2953A5),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildStatChip(
+                    icon: Icons.check_circle,
+                    label: 'Presenças',
+                    value: '$presentCount',
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatChip(
+                    icon: Icons.cancel,
+                    label: 'Faltas',
+                    value: '$absentCount',
+                    color: Colors.red,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatChip(
+                    icon: Icons.percent,
+                    label: 'Taxa',
+                    value: '${attendanceRate.toStringAsFixed(1)}%',
+                    color: attendanceRate >= 75 ? Colors.green : Colors.orange,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-        ..._attendances.map((attendance) {
+
+        // Lista de registros de frequência
+        ...visibleAttendances.map((attendance) {
           final present = attendance['present'] == true;
           final lesson = attendance['lesson'];
           final date = DateTime.parse(lesson['date']);
 
           return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-            padding: const EdgeInsets.all(16.0),
+            margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+            padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
               color:
                   present
-                      ? Colors.green.withAlpha(30)
-                      : Colors.red.withAlpha(30),
+                      ? Colors.green.withAlpha(20)
+                      : Colors.red.withAlpha(20),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color:
                     present
-                        ? Colors.green.withAlpha(80)
-                        : Colors.red.withAlpha(80),
+                        ? Colors.green.withAlpha(60)
+                        : Colors.red.withAlpha(60),
+                width: 1,
               ),
             ),
             child: Row(
@@ -622,44 +682,108 @@ class _TeacherStudentDetailScreenState
                 Icon(
                   present ? Icons.check_circle : Icons.cancel,
                   color: present ? Colors.green : Colors.red,
+                  size: 20,
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 16,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(date),
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: Text(
+                    DateFormat('dd/MM/yyyy - EEE', 'pt_BR').format(date),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
-                Text(
-                  present ? 'Presente' : 'Ausente',
-                  style: TextStyle(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
                     color: present ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    present ? 'P' : 'F',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
             ),
           );
         }),
+
+        // Botão para mostrar mais/menos registros
+        if (totalLessons > 5)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showAllAttendances = !_showAllAttendances;
+                });
+              },
+              icon: Icon(
+                _showAllAttendances ? Icons.expand_less : Icons.expand_more,
+                color: const Color(0xFF2953A5),
+              ),
+              label: Text(
+                _showAllAttendances
+                    ? 'Mostrar menos'
+                    : 'Mostrar todos (${totalLessons - 5} mais)',
+                style: const TextStyle(
+                  color: Color(0xFF2953A5),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: color.withAlpha(20),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withAlpha(60)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: color.withAlpha(180),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

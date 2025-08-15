@@ -131,11 +131,12 @@ export const createTeacher = async (data: {
   return teacher;
 };
 
-export const getTeacherClasses = async (teacherId: string) => {
+export const getTeacherClasses = async (teacherId: string, subjectId?: string) => {
   const teacher = await prisma.teacher.findUnique({
     where: { id: teacherId },
     include: {
       subjects: {
+        where: subjectId ? { subjectId } : undefined,
         include: {
           class: {
             include: {

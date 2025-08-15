@@ -511,7 +511,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder:
           (context) => _AddClassDialog(
-            onAdd: (grade, letter, academicYear, shift, evaluationModel) async {
+            onAdd: (grade, letter, academicYear, shift) async {
               if (mounted) {
                 setState(() {
                   _loadingClasses = true;
@@ -527,7 +527,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'letter': letter,
                     'academicYear': academicYear,
                     'shift': shift,
-                    'evaluationModel': evaluationModel,
                   }),
                 );
                 if (!context.mounted) return;
@@ -544,7 +543,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'letter': classData['letter'],
                     'academicYear': classData['academicYear'],
                     'shift': classData['shift'],
-                    'evaluationModel': classData['evaluationModel'],
                     'createdAt': classData['createdAt'],
                   };
 
@@ -2437,13 +2435,7 @@ class _ClassCardGrid extends StatelessWidget {
 }
 
 class _AddClassDialog extends StatefulWidget {
-  final void Function(
-    int grade,
-    String letter,
-    int academicYear,
-    String shift,
-    String evaluationModel,
-  )
+  final void Function(int grade, String letter, int academicYear, String shift)
   onAdd;
   const _AddClassDialog({required this.onAdd});
 
@@ -2457,7 +2449,6 @@ class _AddClassDialogState extends State<_AddClassDialog> {
   String _letter = '';
   int? _academicYear;
   String? _shift;
-  String? _evaluationModel;
 
   @override
   Widget build(BuildContext context) {
@@ -2512,25 +2503,6 @@ class _AddClassDialogState extends State<_AddClassDialog> {
               },
               onSaved: (v) => _shift = v ?? 'MATUTINO',
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Metodologia do Boletim',
-              ),
-              value: _evaluationModel,
-              items: const [
-                DropdownMenuItem(value: 'NUMERIC', child: Text('Numérica')),
-                DropdownMenuItem(value: 'CONCEPT', child: Text('Conceito')),
-                DropdownMenuItem(value: 'HYBRID', child: Text('Híbrido')),
-              ],
-              validator: (v) => v == null ? 'Selecione a metodologia' : null,
-              onChanged: (v) {
-                if (mounted) {
-                  setState(() => _evaluationModel = v);
-                }
-              },
-              onSaved: (v) => _evaluationModel = v,
-            ),
           ],
         ),
       ),
@@ -2547,15 +2519,8 @@ class _AddClassDialogState extends State<_AddClassDialog> {
               if (_grade != null &&
                   _letter.isNotEmpty &&
                   _academicYear != null &&
-                  _shift != null &&
-                  _evaluationModel != null) {
-                widget.onAdd(
-                  _grade!,
-                  _letter,
-                  _academicYear!,
-                  _shift!,
-                  _evaluationModel!,
-                );
+                  _shift != null) {
+                widget.onAdd(_grade!, _letter, _academicYear!, _shift!);
               } else {
                 // Mostrar erro para o usuário
                 ScaffoldMessenger.of(context).showSnackBar(

@@ -6,8 +6,14 @@ import '../../widgets/data_refresh_widget.dart';
 import '../../services/teacher_service.dart';
 import '../../services/tecaai_service.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../config/api_config.dart';
 import 'teacher_class_detail_screen.dart';
 import 'teacher_student_detail_screen.dart';
+import 'teacher_calendar_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   const TeacherDashboardScreen({super.key});
@@ -20,8 +26,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     with SingleTickerProviderStateMixin, DataRefreshMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _classesSearchController =
+      TextEditingController();
 
   List<Map<String, dynamic>> _teacherClasses = [];
+  List<Map<String, dynamic>> _filteredClasses = [];
   List<Map<String, dynamic>> _allStudents = [];
   bool _loadingClasses = false;
   bool _loadingStudents = false;
@@ -44,7 +53,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
 
     // Debug inicial
     debugPrint('=== INIT STATE ===');
@@ -229,6 +238,26 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     });
   }
 
+  void _filterClasses(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredClasses = _teacherClasses;
+      } else {
+        _filteredClasses =
+            _teacherClasses.where((classData) {
+              final className =
+                  classData['name']?.toString().toLowerCase() ?? '';
+              final letter =
+                  classData['letter']?.toString().toLowerCase() ?? '';
+              final shift = classData['shift']?.toString().toLowerCase() ?? '';
+              return className.contains(query.toLowerCase()) ||
+                  letter.contains(query.toLowerCase()) ||
+                  shift.contains(query.toLowerCase());
+            }).toList();
+      }
+    });
+  }
+
   Future<void> _loadTeacherClasses() async {
     setState(() {
       _loadingClasses = true;
@@ -243,6 +272,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         );
         setState(() {
           _teacherClasses = classes;
+          _filteredClasses = classes;
           _loadingClasses = false;
         });
       }
@@ -342,34 +372,69 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Configurações'),
-            content: const SingleChildScrollView(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.settings, color: Color(0xFF2953A5)),
+                SizedBox(width: 8),
+                Text('Configurações'),
+              ],
+            ),
+            content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Preferências do Professor:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  const Text(
+                    'Perfil:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2953A5),
+                    ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   ListTile(
-                    leading: Icon(Icons.notifications),
+                    leading: const Icon(Icons.person, color: Color(0xFF2953A5)),
+                    title: const Text('Editar Perfil'),
+                    subtitle: const Text(
+                      'Atualizar dados pessoais e profissionais',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _showEditProfileDialog();
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Preferências:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2953A5),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const ListTile(
+                    leading: Icon(Icons.notifications, color: Colors.orange),
                     title: Text('Notificações'),
                     subtitle: Text('Ativado'),
                   ),
-                  ListTile(
-                    leading: Icon(Icons.color_lens),
+                  const ListTile(
+                    leading: Icon(Icons.color_lens, color: Colors.purple),
                     title: Text('Tema'),
                     subtitle: Text('Claro'),
                   ),
-                  ListTile(
-                    leading: Icon(Icons.language),
+                  const ListTile(
+                    leading: Icon(Icons.language, color: Colors.green),
                     title: Text('Idioma'),
                     subtitle: Text('Português'),
                   ),
-                  ListTile(
-                    leading: Icon(Icons.refresh),
+                  const ListTile(
+                    leading: Icon(Icons.refresh, color: Colors.blue),
                     title: Text('Atualização Automática'),
                     subtitle: Text('Ativado'),
                   ),
@@ -386,11 +451,353 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     );
   }
 
+  void _showEditProfileDialog() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    final teacher = user?.teacher;
+
+    if (user == null || teacher == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro: Dados do professor não encontrados'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final nameController = TextEditingController(text: teacher.name);
+    final emailController = TextEditingController(text: user.email);
+    bool isLoading = false;
+    File? selectedImage;
+    String? currentPhotoUrl = user.photoUrl;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: const Row(
+                    children: [
+                      Icon(Icons.person, color: Color(0xFF2953A5)),
+                      SizedBox(width: 8),
+                      Text('Editar Perfil'),
+                    ],
+                  ),
+                  content: SingleChildScrollView(
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Seção de Foto
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withAlpha(20),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.grey.withAlpha(60),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                // Avatar/Foto
+                                GestureDetector(
+                                  onTap:
+                                      isLoading
+                                          ? null
+                                          : () async {
+                                            try {
+                                              final result = await FilePicker
+                                                  .platform
+                                                  .pickFiles(
+                                                    type: FileType.image,
+                                                    allowMultiple: false,
+                                                  );
+
+                                              if (result != null &&
+                                                  result.files.isNotEmpty) {
+                                                final file = File(
+                                                  result.files.first.path!,
+                                                );
+                                                setState(() {
+                                                  selectedImage = file;
+                                                });
+                                              }
+                                            } catch (e) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Erro ao selecionar imagem: $e',
+                                                  ),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                  child: Stack(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 50,
+                                        backgroundColor: Colors.grey[300],
+                                        backgroundImage:
+                                            selectedImage != null
+                                                ? FileImage(selectedImage!)
+                                                : (currentPhotoUrl != null &&
+                                                    currentPhotoUrl.isNotEmpty)
+                                                ? NetworkImage(
+                                                  '${ApiConfig.baseUrl}$currentPhotoUrl',
+                                                )
+                                                : null,
+                                        child:
+                                            (selectedImage == null &&
+                                                    (currentPhotoUrl == null ||
+                                                        currentPhotoUrl
+                                                            .isEmpty))
+                                                ? Icon(
+                                                  Icons.person,
+                                                  size: 50,
+                                                  color: Colors.grey[600],
+                                                )
+                                                : null,
+                                      ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF2953A5),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  selectedImage != null
+                                      ? 'Nova foto selecionada'
+                                      : 'Toque para alterar a foto',
+                                  style: TextStyle(
+                                    color:
+                                        selectedImage != null
+                                            ? Colors.green
+                                            : Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Campo Nome
+                          TextFormField(
+                            controller: nameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Nome Completo',
+                              prefixIcon: Icon(Icons.person_outline),
+                              border: OutlineInputBorder(),
+                            ),
+                            enabled: !isLoading,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Campo Email (somente leitura por enquanto)
+                          TextFormField(
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              prefixIcon: Icon(Icons.email_outlined),
+                              border: OutlineInputBorder(),
+                              helperText: 'Email não pode ser alterado',
+                            ),
+                            enabled:
+                                false, // Email não pode ser alterado por enquanto
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Info sobre campos futuros
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withAlpha(20),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.blue.withAlpha(60),
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Campos adicionais como telefone e disciplinas serão disponibilizados em futuras atualizações.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed:
+                          isLoading ? null : () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                    ElevatedButton(
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () async {
+                                setState(() {
+                                  isLoading = true;
+                                });
+
+                                try {
+                                  // Validação básica
+                                  final name = nameController.text.trim();
+                                  final email = emailController.text.trim();
+
+                                  if (name.isEmpty || email.isEmpty) {
+                                    throw Exception(
+                                      'Nome e email são obrigatórios',
+                                    );
+                                  }
+
+                                  // Atualizar foto se uma nova foi selecionada
+                                  if (selectedImage != null) {
+                                    await _uploadTeacherPhoto(
+                                      teacher.id,
+                                      selectedImage!,
+                                    );
+                                  }
+
+                                  // Preparar dados para atualização
+                                  final updateData = {'name': name};
+
+                                  // Atualizar dados do professor via API
+                                  await TeacherService.updateTeacher(
+                                    teacher.id,
+                                    updateData,
+                                  );
+
+                                  // Recarregar dados do usuário
+                                  await _refreshTeacherData();
+
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Perfil atualizado com sucesso!',
+                                        ),
+                                        backgroundColor: Colors.green,
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    setState(() {
+                                      isLoading = false;
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Erro ao atualizar perfil: $e',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2953A5),
+                        foregroundColor: Colors.white,
+                      ),
+                      child:
+                          isLoading
+                              ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : const Text('Salvar'),
+                    ),
+                  ],
+                ),
+          ),
+    );
+  }
+
+  Future<void> _uploadTeacherPhoto(String teacherId, File imageFile) async {
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/teachers/$teacherId/photo');
+      final request = http.MultipartRequest('POST', uri);
+
+      // Adicionar o arquivo
+      final multipartFile = await http.MultipartFile.fromPath(
+        'photo',
+        imageFile.path,
+        filename: 'teacher_photo.jpg',
+      );
+      request.files.add(multipartFile);
+
+      // Enviar a requisição
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
+      }
+
+      debugPrint('Foto do professor atualizada com sucesso');
+    } catch (e) {
+      debugPrint('Erro no upload da foto: $e');
+      throw Exception('Erro ao atualizar foto: $e');
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _classesSearchController.dispose();
     _armarioSearchController.dispose();
     _debounce?.cancel();
     super.dispose();
@@ -553,46 +960,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           child: Column(
             children: [
               const SizedBox(height: 24),
-              // Avatar
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: Colors.white,
-                backgroundImage:
-                    authProvider.user?.photoUrl != null
-                        ? NetworkImage(
-                          'http://192.168.18.15:3000${authProvider.user!.photoUrl}',
-                        )
-                        : null,
-                child:
-                    authProvider.user?.photoUrl == null
-                        ? const Icon(
-                          Icons.person,
-                          size: 60,
-                          color: Color(0xFF2953A5),
-                        )
-                        : null,
-              ),
-              const SizedBox(height: 24),
-              // Nome do professor
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  authProvider.user?.displayName ?? 'Professor',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                authProvider.user?.email ?? '',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
               // Menu
               _SidebarButton(
                 icon: Icons.class_,
@@ -611,6 +978,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                 label: 'Armários',
                 selected: _tabController.index == 2,
                 onTap: () => setState(() => _tabController.animateTo(2)),
+              ),
+              _SidebarButton(
+                icon: Icons.calendar_today,
+                label: 'Agenda',
+                selected: _tabController.index == 3,
+                onTap: () => setState(() => _tabController.animateTo(3)),
               ),
               const Spacer(),
               const Divider(color: Colors.white54, indent: 16, endIndent: 16),
@@ -652,89 +1025,65 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   }
 
   Widget _buildMobileLayout(AuthProvider authProvider) {
-    return Column(
-      children: [
-        // Header com informações do professor
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Color(0xFF2953A5),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(20),
-              bottomRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.white,
-                backgroundImage:
-                    authProvider.user?.photoUrl != null
-                        ? NetworkImage(
-                          'http://192.168.18.15:3000${authProvider.user!.photoUrl}',
-                        )
-                        : null,
-                child:
-                    authProvider.user?.photoUrl == null
-                        ? const Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Color(0xFF2953A5),
-                        )
-                        : null,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                authProvider.user?.displayName ?? 'Professor',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                authProvider.user?.email ?? '',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        // Conteúdo principal
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: _buildMainContent(),
-          ),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: _buildMainContent(),
     );
   }
 
   Widget _buildMainContent() {
     return Column(
       children: [
-        // Header com título e busca
+        // Header com busca
         Row(
           children: [
-            Expanded(
-              child: Text(
-                _getTabTitle(),
-                style: TextStyle(
-                  fontSize: MediaQuery.of(context).size.width > 600 ? 28 : 24,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2953A5),
+            if (_tabController.index == 0)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _classesSearchController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: 'Buscar turma...',
+                          ),
+                          onChanged: _filterClasses,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.search, color: Colors.grey),
+                        onPressed: () => setState(() {}),
+                        tooltip: 'Buscar',
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Color(0xFF2953A5),
+                        ),
+                        onPressed: _fetchTeacherClasses,
+                        tooltip: 'Atualizar Turmas',
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
             if (_tabController.index == 1)
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.only(left: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -761,6 +1110,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                       IconButton(
                         icon: const Icon(Icons.search, color: Colors.grey),
                         onPressed: () => setState(() {}),
+                        tooltip: 'Buscar',
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Color(0xFF2953A5),
+                        ),
+                        onPressed: _fetchStudentsFromClasses,
+                        tooltip: 'Atualizar Alunos',
                       ),
                     ],
                   ),
@@ -797,25 +1155,34 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                       IconButton(
                         icon: const Icon(Icons.search, color: Colors.grey),
                         onPressed: () => setState(() {}),
+                        tooltip: 'Buscar',
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.refresh,
+                          color: Color(0xFF2953A5),
+                        ),
+                        onPressed: _loadArmarioItems,
+                        tooltip: 'Atualizar Itens',
                       ),
                     ],
                   ),
                 ),
               ),
-            const SizedBox(width: 16),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                if (_tabController.index == 0) {
-                  _fetchTeacherClasses();
-                } else if (_tabController.index == 1) {
-                  _fetchStudentsFromClasses();
-                } else if (_tabController.index == 2) {
-                  _loadArmarioItems();
-                }
-              },
-              tooltip: 'Atualizar',
-            ),
+            if (_tabController.index == 3)
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Color(0xFF2953A5)),
+                onPressed: () {
+                  // Para a agenda, vamos recarregar os dados do calendário
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Agenda atualizada automaticamente'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                tooltip: 'Atualizar Agenda',
+              ),
           ],
         ),
         const SizedBox(height: 24),
@@ -827,6 +1194,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
               _buildClassesTab(),
               _buildStudentsTab(),
               _buildArmariosTab(),
+              _buildAgendaTab(),
             ],
           ),
         ),
@@ -842,6 +1210,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         return 'Meus Alunos';
       case 2:
         return 'Controle dos Armários';
+      case 3:
+        return 'Minha Agenda';
       default:
         return 'Dashboard';
     }
@@ -881,16 +1251,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                 onTap: () => setState(() => _tabController.animateTo(2)),
               ),
               _BottomNavItem(
-                icon: Icons.help_outline,
-                label: 'Ajuda',
-                isSelected: false,
-                onTap: _showHelpDialog,
-              ),
-              _BottomNavItem(
-                icon: Icons.settings,
-                label: 'Config',
-                isSelected: false,
-                onTap: _showSettingsDialog,
+                icon: Icons.calendar_today,
+                label: 'Agenda',
+                isSelected: _tabController.index == 3,
+                onTap: () => setState(() => _tabController.animateTo(3)),
               ),
             ],
           ),
@@ -953,6 +1317,28 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       );
     }
 
+    if (_filteredClasses.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Nenhuma turma encontrada',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Nenhuma turma corresponde aos critérios de busca.',
+              style: TextStyle(color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
@@ -980,9 +1366,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
             mainAxisSpacing: screenWidth > 600 ? 24 : 16,
             childAspectRatio: childAspectRatio,
           ),
-          itemCount: _teacherClasses.length,
+          itemCount: _filteredClasses.length,
           itemBuilder: (context, index) {
-            final classData = _teacherClasses[index];
+            final classData = _filteredClasses[index];
             return _ClassCard(classData: classData);
           },
         );
@@ -1637,6 +2023,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildAgendaTab() {
+    return const TeacherCalendarScreen();
   }
 
   Future<void> _executePredefinedCommand(String commandKey) async {

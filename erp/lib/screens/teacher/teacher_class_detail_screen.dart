@@ -7,6 +7,7 @@ import '../../services/grade_period_service.dart';
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../services/teacher_service.dart';
+import '../../config/api_config.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
@@ -43,7 +44,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   DateTime _selectedDate = DateTime.now();
   Map<String, dynamic>? _currentLesson;
   bool _loadingAttendance = false;
-  Map<String, bool> _attendanceMap = {};
+  Map<String, String?> _attendanceMap =
+      {}; // null = não marcado, 'PRESENT', 'ABSENT', 'JUSTIFIED_ABSENT'
+  Map<String, String> _justificationMap =
+      {}; // Justificativas para faltas justificadas
   String? _errorAttendance;
 
   // Notas
@@ -54,9 +58,16 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   bool _loadingGrades = false;
   String? _errorGrades;
 
+  // Duplicação de aula
+
   @override
   void initState() {
     super.initState();
+
+    // Garantir que a data seja inicializada corretamente
+    _selectedDate = DateTime.now();
+    debugPrint('🔄 Data inicializada: $_selectedDate');
+
     _tabController = TabController(length: 3, vsync: this);
     _fetchSubjects();
     _fetchStudents();
@@ -66,6 +77,14 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     _tabController.addListener(() {
       if (_tabController.index == 0 && _assignments.isEmpty) {
         _fetchAssignments();
+      } else if (_tabController.index == 1 && _currentLesson == null) {
+        // Aba de chamada - carregar frequência se houver disciplina selecionada
+        if (_selectedSubjectId != null) {
+          debugPrint(
+            '🔄 Listener detectou aba de chamada, carregando frequência...',
+          );
+          _loadAttendance();
+        }
       } else if (_tabController.index == 2 && _grades.isEmpty) {
         _fetchGrades();
       }
@@ -101,10 +120,17 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       });
 
       if (_selectedSubjectId != null) {
+        debugPrint('🔄 Disciplina selecionada: $_selectedSubjectId');
         _fetchAssignments();
+
+        // Se estiver na aba de chamada, carregar frequência automaticamente
+        if (_tabController.index == 1) {
+          debugPrint('🔄 Aba de chamada detectada, carregando frequência...');
+          _loadAttendance();
+        }
       }
     } catch (e) {
-      debugPrint('Erro ao carregar disciplinas: $e');
+      debugPrint('❌ Erro ao carregar disciplinas: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -124,10 +150,19 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       );
       setState(() {
         _students = students;
-        _attendanceMap = {};
+        // Inicializa o mapa de presença com valores nulos (não marcado)
+        _attendanceMap = Map.fromEntries(
+          students.map((student) => MapEntry(student['id'], null)),
+        );
+        // Inicializa o mapa de justificativas vazio
+        _justificationMap = Map.fromEntries(
+          students.map((student) => MapEntry(student['id'], '')),
+        );
       });
+      debugPrint('🔄 Alunos carregados: ${students.length}');
+      debugPrint('🔄 Mapa de presença inicializado: $_attendanceMap');
     } catch (e) {
-      debugPrint('Erro ao carregar alunos: $e');
+      debugPrint('❌ Erro ao carregar alunos: $e');
     }
   }
 
@@ -210,6 +245,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   Future<void> _loadAttendance() async {
     if (_selectedSubjectId == null) return;
 
+    debugPrint('🔄 Carregando frequência para disciplina: $_selectedSubjectId');
+    debugPrint('🔄 Data selecionada: $_selectedDate');
+
     setState(() {
       _loadingAttendance = true;
       _errorAttendance = null;
@@ -222,11 +260,6 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       if (teacherId == null) {
         throw Exception('Professor não encontrado');
       }
-
-      // Reset: Inicializa sem valores por padrão
-      setState(() {
-        _attendanceMap = {};
-      });
 
       // Busca ou cria a aula
       final lesson = await AttendanceService.getOrCreateLesson(
@@ -245,11 +278,37 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         lesson['id'],
       );
 
-      // Atualiza o mapa de presença com os dados existentes da API
-      for (var attendance in attendances) {
-        _attendanceMap[attendance['studentId']] = attendance['present'];
+      // Inicializa os mapas de presença e justificativa sem valores marcados
+      final newAttendanceMap = <String, String?>{};
+      final newJustificationMap = <String, String>{};
+
+      // Por padrão, todos os alunos começam sem marcação
+      for (var student in _students) {
+        newAttendanceMap[student['id']] = null;
+        newJustificationMap[student['id']] = '';
       }
+
+      // Sobrescreve com os dados existentes da API
+      for (var attendance in attendances) {
+        final studentId = attendance['studentId'];
+        // Determinar status baseado nos novos campos ou compatibilidade
+        String? status = attendance['status'];
+        if (status == null) {
+          // Compatibilidade com sistema antigo
+          status = attendance['present'] == true ? 'PRESENT' : 'ABSENT';
+        }
+        newAttendanceMap[studentId] = status;
+        newJustificationMap[studentId] = attendance['justification'] ?? '';
+      }
+
+      setState(() {
+        _attendanceMap = newAttendanceMap;
+        _justificationMap = newJustificationMap;
+      });
+
+      debugPrint('🔄 Mapa de presença inicializado: $_attendanceMap');
     } catch (e) {
+      debugPrint('❌ Erro ao carregar frequência: $e');
       setState(() {
         _errorAttendance = 'Erro ao carregar chamada: $e';
       });
@@ -273,6 +332,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   Future<void> _saveAttendance() async {
     if (_currentLesson == null) return;
 
+    debugPrint('🔄 Salvando frequência...');
+    debugPrint('🔄 Aula atual: ${_currentLesson!['id']}');
+    debugPrint('🔄 Mapa de presença: $_attendanceMap');
+
     setState(() {
       _loadingAttendance = true;
     });
@@ -280,17 +343,40 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     try {
       // Prepara a lista de presenças
       final presences =
-          _students.map((student) {
-            return {
-              'studentId': student['id'],
-              'present': _attendanceMap[student['id']] ?? false,
-            };
-          }).toList();
+          _students
+              .map((student) {
+                final studentId = student['id'];
+                final status = _attendanceMap[studentId];
+                final justification = _justificationMap[studentId] ?? '';
+
+                // Só inclui alunos que têm status marcado
+                if (status == null) {
+                  return null; // Será filtrado depois
+                }
+
+                debugPrint('🔄 Aluno ${student['name']}: $status');
+
+                return {
+                  'studentId': studentId,
+                  'status': status,
+                  'justification':
+                      status == 'JUSTIFIED_ABSENT' ? justification : null,
+                  // Manter compatibilidade com campo antigo
+                  'present': status == 'PRESENT',
+                };
+              })
+              .where((element) => element != null)
+              .cast<Map<String, dynamic>>()
+              .toList();
+
+      debugPrint('🔄 Lista de presenças preparada: $presences');
 
       await AttendanceService.markAttendanceByLesson(
         lessonId: _currentLesson!['id'],
         presences: presences,
       );
+
+      debugPrint('✅ Frequência salva com sucesso!');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -305,6 +391,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       // Recarrega a frequência
       await _loadAttendance();
     } catch (e) {
+      debugPrint('❌ Erro ao salvar frequência: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -327,18 +414,24 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   }
 
   void _onSubjectChanged(String? subjectId) {
+    debugPrint('🔄 Disciplina alterada para: $subjectId');
+    debugPrint('🔄 Aba atual: ${_tabController.index}');
+
     setState(() {
       _selectedSubjectId = subjectId;
       _currentLesson = null;
-      _attendanceMap = {};
+      // Não limpa o mapa de presença aqui, deixa a função _loadAttendance fazer isso
     });
 
     if (subjectId != null) {
       if (_tabController.index == 0) {
+        debugPrint('🔄 Carregando atividades...');
         _fetchAssignments();
       } else if (_tabController.index == 1) {
+        debugPrint('🔄 Carregando frequência...');
         _loadAttendance();
       } else if (_tabController.index == 2) {
+        debugPrint('🔄 Carregando notas...');
         _fetchGrades();
       }
     }
@@ -353,13 +446,16 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     );
 
     if (date != null) {
+      debugPrint('🔄 Data alterada para: $date');
+
       setState(() {
         _selectedDate = date;
         _currentLesson = null;
-        _attendanceMap = {};
+        // Não limpa o mapa de presença aqui, deixa a função _loadAttendance fazer isso
       });
 
       if (_selectedSubjectId != null) {
+        debugPrint('🔄 Recarregando frequência para nova data...');
         _loadAttendance();
       }
     }
@@ -443,19 +539,40 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isTablet =
+        MediaQuery.of(context).size.width >= 600 &&
+        MediaQuery.of(context).size.width < 1200;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Turma - ${widget.classData['name'] ?? ''}'),
+        title: Text(
+          'Turma - ${widget.classData['name'] ?? ''}',
+          style: TextStyle(
+            fontSize: isMobile ? 18 : 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: const Color(0xFF2953A5),
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: 'Atividades', icon: Icon(Icons.assignment)),
-            Tab(text: 'Chamadas', icon: Icon(Icons.how_to_reg)),
-            Tab(text: 'Notas', icon: Icon(Icons.grade)),
+          isScrollable: isMobile, // Permite scroll horizontal em telas pequenas
+          tabs: [
+            Tab(
+              text: isMobile ? 'Ativ.' : 'Atividades',
+              icon: const Icon(Icons.assignment),
+            ),
+            Tab(
+              text: isMobile ? 'Cham.' : 'Chamadas',
+              icon: const Icon(Icons.how_to_reg),
+            ),
+            Tab(
+              text: isMobile ? 'Notas' : 'Notas',
+              icon: const Icon(Icons.grade),
+            ),
           ],
         ),
       ),
@@ -464,37 +581,73 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
           // Seletor de disciplinas (se há múltiplas)
           if (_subjects.length > 1)
             Container(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
               color: Colors.grey.shade100,
-              child: Row(
-                children: [
-                  const Text(
-                    'Disciplina:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedSubjectId,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+              child:
+                  isMobile
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Disciplina:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: _selectedSubjectId,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            items:
+                                _subjects.map((subject) {
+                                  return DropdownMenuItem<String>(
+                                    value: subject['id'],
+                                    child: Text(
+                                      subject['name'] ?? 'Disciplina',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                            onChanged: _onSubjectChanged,
+                          ),
+                        ],
+                      )
+                      : Row(
+                        children: [
+                          const Text(
+                            'Disciplina:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedSubjectId,
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              items:
+                                  _subjects.map((subject) {
+                                    return DropdownMenuItem<String>(
+                                      value: subject['id'],
+                                      child: Text(
+                                        subject['name'] ?? 'Disciplina',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                              onChanged: _onSubjectChanged,
+                            ),
+                          ),
+                        ],
                       ),
-                      items:
-                          _subjects.map((subject) {
-                            return DropdownMenuItem<String>(
-                              value: subject['id'],
-                              child: Text(subject['name'] ?? 'Disciplina'),
-                            );
-                          }).toList(),
-                      onChanged: _onSubjectChanged,
-                    ),
-                  ),
-                ],
-              ),
             ),
 
           // Conteúdo das abas
@@ -502,9 +655,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildAssignmentsTab(),
-                _buildAttendanceTab(),
-                _buildGradesTab(),
+                _buildAssignmentsTab(isMobile: isMobile, isTablet: isTablet),
+                _buildAttendanceTab(isMobile: isMobile, isTablet: isTablet),
+                _buildGradesTab(isMobile: isMobile, isTablet: isTablet),
               ],
             ),
           ),
@@ -513,7 +666,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     );
   }
 
-  Widget _buildAssignmentsTab() {
+  Widget _buildAssignmentsTab({bool isMobile = false, bool isTablet = false}) {
     if (_selectedSubjectId == null) {
       return const Center(
         child: Text('Selecione uma disciplina para ver as atividades'),
@@ -521,23 +674,28 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
       child: Stack(
         children: [
           _loadingAssignments
               ? const Center(child: CircularProgressIndicator())
               : _errorAssignments != null
               ? Center(
-                child: Text(
-                  _errorAssignments!,
-                  style: const TextStyle(color: Colors.red),
+                child: Padding(
+                  padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
+                  child: Text(
+                    _errorAssignments!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               )
               : _assignments.isEmpty
               ? const Center(child: Text('Nenhuma atividade cadastrada.'))
               : ListView.separated(
                 itemCount: _assignments.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                separatorBuilder:
+                    (_, __) => SizedBox(height: isMobile ? 12 : 16),
                 itemBuilder: (context, index) {
                   final assignment = _assignments[index];
                   final desc = assignment['description'] ?? '';
@@ -550,43 +708,88 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                       parts.length > 1 ? parts.sublist(1).join('\n') : '';
                   return Card(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isMobile ? 8 : 12),
                     ),
-                    elevation: 3,
+                    elevation: isMobile ? 2 : 3,
                     child: ListTile(
-                      title: Text(nome),
+                      contentPadding: EdgeInsets.all(isMobile ? 12 : 16),
+                      title: Text(
+                        nome,
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (descricao.isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
-                              child: Text(descricao),
+                              padding: EdgeInsets.only(
+                                top: isMobile ? 4.0 : 8.0,
+                              ),
+                              child: Text(
+                                descricao,
+                                style: TextStyle(fontSize: isMobile ? 14 : 16),
+                              ),
                             ),
                           if (assignment['dueDate'] != null)
                             Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
+                              padding: EdgeInsets.only(
+                                top: isMobile ? 4.0 : 8.0,
+                              ),
                               child: Text(
                                 'Entrega até: ${assignment['dueDate'] != null ? assignment['dueDate'].toString().split('T').first : ''}',
+                                style: TextStyle(
+                                  fontSize: isMobile ? 12 : 14,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                             ),
                           if (assignment['fileUrl'] != null &&
                               assignment['fileUrl'].toString().isNotEmpty)
-                            TextButton.icon(
-                              icon: const Icon(Icons.attach_file),
-                              label: const Text('Baixar Anexo'),
-                              onPressed: () async {
-                                final url = assignment['fileUrl'];
-                                final uri = Uri.parse(url);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri);
-                                }
-                              },
+                            Padding(
+                              padding: EdgeInsets.only(
+                                top: isMobile ? 8.0 : 12.0,
+                              ),
+                              child: TextButton.icon(
+                                icon: Icon(
+                                  Icons.attach_file,
+                                  size: isMobile ? 18 : 20,
+                                ),
+                                label: Text(
+                                  'Baixar Anexo',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 12 : 14,
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  final fileUrl = assignment['fileUrl'];
+                                  final url = '${ApiConfig.baseUrl}$fileUrl';
+                                  final uri = Uri.parse(url);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Não foi possível abrir o arquivo',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
                             ),
                         ],
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
+                        icon: Icon(
+                          Icons.delete,
+                          color: Colors.red,
+                          size: isMobile ? 20 : 24,
+                        ),
                         tooltip: 'Excluir atividade',
                         onPressed: () => _deleteAssignment(assignment['id']),
                       ),
@@ -606,12 +809,16 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                 },
               ),
           Positioned(
-            bottom: 24,
-            right: 24,
+            bottom: isMobile ? 16 : 24,
+            right: isMobile ? 16 : 24,
             child: FloatingActionButton(
               backgroundColor: Colors.orange,
               onPressed: _showAddAssignmentDialog,
-              child: const Icon(Icons.add, size: 32, color: Colors.white),
+              child: Icon(
+                Icons.add,
+                size: isMobile ? 24 : 32,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -619,7 +826,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     );
   }
 
-  Widget _buildAttendanceTab() {
+  Widget _buildAttendanceTab({bool isMobile = false, bool isTablet = false}) {
     if (_selectedSubjectId == null) {
       return const Center(
         child: Text('Selecione uma disciplina para fazer a chamada'),
@@ -627,64 +834,128 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Seletor de Data
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  const Text(
-                    'Data da aula:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 16),
-                  InkWell(
-                    onTap: _onDateChanged,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+              child:
+                  isMobile
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.calendar_today),
-                          const SizedBox(width: 8),
-                          Text(DateFormat('dd/MM/yyyy').format(_selectedDate)),
+                          const Text(
+                            'Data da aula:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          InkWell(
+                            onTap: _onDateChanged,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.calendar_today),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    DateFormat(
+                                      'dd/MM/yyyy',
+                                    ).format(_selectedDate),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed:
+                                  _selectedSubjectId != null
+                                      ? _loadAttendance
+                                      : null,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Carregar Chamada'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2953A5),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      : Row(
+                        children: [
+                          const Text(
+                            'Data da aula:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          InkWell(
+                            onTap: _onDateChanged,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.calendar_today),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    DateFormat(
+                                      'dd/MM/yyyy',
+                                    ).format(_selectedDate),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            onPressed:
+                                _selectedSubjectId != null
+                                    ? _loadAttendance
+                                    : null,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Carregar Chamada'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2953A5),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed:
-                        _selectedSubjectId != null ? _loadAttendance : null,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Carregar Chamada'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2953A5),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
 
           // Lista de Alunos
-          Expanded(child: _buildStudentsList()),
+          Expanded(
+            child: _buildStudentsList(isMobile: isMobile, isTablet: isTablet),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStudentsList() {
+  Widget _buildStudentsList({bool isMobile = false, bool isTablet = false}) {
     if (_loadingAttendance) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -738,7 +1009,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         children: [
           // Header da lista
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
             decoration: const BoxDecoration(
               color: Color(0xFF2953A5),
               borderRadius: BorderRadius.only(
@@ -746,45 +1017,109 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                 topRight: Radius.circular(8),
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    'Aluno (${_students.length})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+            child:
+                isMobile
+                    ? Column(
+                      children: [
+                        Text(
+                          'Aluno (${_students.length})',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isMobile ? 14 : 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Presente',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isMobile ? 10 : 12,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Falta',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isMobile ? 10 : 12,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'F. Justif.',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isMobile ? 10 : 12,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                    : Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Aluno (${_students.length})',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            'Presente',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            'Falta',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            'F. Justif.',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    'Presente',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    'Falta',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
           ),
 
           // Lista de alunos
@@ -794,7 +1129,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
               itemBuilder: (context, index) {
                 final student = _students[index];
                 final studentId = student['id'];
-                final isPresent = _attendanceMap[studentId];
+                final currentStatus = _attendanceMap[studentId];
 
                 return Container(
                   decoration: BoxDecoration(
@@ -807,132 +1142,217 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        // Avatar e nome do aluno
-                        Expanded(
-                          flex: 3,
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: const Color(0xFF2953A5),
-                                child: Text(
-                                  student['name']
-                                          ?.substring(0, 1)
-                                          .toUpperCase() ??
-                                      'A',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                        Row(
+                          children: [
+                            // Avatar e nome do aluno
+                            Expanded(
+                              flex: 3,
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: const Color(0xFF2953A5),
+                                    child: Text(
+                                      student['name']
+                                              ?.substring(0, 1)
+                                              .toUpperCase() ??
+                                          'A',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          student['name'] ?? 'Aluno',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (student['registrationNumber'] !=
+                                            null)
+                                          Text(
+                                            'Mat: ${student['registrationNumber']}',
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.visibility),
+                                    tooltip: 'Ver detalhes do aluno',
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) {
+                                            final authProvider =
+                                                Provider.of<AuthProvider>(
+                                                  context,
+                                                  listen: false,
+                                                );
+                                            final teacherId =
+                                                authProvider.user?.teacher?.id;
+
+                                            if (teacherId == null) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Erro: Professor não encontrado',
+                                                  ),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                              return const SizedBox.shrink();
+                                            }
+
+                                            return TeacherStudentDetailScreen(
+                                              student: student,
+                                              classData: widget.classData,
+                                              subjectId: _selectedSubjectId!,
+                                              teacherId: teacherId,
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Radio button Presente
+                            Expanded(
+                              flex: 1,
+                              child: Center(
+                                child: Radio<String>(
+                                  value: 'PRESENT',
+                                  groupValue: currentStatus,
+                                  onChanged: (String? value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        _attendanceMap[studentId] = value;
+                                        _justificationMap[studentId] =
+                                            ''; // Limpa justificativa
+                                      });
+                                    }
+                                  },
+                                  activeColor: Colors.green,
+                                ),
+                              ),
+                            ),
+
+                            // Radio button Falta
+                            Expanded(
+                              flex: 1,
+                              child: Center(
+                                child: Radio<String>(
+                                  value: 'ABSENT',
+                                  groupValue: currentStatus,
+                                  onChanged: (String? value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        _attendanceMap[studentId] = value;
+                                        _justificationMap[studentId] =
+                                            ''; // Limpa justificativa
+                                      });
+                                    }
+                                  },
+                                  activeColor: Colors.red,
+                                ),
+                              ),
+                            ),
+
+                            // Radio button Falta Justificada
+                            Expanded(
+                              flex: 1,
+                              child: Center(
+                                child: Radio<String>(
+                                  value: 'JUSTIFIED_ABSENT',
+                                  groupValue: currentStatus,
+                                  onChanged: (String? value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        _attendanceMap[studentId] = value;
+                                      });
+                                      // Mostrar dialog para justificativa
+                                      _showJustificationDialog(
+                                        studentId,
+                                        student['name'],
+                                      );
+                                    }
+                                  },
+                                  activeColor: Colors.orange,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Mostrar justificativa se houver
+                        if (currentStatus == 'JUSTIFIED_ABSENT' &&
+                            _justificationMap[studentId]?.isNotEmpty ==
+                                true) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(20),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.orange.withAlpha(80),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.assignment_late,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Justificativa: ${_justificationMap[studentId]}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.orange,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      student['name'] ?? 'Aluno',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 16),
+                                  onPressed:
+                                      () => _showJustificationDialog(
+                                        studentId,
+                                        student['name'],
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (student['registrationNumber'] != null)
-                                      Text(
-                                        'Mat: ${student['registrationNumber']}',
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                  ],
+                                  color: Colors.orange,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 32,
+                                    minHeight: 32,
+                                  ),
+                                  padding: const EdgeInsets.all(4),
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.visibility),
-                                tooltip: 'Ver detalhes do aluno',
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) {
-                                        final authProvider =
-                                            Provider.of<AuthProvider>(
-                                              context,
-                                              listen: false,
-                                            );
-                                        final teacherId =
-                                            authProvider.user?.teacher?.id;
-
-                                        if (teacherId == null) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Erro: Professor não encontrado',
-                                              ),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                          return const SizedBox.shrink();
-                                        }
-
-                                        return TeacherStudentDetailScreen(
-                                          student: student,
-                                          classData: widget.classData,
-                                          subjectId: _selectedSubjectId!,
-                                          teacherId: teacherId,
-                                        );
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Radio button Presente
-                        Expanded(
-                          flex: 1,
-                          child: Center(
-                            child: Radio<bool>(
-                              value: true,
-                              groupValue: isPresent,
-                              onChanged: (bool? value) {
-                                if (value != null) {
-                                  setState(() {
-                                    _attendanceMap[studentId] = true;
-                                  });
-                                }
-                              },
-                              activeColor: Colors.green,
+                              ],
                             ),
                           ),
-                        ),
-
-                        // Radio button Falta
-                        Expanded(
-                          flex: 1,
-                          child: Center(
-                            child: Radio<bool>(
-                              value: false,
-                              groupValue: isPresent,
-                              onChanged: (bool? value) {
-                                if (value != null) {
-                                  setState(() {
-                                    _attendanceMap[studentId] = false;
-                                  });
-                                }
-                              },
-                              activeColor: Colors.red,
-                            ),
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -943,7 +1363,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
           // Botões de ação
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isMobile ? 12 : 16),
             decoration: BoxDecoration(
               color: Colors.grey.shade50,
               borderRadius: const BorderRadius.only(
@@ -951,64 +1371,149 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                 bottomRight: Radius.circular(8),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      for (var student in _students) {
-                        _attendanceMap[student['id']] = true;
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('Todos Presentes'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      for (var student in _students) {
-                        _attendanceMap[student['id']] = false;
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.cancel),
-                  label: const Text('Todos Ausentes'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _loadingAttendance ? null : _saveAttendance,
-                  icon:
-                      _loadingAttendance
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : const Icon(Icons.save),
-                  label: const Text('Salvar Chamada'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2953A5),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
+            child:
+                isMobile
+                    ? Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    for (var student in _students) {
+                                      _attendanceMap[student['id']] = 'PRESENT';
+                                      _justificationMap[student['id']] = '';
+                                    }
+                                  });
+                                },
+                                icon: const Icon(Icons.check_circle, size: 18),
+                                label: Text(
+                                  'Todos Presentes',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    for (var student in _students) {
+                                      _attendanceMap[student['id']] = 'ABSENT';
+                                      _justificationMap[student['id']] = '';
+                                    }
+                                  });
+                                },
+                                icon: const Icon(Icons.cancel, size: 18),
+                                label: Text(
+                                  'Todos Ausentes',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed:
+                                _loadingAttendance ? null : _saveAttendance,
+                            icon:
+                                _loadingAttendance
+                                    ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Icon(Icons.save),
+                            label: const Text('Salvar Chamada'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2953A5),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    )
+                    : Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              for (var student in _students) {
+                                _attendanceMap[student['id']] = 'PRESENT';
+                                _justificationMap[student['id']] = '';
+                              }
+                            });
+                          },
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('Todos Presentes'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              for (var student in _students) {
+                                _attendanceMap[student['id']] = 'ABSENT';
+                                _justificationMap[student['id']] = '';
+                              }
+                            });
+                          },
+                          icon: const Icon(Icons.cancel),
+                          label: const Text('Todos Ausentes'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed:
+                              _loadingAttendance ? null : _saveAttendance,
+                          icon:
+                              _loadingAttendance
+                                  ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Icon(Icons.save),
+                          label: const Text('Salvar Chamada'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2953A5),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGradesTab() {
+  Widget _buildGradesTab({bool isMobile = false, bool isTablet = false}) {
     if (_selectedSubjectId == null) {
       return const Center(
         child: Text('Selecione uma disciplina para gerenciar notas'),
@@ -1016,62 +1521,108 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Seletor de Período
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedPeriodId,
-                      decoration: const InputDecoration(
-                        labelText: 'Período',
-                        border: OutlineInputBorder(),
+              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
+              child:
+                  isMobile
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: _selectedPeriodId,
+                            decoration: const InputDecoration(
+                              labelText: 'Período',
+                              border: OutlineInputBorder(),
+                            ),
+                            items:
+                                _periods.map((period) {
+                                  return DropdownMenuItem<String>(
+                                    value: period['id'],
+                                    child: Text(period['name'] ?? 'Período'),
+                                  );
+                                }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedPeriodId = value;
+                              });
+                              _fetchGrades();
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed:
+                                  _selectedPeriodId != null
+                                      ? _fetchGrades
+                                      : null,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Atualizar Notas'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2953A5),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      : Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedPeriodId,
+                              decoration: const InputDecoration(
+                                labelText: 'Período',
+                                border: OutlineInputBorder(),
+                              ),
+                              items:
+                                  _periods.map((period) {
+                                    return DropdownMenuItem<String>(
+                                      value: period['id'],
+                                      child: Text(period['name'] ?? 'Período'),
+                                    );
+                                  }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedPeriodId = value;
+                                });
+                                _fetchGrades();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          ElevatedButton.icon(
+                            onPressed:
+                                _selectedPeriodId != null ? _fetchGrades : null,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Atualizar Notas'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2953A5),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
-                      items:
-                          _periods.map((period) {
-                            return DropdownMenuItem<String>(
-                              value: period['id'],
-                              child: Text(period['name'] ?? 'Período'),
-                            );
-                          }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedPeriodId = value;
-                        });
-                        _fetchGrades();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: _selectedPeriodId != null ? _fetchGrades : null,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Atualizar Notas'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2953A5),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
 
           // Tabela de Notas
-          Expanded(child: _buildGradesList()),
+          Expanded(
+            child: _buildGradesList(isMobile: isMobile, isTablet: isTablet),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildGradesList() {
+  Widget _buildGradesList({bool isMobile = false, bool isTablet = false}) {
     if (_loadingGrades) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1134,178 +1685,383 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       }
     }
 
-    return Card(
-      child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(const Color(0xFF2953A5)),
-          columns: [
-            const DataColumn(
-              label: Text(
-                'Aluno',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ..._gradeTypes.map(
-              (type) => DataColumn(
-                label: Text(
-                  type['name'] ?? 'Tipo',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+    return isMobile
+        ? _buildMobileGradesList(gradesByStudent)
+        : Card(
+          child: SingleChildScrollView(
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF2953A5)),
+              columns: [
+                const DataColumn(
+                  label: Text(
+                    'Aluno',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const DataColumn(
-              label: Text(
-                'Média',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                ..._gradeTypes.map(
+                  (type) => DataColumn(
+                    label: Text(
+                      type['name'] ?? 'Tipo',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
-          rows:
-              _students.map((student) {
-                final studentId = student['id'];
-                final studentGrades = gradesByStudent[studentId] ?? {};
-                final average = _calculateAverage(studentGrades);
+                const DataColumn(
+                  label: Text(
+                    'Média',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+              rows:
+                  _students.map((student) {
+                    final studentId = student['id'];
+                    final studentGrades = gradesByStudent[studentId] ?? {};
+                    final average = _calculateAverage(studentGrades);
 
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: const Color(0xFF2953A5),
-                            child: Text(
-                              student['name']?.substring(0, 1).toUpperCase() ??
-                                  'A',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  student['name'] ?? 'Aluno',
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: const Color(0xFF2953A5),
+                                child: Text(
+                                  student['name']
+                                          ?.substring(0, 1)
+                                          .toUpperCase() ??
+                                      'A',
                                   style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      student['name'] ?? 'Aluno',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (student['registrationNumber'] != null)
+                                      Text(
+                                        'Mat: ${student['registrationNumber']}',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ..._gradeTypes.map((type) {
+                          final grade = studentGrades[type['id']];
+                          return DataCell(
+                            _buildGradeCell(student, grade, type),
+                          );
+                        }),
+                        // Célula da média
+                        DataCell(
+                          average != null
+                              ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getGradeColor({'value': average}),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  average.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                if (student['registrationNumber'] != null)
-                                  Text(
-                                    'Mat: ${student['registrationNumber']}',
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                              ],
+                              )
+                              : const Text(
+                                '-',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+            ),
+          ),
+        );
+  }
+
+  Widget _buildMobileGradesList(
+    Map<String, Map<String, Map<String, dynamic>>> gradesByStudent,
+  ) {
+    return ListView.builder(
+      itemCount: _students.length,
+      itemBuilder: (context, index) {
+        final student = _students[index];
+        final studentId = student['id'];
+        final studentGrades = gradesByStudent[studentId] ?? {};
+        final average = _calculateAverage(studentGrades);
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header do aluno
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: const Color(0xFF2953A5),
+                      child: Text(
+                        student['name']?.substring(0, 1).toUpperCase() ?? 'A',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student['name'] ?? 'Aluno',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
                           ),
+                          if (student['registrationNumber'] != null)
+                            Text(
+                              'Mat: ${student['registrationNumber']}',
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                    ..._gradeTypes.map((type) {
-                      final grade = studentGrades[type['id']];
-                      return DataCell(
-                        grade != null
-                            ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getGradeColor(grade),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _getGradeDisplayText(grade),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20),
-                                  color: Colors.blue,
-                                  onPressed:
-                                      () => _showGradeDialog(student, grade),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 20),
-                                  color: Colors.red,
-                                  onPressed: () => _deleteGrade(grade['id']),
-                                ),
-                              ],
-                            )
-                            : Center(
-                              child: IconButton(
-                                icon: const Icon(Icons.add_circle_outline),
-                                color: Colors.green,
-                                onPressed:
-                                    () => _showGradeDialog(
-                                      student,
-                                      null,
-                                      typeId: type['id'],
-                                    ),
+                    // Média
+                    if (average != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getGradeColor({'value': average}),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Média',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                      );
-                    }),
-                    // Célula da média
-                    DataCell(
-                      average != null
-                          ? Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getGradeColor({'value': average}),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
+                            Text(
                               average.toStringAsFixed(1),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: 16,
                               ),
                             ),
-                          )
-                          : const Text(
-                            '-',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
-                            textAlign: TextAlign.center,
-                          ),
-                    ),
+                          ],
+                        ),
+                      ),
                   ],
-                );
-              }).toList(),
-        ),
+                ),
+                const SizedBox(height: 16),
+
+                // Notas por tipo
+                if (_gradeTypes.isNotEmpty) ...[
+                  const Text(
+                    'Notas:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF2953A5),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        _gradeTypes.map((type) {
+                          final grade = studentGrades[type['id']];
+                          return _buildMobileGradeChip(student, grade, type);
+                        }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMobileGradeChip(
+    Map<String, dynamic> student,
+    Map<String, dynamic>? grade,
+    Map<String, dynamic> type,
+  ) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 80),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            type['name'] ?? 'Tipo',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2953A5),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          if (grade != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getGradeColor(grade),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _getGradeDisplayText(grade),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _showGradeDialog(student, grade),
+                  child: const Icon(Icons.edit, size: 16, color: Colors.blue),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => _deleteGrade(grade['id']),
+                  child: const Icon(Icons.delete, size: 16, color: Colors.red),
+                ),
+              ],
+            )
+          else
+            GestureDetector(
+              onTap: () => _showGradeDialog(student, null, typeId: type['id']),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withAlpha(20),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.green, width: 1),
+                ),
+                child: const Icon(Icons.add, size: 16, color: Colors.green),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  Widget _buildGradeCell(
+    Map<String, dynamic> student,
+    Map<String, dynamic>? grade,
+    Map<String, dynamic> type,
+  ) {
+    if (grade != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _getGradeColor(grade),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _getGradeDisplayText(grade),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, size: 20),
+            color: Colors.blue,
+            onPressed: () => _showGradeDialog(student, grade),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, size: 20),
+            color: Colors.red,
+            onPressed: () => _deleteGrade(grade['id']),
+          ),
+        ],
+      );
+    } else {
+      return Center(
+        child: IconButton(
+          icon: const Icon(Icons.add_circle_outline),
+          color: Colors.green,
+          onPressed: () => _showGradeDialog(student, null, typeId: type['id']),
+        ),
+      );
+    }
   }
 
   double? _safeToDouble(dynamic value) {
@@ -1499,7 +2255,73 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       }
     }
   }
+
+  // Função para mostrar dialog de justificativa
+  void _showJustificationDialog(String studentId, String? studentName) {
+    final currentJustification = _justificationMap[studentId] ?? '';
+    final controller = TextEditingController(text: currentJustification);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Justificar Falta - ${studentName ?? 'Aluno'}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Descreva o motivo da falta justificada:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'Ex: Atestado médico, compromisso familiar...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                maxLength: 200,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final justification = controller.text.trim();
+                if (justification.isNotEmpty) {
+                  setState(() {
+                    _justificationMap[studentId] = justification;
+                  });
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Por favor, informe uma justificativa'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
+
+// Dialog para duplicar aula
 
 // Dialog para adicionar/editar nota
 class GradeDialog extends StatefulWidget {

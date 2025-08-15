@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/api_config.dart';
 import '../../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
@@ -78,8 +79,54 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                       _buildInfoRow('Data de Entrega', _formatDate(dueDate)),
                     ],
                     if (fileUrl != null) ...[
-                      const SizedBox(height: 8),
-                      _buildInfoRow('Arquivo da Atividade', 'Anexo disponível'),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.attach_file,
+                            color: Color(0xFF2953A5),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Arquivo da Atividade:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.download, size: 18),
+                              label: const Text('Baixar Anexo'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF2953A5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              onPressed: () async {
+                                final url = '${ApiConfig.baseUrl}$fileUrl';
+                                final uri = Uri.parse(url);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Não foi possível abrir o arquivo',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ],
                 ),

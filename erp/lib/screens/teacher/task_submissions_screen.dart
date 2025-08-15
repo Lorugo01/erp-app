@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/assignment_service.dart';
+import '../../config/api_config.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class TaskSubmissionsScreen extends StatefulWidget {
   final Map<String, dynamic> assignment;
@@ -22,6 +25,10 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
   // Controle local de marcação manual
   final Set<String> _manuallyMarkedDelivered = {};
 
+  // Para duplicação de atividade
+  List<Map<String, dynamic>> _availableClasses = [];
+  bool _loadingClasses = false;
+
   // Cores constantes
   static const _orangeAlpha = Color(0xB5FFA500); // Laranja com alpha 0.7
   static const _redAlpha = Color(0xBFFF0000); // Vermelho com alpha 0.75
@@ -30,6 +37,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
   void initState() {
     super.initState();
     _fetchSubmissions();
+    _fetchAvailableClasses();
   }
 
   Future<void> _fetchSubmissions() async {
@@ -52,6 +60,111 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  // Buscar turmas disponíveis para duplicação
+  Future<void> _fetchAvailableClasses() async {
+    setState(() {
+      _loadingClasses = true;
+    });
+
+    try {
+      // Buscar turmas onde o professor leciona a mesma disciplina
+      // Esta é uma implementação básica - você pode expandir conforme necessário
+      final response = await http.get(
+        Uri.parse(
+          '${ApiConfig.baseUrl}/teachers/classes?subjectId=${widget.assignment['subjectId']}',
+        ),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final classes = List<Map<String, dynamic>>.from(data);
+
+        // Filtrar para excluir a turma atual
+        final filteredClasses =
+            classes
+                .where((cls) => cls['id'] != widget.assignment['classId'])
+                .toList();
+
+        setState(() {
+          _availableClasses = filteredClasses;
+          _loadingClasses = false;
+        });
+      } else {
+        setState(() {
+          _availableClasses = [];
+          _loadingClasses = false;
+        });
+      }
+    } catch (e) {
+      print('Erro ao buscar turmas disponíveis: $e');
+      setState(() {
+        _availableClasses = [];
+        _loadingClasses = false;
+      });
+    }
+  }
+
+  // Mostrar dialog de duplicação de atividade
+  void _showDuplicateAssignmentDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => _DuplicateAssignmentDialog(
+            assignment: widget.assignment,
+            availableClasses: _availableClasses,
+            onDuplicate: (data) {
+              _duplicateAssignment(
+                targetClassIds: List<String>.from(data['targetClassIds']),
+                targetDate: DateTime.parse(data['targetDate']),
+              );
+            },
+          ),
+    );
+  }
+
+  // Duplicar atividade para outras turmas
+  Future<void> _duplicateAssignment({
+    required List<String> targetClassIds,
+    required DateTime targetDate,
+  }) async {
+    try {
+      // Aqui você implementará a lógica para duplicar a atividade
+      // Enviando para o backend
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/assignments/duplicate'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'sourceAssignmentId': widget.assignment['id'],
+          'targetClassIds': targetClassIds,
+          'targetDate': targetDate.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Atividade duplicada com sucesso!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao duplicar atividade: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -147,6 +260,44 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                     ),
                                   ),
                                 ),
+                                // Botão para duplicar atividade
+                                ElevatedButton.icon(
+                                  onPressed:
+                                      _availableClasses.isNotEmpty
+                                          ? () =>
+                                              _showDuplicateAssignmentDialog()
+                                          : null,
+                                  icon: const Icon(Icons.copy),
+                                  label: const Text('Duplicar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.purple,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                ),
+                                if (_availableClasses.isEmpty &&
+                                    !_loadingClasses)
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 8),
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: Colors.orange.withAlpha(100),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Nenhuma turma disponível para duplicação',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                             if (widget.assignment['dueDate'] != null) ...[
@@ -172,10 +323,20 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                 icon: const Icon(Icons.attach_file),
                                 label: const Text('Baixar Anexo'),
                                 onPressed: () async {
-                                  final url = widget.assignment['fileUrl'];
+                                  final fileUrl = widget.assignment['fileUrl'];
+                                  final url = '${ApiConfig.baseUrl}$fileUrl';
                                   final uri = Uri.parse(url);
                                   if (await canLaunchUrl(uri)) {
                                     await launchUrl(uri);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Não foi possível abrir o arquivo',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
                                   }
                                 },
                               ),
@@ -290,10 +451,23 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                         ),
                                       ),
                                       onPressed: () async {
-                                        final url = sub['fileUrl'];
+                                        final fileUrl = sub['fileUrl'];
+                                        final url =
+                                            '${ApiConfig.baseUrl}$fileUrl';
                                         final uri = Uri.parse(url);
                                         if (await canLaunchUrl(uri)) {
                                           await launchUrl(uri);
+                                        } else {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Não foi possível abrir o arquivo',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
                                         }
                                       },
                                     ),
@@ -442,6 +616,120 @@ class _StatisticCard extends StatelessWidget {
             fontSize: 14,
             color: color.withAlpha(204),
           ), // 0.8 * 255 ≈ 204
+        ),
+      ],
+    );
+  }
+}
+
+class _DuplicateAssignmentDialog extends StatefulWidget {
+  final Map<String, dynamic> assignment;
+  final List<Map<String, dynamic>> availableClasses;
+  final Function(Map<String, dynamic>) onDuplicate;
+
+  const _DuplicateAssignmentDialog({
+    required this.assignment,
+    required this.availableClasses,
+    required this.onDuplicate,
+  });
+
+  @override
+  State<_DuplicateAssignmentDialog> createState() =>
+      _DuplicateAssignmentDialogState();
+}
+
+class _DuplicateAssignmentDialogState
+    extends State<_DuplicateAssignmentDialog> {
+  DateTime _targetDate = DateTime.now();
+  List<String> _selectedClasses = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Duplicar Atividade'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Atividade: ${widget.assignment['description']}'),
+          const SizedBox(height: 16),
+          Text('Turmas disponíveis:'),
+          if (widget.availableClasses.isEmpty)
+            const Text('Nenhuma turma disponível para duplicação.'),
+          if (widget.availableClasses.isNotEmpty)
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: widget.availableClasses.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final classInfo = widget.availableClasses[index];
+                return CheckboxListTile(
+                  title: Text(classInfo['name'] ?? 'Turma Desconhecida'),
+                  value: _selectedClasses.contains(classInfo['id']),
+                  onChanged: (bool? newValue) {
+                    setState(() {
+                      if (newValue!) {
+                        _selectedClasses.add(classInfo['id']);
+                      } else {
+                        _selectedClasses.remove(classInfo['id']);
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+          const SizedBox(height: 16),
+          Text('Data de entrega:'),
+          InkWell(
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _targetDate,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (date != null) {
+                setState(() {
+                  _targetDate = date;
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_targetDate.day.toString().padLeft(2, '0')}/${_targetDate.month.toString().padLeft(2, '0')}/${_targetDate.year}',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed:
+              _selectedClasses.isEmpty
+                  ? null
+                  : () {
+                    widget.onDuplicate({
+                      'targetClassIds': _selectedClasses,
+                      'targetDate': _targetDate.toIso8601String(),
+                    });
+                    Navigator.of(context).pop();
+                  },
+          child: const Text('Duplicar'),
         ),
       ],
     );

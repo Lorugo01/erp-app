@@ -1,29 +1,95 @@
 import { Request, Response, NextFunction } from 'express';
 import * as LessonService from '../services/lesson.service';
 
-export const getAll = async (_: Request, res: Response) => {
-  const lessons = await LessonService.getAllLessons();
-  res.json(lessons);
+export const create = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lesson = await LessonService.createLesson(req.body);
+    res.status(201).json(lesson);
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const lesson = await LessonService.getLessonById(req.params.id);
+    if (!lesson) {
+      return res.status(404).json({ error: 'Aula não encontrada' });
+    }
     res.json(lesson);
   } catch (error) {
     next(error);
   }
 };
 
-export const create = async (req: Request, res: Response) => {
-  const lesson = await LessonService.createLesson(req.body);
-  res.status(201).json(lesson);
+export const getOrCreate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { classId, subjectId, teacherId, date } = req.body;
+    
+    if (!classId || !subjectId || !teacherId || !date) {
+      return res.status(400).json({ 
+        error: 'Campos obrigatórios: classId, subjectId, teacherId, date' 
+      });
+    }
+
+    const lesson = await LessonService.getOrCreateLesson({
+      classId,
+      subjectId,
+      teacherId,
+      date: new Date(date),
+    });
+
+    res.json(lesson);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const duplicate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      sourceLessonId,
+      targetClassIds,
+      targetDate,
+      teacherId,
+      subjectId,
+      copyAttendance = false,
+      createNewLesson = true,
+      attendanceData,
+    } = req.body;
+
+    if (!sourceLessonId || !targetClassIds || !Array.isArray(targetClassIds) || targetClassIds.length === 0) {
+      return res.status(400).json({
+        error: 'Campos obrigatórios: sourceLessonId, targetClassIds (array não vazio)',
+      });
+    }
+
+    if (!targetDate || !teacherId || !subjectId) {
+      return res.status(400).json({
+        error: 'Campos obrigatórios: targetDate, teacherId, subjectId',
+      });
+    }
+
+    const result = await LessonService.duplicateLesson({
+      sourceLessonId,
+      targetClassIds,
+      targetDate: new Date(targetDate),
+      teacherId,
+      subjectId,
+      copyAttendance,
+      createNewLesson,
+      attendanceData,
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
-    const lesson = await LessonService.updateLesson(id, req.body);
+    const lesson = await LessonService.updateLesson(req.params.id, req.body);
     res.json(lesson);
   } catch (error) {
     next(error);
@@ -34,42 +100,6 @@ export const remove = async (req: Request, res: Response, next: NextFunction) =>
   try {
     await LessonService.deleteLesson(req.params.id);
     res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getOrCreateByClassDate = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { classId, date, subjectId, teacherId } = req.body;
-    
-    if (!classId || !date || !subjectId || !teacherId) {
-      return res.status(400).json({ error: 'classId, date, subjectId e teacherId são obrigatórios' });
-    }
-
-    // Valida e converte a data
-    const parsedDate = new Date(date);
-    if (isNaN(parsedDate.getTime())) {
-      return res.status(400).json({ error: 'Formato de data inválido. Use ISO-8601.' });
-    }
-
-    const lesson = await LessonService.getOrCreateLessonByClassDate({ 
-      classId, 
-      date: parsedDate, 
-      subjectId, 
-      teacherId 
-    });
-    res.json(lesson);
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getByClass = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const classId = req.params.classId;
-    const lessons = await LessonService.getLessonsByClass(classId);
-    res.json(lessons);
   } catch (error) {
     next(error);
   }
