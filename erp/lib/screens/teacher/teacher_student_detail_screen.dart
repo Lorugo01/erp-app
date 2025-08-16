@@ -81,7 +81,7 @@ class _TeacherStudentDetailScreenState
 
   Future<void> _fetchAttendances() async {
     try {
-      final attendances = await AttendanceService.getAttendanceByStudent(
+      final attendances = await AttendanceService.getAttendancesByStudent(
         widget.student['id'],
       );
       setState(() {

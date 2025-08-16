@@ -34,7 +34,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _loadingTeachers = false;
   String? _errorTeachers;
 
-  List<student_service.Student> _students = [];
+  List<Map<String, dynamic>> _students = [];
   bool _loadingStudents = false;
   String? _errorStudents;
 
@@ -161,16 +161,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  Future<void> _deleteStudent(student_service.Student student) async {
+  Future<void> _deleteStudent(Map<String, dynamic> student) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/students/${student.id}'),
+        Uri.parse('http://192.168.18.15:3000/students/${student['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         setState(() {
-          _students.removeWhere((s) => s.id == student.id);
+          _students.removeWhere((s) => s['id'] == student['id']);
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -195,14 +195,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  List<student_service.Student> get _filteredStudents {
+  List<Map<String, dynamic>> get _filteredStudents {
     final query = _searchController.text.toLowerCase();
     if (query.isEmpty) return _students;
     return _students
         .where(
           (student) =>
-              (student.name).toLowerCase().contains(query) ||
-              (student.email).toLowerCase().contains(query),
+              (student['name'] ?? '').toLowerCase().contains(query) ||
+              (student['email'] ?? '').toLowerCase().contains(query),
         )
         .toList();
   }
@@ -460,20 +460,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                   if (mounted) {
                     setState(() {
-                      _students.add(
-                        student_service.Student(
-                          id: studentData['id'] ?? '',
-                          name: studentData['name'] ?? name,
-                          email: studentData['email'] ?? email,
-                          registrationNumber:
-                              studentData['registrationNumber'] ??
-                              registrationNumber,
-                          profilePicture: studentData['profilePicture'],
-                          subjects: [],
-                          createdAt: null,
-                          role: null,
-                        ),
-                      );
+                      _students.add({
+                        'id': studentData['id'] ?? '',
+                        'name': studentData['name'] ?? name,
+                        'email': studentData['email'] ?? email,
+                        'registrationNumber':
+                            studentData['registrationNumber'] ?? '',
+                        'profilePicture': studentData['profilePicture'],
+                      });
                     });
                   }
                   Navigator.of(context).pop();
@@ -1849,7 +1843,7 @@ class _TeacherCardGrid extends StatelessWidget {
 }
 
 class _StudentCardGrid extends StatelessWidget {
-  final student_service.Student student;
+  final Map<String, dynamic> student;
   final VoidCallback? onDelete;
 
   const _StudentCardGrid({required this.student, this.onDelete});
@@ -1861,7 +1855,16 @@ class _StudentCardGrid extends StatelessWidget {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => StudentDetailScreen(student: student),
+            builder:
+                (_) => StudentDetailScreen(
+                  student: student_service.Student(
+                    id: student['id'] ?? '',
+                    name: student['name'] ?? '',
+                    email: student['email'] ?? '',
+                    registrationNumber: student['registrationNumber'],
+                    profilePicture: student['profilePicture'],
+                  ),
+                ),
           ),
         );
       },
@@ -1894,13 +1897,13 @@ class _StudentCardGrid extends StatelessWidget {
                   radius: isSmall ? 24 : 32,
                   backgroundColor: Colors.white,
                   backgroundImage:
-                      student.profilePicture != null
+                      student['profilePicture'] != null
                           ? NetworkImage(
-                            'http://192.168.18.15:3000${student.profilePicture}',
+                            'http://192.168.18.15:3000${student['profilePicture']}',
                           )
                           : null,
                   child:
-                      student.profilePicture == null
+                      student['profilePicture'] == null
                           ? Icon(
                             Icons.person,
                             size: isSmall ? 28 : 40,
@@ -1938,7 +1941,7 @@ class _StudentCardGrid extends StatelessWidget {
             ),
             SizedBox(height: isSmall ? 8 : 16),
             Text(
-              student.name,
+              student['name'] ?? '',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -1949,7 +1952,7 @@ class _StudentCardGrid extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              student.email,
+              student['email'] ?? '',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: isSmall ? 12 : 14,
@@ -1957,9 +1960,9 @@ class _StudentCardGrid extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            if (student.registrationNumber != null)
+            if (student['registrationNumber'] != null)
               Text(
-                'Matrícula: ${student.registrationNumber}',
+                'Matrícula: ${student['registrationNumber']}',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: isSmall ? 10 : 12,
@@ -1987,7 +1990,17 @@ class _StudentCardGrid extends StatelessWidget {
                     Navigator.pop(context);
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => StudentDetailScreen(student: student),
+                        builder:
+                            (_) => StudentDetailScreen(
+                              student: student_service.Student(
+                                id: student['id'] ?? '',
+                                name: student['name'] ?? '',
+                                email: student['email'] ?? '',
+                                registrationNumber:
+                                    student['registrationNumber'],
+                                profilePicture: student['profilePicture'],
+                              ),
+                            ),
                       ),
                     );
                   },
@@ -2013,7 +2026,7 @@ class _StudentCardGrid extends StatelessWidget {
         return AlertDialog(
           title: const Text('Confirmar Exclusão'),
           content: Text(
-            'Tem certeza que deseja excluir o aluno "${student.name}"?\n\n'
+            'Tem certeza que deseja excluir o aluno "${student['name']}"?\n\n'
             'Esta ação não pode ser desfeita.',
           ),
           actions: [

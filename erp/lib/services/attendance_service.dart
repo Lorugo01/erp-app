@@ -1,113 +1,110 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class AttendanceService {
-  static const String baseUrl = 'http://192.168.18.15:3000';
+  // URL base da API - agora centralizada
+  static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<void> markAttendance({
-    required String studentId,
-    required String classId,
-    required bool present,
-    required DateTime date,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/attendances'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'studentId': studentId,
-        'classId': classId,
-        'present': present,
-        'date': date.toIso8601String(),
-      }),
-    );
-    if (response.statusCode != 201) {
-      throw Exception('Erro ao registrar presença');
-    }
-  }
-
-  static Future<void> markAllAttendance({
-    required String classId,
-    required List<String> studentIds,
-    required bool present,
-    required DateTime date,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/attendances/bulk'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'classId': classId,
-        'studentIds': studentIds,
-        'present': present,
-        'date': date.toIso8601String(),
-      }),
-    );
-    if (response.statusCode != 201) {
-      throw Exception('Erro ao registrar presença em massa');
-    }
-  }
-
-  static Future<List<Map<String, dynamic>>> getAttendanceByClass(
-    String classId,
-    DateTime date,
+  static Future<List<Map<String, dynamic>>> getAttendancesByLesson(
+    String lessonId,
   ) async {
     final response = await http.get(
-      Uri.parse(
-        '$baseUrl/attendances/class/$classId?date=${date.toIso8601String()}',
-      ),
+      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
     } else {
-      throw Exception('Erro ao buscar frequência');
+      throw Exception('Erro ao buscar frequências da aula');
     }
   }
 
-  // Novo método para buscar ou criar uma aula
+  static Future<Map<String, dynamic>> updateAttendance(
+    String attendanceId,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await http.put(
+      Uri.parse(ApiConfig.getAttendanceUrl('/$attendanceId')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao atualizar frequência');
+    }
+  }
+
+  static Future<Map<String, dynamic>> createAttendance(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await http.post(
+      Uri.parse(ApiConfig.getAttendanceUrl('')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao criar frequência');
+    }
+  }
+
+  static Future<void> deleteAttendance(String attendanceId) async {
+    final response = await http.delete(
+      Uri.parse(ApiConfig.getAttendanceUrl('/$attendanceId')),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao deletar frequência');
+    }
+  }
+
+  // Buscar ou criar uma aula
   static Future<Map<String, dynamic>> getOrCreateLesson({
     required String classId,
     required String subjectId,
     required String teacherId,
     required DateTime date,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/lessons/get-or-create'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'classId': classId,
-        'subjectId': subjectId,
-        'teacherId': teacherId,
-        'date': date.toIso8601String(),
-      }),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Erro ao buscar/criar aula: ${response.body}');
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.getAttendanceUrl('/lesson')),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'classId': classId,
+          'subjectId': subjectId,
+          'teacherId': teacherId,
+          'date': date.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return Map<String, dynamic>.from(data);
+      } else {
+        throw Exception('Erro ao buscar/criar aula');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
     }
   }
 
-  // Novo método para registrar frequência por aula
-  static Future<void> markAttendanceByLesson({
-    required String lessonId,
-    required List<Map<String, dynamic>> presences,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/attendances/bulk'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'lessonId': lessonId, 'presences': presences}),
-    );
-    if (response.statusCode != 201) {
-      throw Exception('Erro ao registrar frequência: ${response.body}');
-    }
-  }
-
-  // Novo método para buscar frequência de uma aula específica
+  // Buscar frequência por aula
   static Future<List<Map<String, dynamic>>> getAttendanceByLesson(
     String lessonId,
   ) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/attendances/lesson/$lessonId'),
+      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -117,54 +114,34 @@ class AttendanceService {
     }
   }
 
-  // Novo método para buscar frequência de um aluno
-  static Future<List<Map<String, dynamic>>> getAttendanceByStudent(
+  // Marcar frequência por aula
+  static Future<void> markAttendanceByLesson({
+    required String lessonId,
+    required List<Map<String, dynamic>> presences,
+  }) async {
+    final response = await http.post(
+      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'lessonId': lessonId, 'presences': presences}),
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao marcar frequência');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAttendancesByStudent(
     String studentId,
   ) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/attendances/student/$studentId'),
+      Uri.parse(ApiConfig.getAttendanceUrl('/student/$studentId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
     } else {
-      throw Exception('Erro ao buscar frequência do aluno');
-    }
-  }
-
-  // Método para calcular total de faltas de um aluno
-  static Future<int> getStudentAbsences(String studentId) async {
-    try {
-      final attendances = await getAttendanceByStudent(studentId);
-      // Conta apenas as faltas (present: false)
-      return attendances
-          .where((attendance) => attendance['present'] == false)
-          .length;
-    } catch (e) {
-      throw Exception('Erro ao calcular faltas do aluno: $e');
-    }
-  }
-
-  // Método para buscar estatísticas de frequência do aluno
-  static Future<Map<String, dynamic>> getStudentAttendanceStats(
-    String studentId,
-  ) async {
-    try {
-      final attendances = await getAttendanceByStudent(studentId);
-
-      final total = attendances.length;
-      final present = attendances.where((a) => a['present'] == true).length;
-      final absent = attendances.where((a) => a['present'] == false).length;
-      final percentage = total > 0 ? (present / total * 100).round() : 0;
-
-      return {
-        'total': total,
-        'present': present,
-        'absent': absent,
-        'percentage': percentage,
-      };
-    } catch (e) {
-      throw Exception('Erro ao buscar estatísticas de frequência: $e');
+      throw Exception('Erro ao buscar frequências do aluno');
     }
   }
 }

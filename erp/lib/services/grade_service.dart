@@ -1,26 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class GradeService {
-  static const String baseUrl = 'http://192.168.18.15:3000';
+  // URL base da API - agora centralizada
+  static String get baseUrl => ApiConfig.baseUrl;
 
-  // Buscar todas as notas
-  static Future<List<Map<String, dynamic>>> getAllGrades() async {
-    final response = await http.get(Uri.parse('$baseUrl/grades'));
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
-    } else {
-      throw Exception('Erro ao buscar notas');
-    }
-  }
-
-  // Buscar notas por aluno
-  static Future<List<Map<String, dynamic>>> getGradesByStudent(
-    String studentId,
-  ) async {
+  static Future<List<Map<String, dynamic>>> getGradesByStudent(String studentId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/grades/student/$studentId'),
+      Uri.parse(ApiConfig.getGradesUrl('/student/$studentId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -30,12 +18,9 @@ class GradeService {
     }
   }
 
-  // Buscar notas por disciplina
-  static Future<List<Map<String, dynamic>>> getGradesBySubject(
-    String subjectId,
-  ) async {
+  static Future<List<Map<String, dynamic>>> getGradesBySubject(String subjectId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/grades/subject/$subjectId'),
+      Uri.parse(ApiConfig.getGradesUrl('/subject/$subjectId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -45,86 +30,50 @@ class GradeService {
     }
   }
 
-  // Criar nova nota
-  static Future<Map<String, dynamic>> createGrade({
-    required String studentId,
-    required String subjectId,
-    required String typeId,
-    required String periodId,
-    double? value,
-    String? concept,
-    DateTime? date,
-  }) async {
+  static Future<Map<String, dynamic>> createGrade(Map<String, dynamic> data) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/grades'),
+      Uri.parse(ApiConfig.getGradesUrl('')),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'studentId': studentId,
-        'subjectId': subjectId,
-        'typeId': typeId,
-        'periodId': periodId,
-        if (value != null) 'value': value,
-        if (concept != null) 'concept': concept,
-        if (date != null) 'date': date.toIso8601String(),
-      }),
+      body: jsonEncode(data),
     );
+
     if (response.statusCode == 201) {
-      return jsonDecode(response.body);
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
     } else {
-      throw Exception('Erro ao criar nota: ${response.body}');
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao criar nota');
     }
   }
 
-  // Atualizar nota
-  static Future<Map<String, dynamic>> updateGrade({
-    required String gradeId,
-    String? studentId,
-    String? subjectId,
-    String? typeId,
-    String? periodId,
-    double? value,
-    String? concept,
-    DateTime? date,
-  }) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl/grades/$gradeId'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        if (studentId != null) 'studentId': studentId,
-        if (subjectId != null) 'subjectId': subjectId,
-        if (typeId != null) 'typeId': typeId,
-        if (periodId != null) 'periodId': periodId,
-        if (value != null) 'value': value,
-        if (concept != null) 'concept': concept,
-        if (date != null) 'date': date.toIso8601String(),
-      }),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Erro ao atualizar nota: ${response.body}');
-    }
-  }
-
-  // Deletar nota
-  static Future<void> deleteGrade(String gradeId) async {
-    final response = await http.delete(Uri.parse('$baseUrl/grades/$gradeId'));
-    if (response.statusCode != 204) {
-      throw Exception('Erro ao deletar nota');
-    }
-  }
-
-  // Buscar boletim completo de um aluno
-  static Future<Map<String, dynamic>> getBoletimCompleto(
-    String studentId,
+  static Future<Map<String, dynamic>> updateGrade(
+    String gradeId,
+    Map<String, dynamic> data,
   ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/grades/boletim/$studentId'),
+    final response = await http.put(
+      Uri.parse(ApiConfig.getGradesUrl('/$gradeId')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
     );
+
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
     } else {
-      throw Exception('Erro ao buscar boletim');
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao atualizar nota');
+    }
+  }
+
+  static Future<void> deleteGrade(String gradeId) async {
+    final response = await http.delete(
+      Uri.parse(ApiConfig.getGradesUrl('/$gradeId')),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao deletar nota');
     }
   }
 }

@@ -46,7 +46,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
       _error = null;
     });
     try {
-      final submissions = await AssignmentService.getSubmissionsByAssignment(
+      final submissions = await AssignmentService.getAssignmentSubmissions(
         widget.assignment['id'],
       );
       setState(() {
@@ -100,7 +100,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
         });
       }
     } catch (e) {
-      print('Erro ao buscar turmas disponíveis: $e');
+      debugPrint('Erro ao buscar turmas disponíveis: $e');
       setState(() {
         _availableClasses = [];
         _loadingClasses = false;
@@ -641,7 +641,7 @@ class _DuplicateAssignmentDialog extends StatefulWidget {
 class _DuplicateAssignmentDialogState
     extends State<_DuplicateAssignmentDialog> {
   DateTime _targetDate = DateTime.now();
-  List<String> _selectedClasses = [];
+  final Set<String> _selectedClasses = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -724,7 +724,7 @@ class _DuplicateAssignmentDialogState
                   ? null
                   : () {
                     widget.onDuplicate({
-                      'targetClassIds': _selectedClasses,
+                      'targetClassIds': _selectedClasses.toList(),
                       'targetDate': _targetDate.toIso8601String(),
                     });
                     Navigator.of(context).pop();

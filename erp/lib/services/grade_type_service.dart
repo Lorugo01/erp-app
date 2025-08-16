@@ -1,27 +1,36 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class GradeTypeService {
-  static const String baseUrl = 'http://192.168.18.15:3000';
+  // URL base da API - agora centralizada
+  static String get baseUrl => ApiConfig.baseUrl;
 
-  // Buscar todos os tipos de nota
   static Future<List<Map<String, dynamic>>> getAllGradeTypes() async {
-    final response = await http.get(Uri.parse('$baseUrl/grade-types'));
+    final response = await http.get(Uri.parse(ApiConfig.getGradeTypesUrl('')));
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
     } else {
-      throw Exception('Erro ao buscar tipos de nota');
+      throw Exception('Erro ao buscar tipos de notas');
     }
   }
 
-  // Buscar tipo de nota por ID
   static Future<Map<String, dynamic>> getGradeTypeById(String id) async {
-    final response = await http.get(Uri.parse('$baseUrl/grade-types/$id'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Erro ao buscar tipo de nota');
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getGradeTypesUrl('/$id')),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Map<String, dynamic>.from(data);
+      } else {
+        throw Exception('Erro ao buscar tipo de nota: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
     }
   }
 

@@ -55,14 +55,14 @@ class DataProvider extends ChangeNotifier {
     try {
       // Buscar aluno da lista atual ou fazer nova requisição
       final allStudents = await StudentService.getAllStudents();
-      final student = allStudents.firstWhere((s) => s.id == studentId);
+      final student = allStudents.firstWhere((s) => s['id'] == studentId);
       _currentStudent = {
-        'id': student.id,
-        'name': student.name,
-        'email': student.email,
-        'registrationNumber': student.registrationNumber,
-        'profilePicture': student.profilePicture,
-        'createdAt': student.createdAt?.toIso8601String(),
+        'id': student['id'],
+        'name': student['name'],
+        'email': student['email'],
+        'registrationNumber': student['registrationNumber'],
+        'profilePicture': student['profilePicture'],
+        'createdAt': student['createdAt']?.toString(),
       };
       _setLoading(false);
     } catch (e) {
@@ -95,12 +95,12 @@ class DataProvider extends ChangeNotifier {
           updatedStudents
               .map(
                 (student) => {
-                  'id': student.id,
-                  'name': student.name,
-                  'email': student.email,
-                  'registrationNumber': student.registrationNumber,
-                  'profilePicture': student.profilePicture,
-                  'createdAt': student.createdAt?.toIso8601String(),
+                  'id': student['id'],
+                  'name': student['name'],
+                  'email': student['email'],
+                  'registrationNumber': student['registrationNumber'],
+                  'profilePicture': student['profilePicture'],
+                  'createdAt': student['createdAt']?.toString(),
                 },
               )
               .toList();

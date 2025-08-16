@@ -1607,10 +1607,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                 final newValue = double.parse(
                                   valueController.text,
                                 );
-                                await GradeService.updateGrade(
-                                  gradeId: grade.id,
-                                  value: newValue,
-                                );
+                                await GradeService.updateGrade(grade.id, {
+                                  'value': newValue,
+                                });
                                 if (context.mounted) {
                                   Navigator.pop(context);
                                   this.setState(
@@ -1847,13 +1846,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       }
 
                       try {
-                        await GradeService.createGrade(
-                          studentId: widget.student.id,
-                          subjectId: subjectId!,
-                          typeId: gradeTypeId!,
-                          periodId: periodId!,
-                          value: value!,
-                        );
+                        await GradeService.createGrade({
+                          'studentId': widget.student.id,
+                          'subjectId': subjectId!,
+                          'typeId': gradeTypeId!,
+                          'periodId': periodId!,
+                          'value': value!,
+                        });
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext);
                         }

@@ -293,7 +293,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         final studentId = attendance['studentId'];
         // Determinar status baseado nos novos campos ou compatibilidade
         String? status = attendance['status'];
-        status ??= attendance['present'] == true ? 'PRESENT' : 'ABSENT';
+        if (status == null) {
+          final present = attendance['present'];
+          status = present == true ? 'PRESENT' : 'ABSENT';
+        }
         newAttendanceMap[studentId] = status;
         newJustificationMap[studentId] = attendance['justification'] ?? '';
       }
@@ -2390,21 +2393,20 @@ class _GradeDialogState extends State<GradeDialog> {
     try {
       if (widget.existingGrade != null) {
         // Atualizar nota existente
-        await GradeService.updateGrade(
-          gradeId: widget.existingGrade!['id'],
-          value: _isConcept ? null : double.tryParse(_valueController.text),
-          concept: _isConcept ? _conceptController.text : null,
-        );
+        await GradeService.updateGrade(widget.existingGrade!['id'], {
+          'value': _isConcept ? null : double.tryParse(_valueController.text),
+          'concept': _isConcept ? _conceptController.text : null,
+        });
       } else {
         // Criar nova nota
-        await GradeService.createGrade(
-          studentId: widget.student['id'],
-          subjectId: widget.subjectId,
-          typeId: widget.typeId,
-          periodId: widget.periodId,
-          value: _isConcept ? null : double.tryParse(_valueController.text),
-          concept: _isConcept ? _conceptController.text : null,
-        );
+        await GradeService.createGrade({
+          'studentId': widget.student['id'],
+          'subjectId': widget.subjectId,
+          'typeId': widget.typeId,
+          'periodId': widget.periodId,
+          'value': _isConcept ? null : double.tryParse(_valueController.text),
+          'concept': _isConcept ? _conceptController.text : null,
+        });
       }
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {

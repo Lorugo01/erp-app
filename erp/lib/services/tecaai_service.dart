@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
+import '../config/tecaai_config.dart';
 
 class TecaAIResponse {
   final bool success;
@@ -113,22 +114,20 @@ class TecaAIItem {
 }
 
 class TecaAIService {
-  // URL base da API TecaAI (porta 5001)
-  static const String baseUrl = 'http://192.168.18.15:5001';
+  // URL base da API TecaAI - agora centralizada
+  static String get baseUrl => TecaAIConfig.baseUrl;
 
-  // Timeout para requisições (em segundos)
-  static const int requestTimeout = 30;
+  // Timeout para requisições - agora centralizado
+  static int get requestTimeout => TecaAIConfig.requestTimeout;
 
-  // Headers padrão
-  static const Map<String, String> defaultHeaders = {
-    'Content-Type': 'application/json',
-  };
+  // Headers padrão - agora centralizado
+  static Map<String, String> get defaultHeaders => TecaAIConfig.defaultHeaders;
 
   /// Verifica se a API TecaAI está online
   static Future<bool> checkConnection() async {
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/health'), headers: defaultHeaders)
+          .get(Uri.parse(TecaAIConfig.getHealthUrl()), headers: defaultHeaders)
           .timeout(const Duration(seconds: 5));
 
       return response.statusCode == 200;
@@ -146,7 +145,7 @@ class TecaAIService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/ask'),
+            Uri.parse(TecaAIConfig.getAskUrl()),
             headers: defaultHeaders,
             body: jsonEncode({
               'question': question,
@@ -155,7 +154,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -185,7 +184,7 @@ class TecaAIService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/locate'),
+            Uri.parse(TecaAIConfig.getLocateUrl()),
             headers: defaultHeaders,
             body: jsonEncode({
               'item': item,
@@ -193,7 +192,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -223,7 +222,7 @@ class TecaAIService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/control'),
+            Uri.parse(TecaAIConfig.getControlUrl()),
             headers: defaultHeaders,
             body: jsonEncode({
               'command': command,
@@ -231,7 +230,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -261,7 +260,7 @@ class TecaAIService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/item-info'),
+            Uri.parse(TecaAIConfig.getItemInfoUrl()),
             headers: defaultHeaders,
             body: jsonEncode({
               'item': item,
@@ -269,7 +268,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -297,7 +296,7 @@ class TecaAIService {
     int limit = 50,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/history').replace(
+      final uri = Uri.parse(TecaAIConfig.getHistoryUrl()).replace(
         queryParameters: {
           if (userId != null) 'user_id': userId,
           'limit': limit.toString(),
@@ -306,7 +305,7 @@ class TecaAIService {
 
       final response = await http
           .get(uri, headers: defaultHeaders)
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -328,8 +327,8 @@ class TecaAIService {
   static Future<TecaAIStats?> getStats() async {
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/stats'), headers: defaultHeaders)
-          .timeout(const Duration(seconds: requestTimeout));
+          .get(Uri.parse(TecaAIConfig.getStatsUrl()), headers: defaultHeaders)
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -348,8 +347,8 @@ class TecaAIService {
   static Future<List<TecaAIItem>> getAllItems() async {
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/items'), headers: defaultHeaders)
-          .timeout(const Duration(seconds: requestTimeout));
+          .get(Uri.parse(TecaAIConfig.getItemsUrl()), headers: defaultHeaders)
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -375,7 +374,7 @@ class TecaAIService {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/items'),
+            Uri.parse(TecaAIConfig.getItemsUrl()),
             headers: defaultHeaders,
             body: jsonEncode({
               'nome': nome,
@@ -385,7 +384,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -418,7 +417,7 @@ class TecaAIService {
     try {
       final response = await http
           .put(
-            Uri.parse('$baseUrl/items/$itemId'),
+            Uri.parse(TecaAIConfig.getItemUrl(itemId)),
             headers: defaultHeaders,
             body: jsonEncode({
               'nome': nome,
@@ -428,7 +427,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -458,14 +457,14 @@ class TecaAIService {
     try {
       final response = await http
           .delete(
-            Uri.parse('$baseUrl/items/$itemId'),
+            Uri.parse(TecaAIConfig.getItemUrl(itemId)),
             headers: defaultHeaders,
             body: jsonEncode({
               'user_id': user.id,
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(const Duration(seconds: requestTimeout));
+          .timeout(Duration(seconds: requestTimeout));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -487,14 +486,8 @@ class TecaAIService {
     }
   }
 
-  /// Comandos pré-definidos para facilitar o uso
-  static const Map<String, String> predefinedCommands = {
-    'ligar_luz': 'ligue a luz',
-    'desligar_luz': 'desligue a luz',
-    'modo_festa_on': 'ligue modo festa',
-    'modo_festa_off': 'desligue modo festa',
-    'alarme_fumaca': 'os alarmes de fumaça foram acionados',
-  };
+  /// Comandos pré-definidos para facilitar o uso - agora centralizado
+  static Map<String, String> get predefinedCommands => TecaAIConfig.predefinedCommands;
 
   /// Executa um comando pré-definido
   static Future<TecaAIResponse> executePredefinedCommand({

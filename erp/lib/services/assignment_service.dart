@@ -1,58 +1,44 @@
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class AssignmentService {
-  static const String baseUrl = 'http://192.168.18.15:3000';
+  // URL base da API - agora centralizada
+  static String get baseUrl => ApiConfig.baseUrl;
 
   static Future<List<Map<String, dynamic>>> getAssignmentsByClass(
     String classId,
   ) async {
-    debugPrint('Buscando atividades da turma: $classId');
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/classes/$classId/assignments'),
-      );
-      debugPrint('Status da resposta: ${response.statusCode}');
-      debugPrint('Corpo da resposta: ${response.body}');
-
-      if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
-      } else {
-        debugPrint('Erro ao buscar atividades: ${response.body}');
-        throw Exception('Erro ao buscar atividades');
-      }
-    } catch (e) {
-      debugPrint('Erro ao buscar atividades: $e');
-      throw Exception('Erro ao buscar atividades');
+    final response = await http.get(
+      Uri.parse(ApiConfig.getAssignmentsUrl('?classId=$classId')),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar tarefas da turma');
     }
   }
 
+  // Buscar tarefas por turma e disciplina
   static Future<List<Map<String, dynamic>>> getAssignmentsByClassAndSubject(
     String classId,
     String subjectId,
   ) async {
-    debugPrint('Buscando atividades da turma $classId e disciplina $subjectId');
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/classes/$classId/assignments?subjectId=$subjectId'),
-      );
-      debugPrint('Status da resposta: ${response.statusCode}');
-      debugPrint('Corpo da resposta: ${response.body}');
-
-      if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
-      } else {
-        debugPrint('Erro ao buscar atividades: ${response.body}');
-        throw Exception('Erro ao buscar atividades');
-      }
-    } catch (e) {
-      debugPrint('Erro ao buscar atividades: $e');
-      throw Exception('Erro ao buscar atividades');
+    final response = await http.get(
+      Uri.parse(
+        ApiConfig.getAssignmentsUrl('?classId=$classId&subjectId=$subjectId'),
+      ),
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Erro ao buscar tarefas da turma e disciplina');
     }
   }
 
-  static Future<void> createAssignment({
+  static Future<Map<String, dynamic>> createAssignment({
     required String classId,
     required String subjectId,
     required String description,
@@ -60,40 +46,49 @@ class AssignmentService {
     String? fileUrl,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/classes/$classId/assignments'),
+      Uri.parse(ApiConfig.getAssignmentsUrl('')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
+        'classId': classId,
         'subjectId': subjectId,
         'description': description,
         'dueDate': dueDate.toIso8601String(),
-        if (fileUrl != null) 'fileUrl': fileUrl,
+        'fileUrl': fileUrl,
       }),
     );
-    if (response.statusCode != 201) {
-      throw Exception('Erro ao criar atividade');
+
+    if (response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao criar tarefa');
     }
   }
 
   static Future<void> deleteAssignment(String assignmentId) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/assignments/$assignmentId'),
+      Uri.parse(ApiConfig.getAssignmentsUrl('/$assignmentId')),
+      headers: {'Content-Type': 'application/json'},
     );
-    if (response.statusCode != 204) {
-      throw Exception('Erro ao excluir atividade');
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao deletar tarefa');
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getSubmissionsByAssignment(
+  static Future<List<Map<String, dynamic>>> getAssignmentSubmissions(
     String assignmentId,
   ) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/assignments/$assignmentId/submissions'),
+      Uri.parse(ApiConfig.getAssignmentsUrl('/$assignmentId/submissions')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
     } else {
-      throw Exception('Erro ao buscar submissões da atividade');
+      throw Exception('Erro ao buscar submissões da tarefa');
     }
   }
 }
