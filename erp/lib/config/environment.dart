@@ -13,7 +13,7 @@ class EnvironmentConfig {
   static String get apiBaseUrl {
     switch (_environment) {
       case Environment.development:
-        return 'http://192.168.1.104:3000';
+        return 'http://192.168.18.15:3000';
       case Environment.production:
         return 'https://seu-dominio.com'; // Substitua pelo seu domínio
       case Environment.local:
@@ -25,7 +25,7 @@ class EnvironmentConfig {
   static String get tecaaiBaseUrl {
     switch (_environment) {
       case Environment.development:
-        return 'http://192.168.1.104:5001';
+        return 'http://192.168.18.15:5001';
       case Environment.production:
         return 'https://ia.seu-dominio.com'; // Substitua pelo seu domínio
       case Environment.local:
@@ -37,7 +37,7 @@ class EnvironmentConfig {
   static String get uploadsBaseUrl {
     switch (_environment) {
       case Environment.development:
-        return 'http://192.168.1.104:3000';
+        return 'http://192.168.18.15:3000';
       case Environment.production:
         return 'https://seu-dominio.com'; // Substitua pelo seu domínio
       case Environment.local:
