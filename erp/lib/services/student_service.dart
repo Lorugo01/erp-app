@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class Student {
   final String id;
@@ -40,41 +41,107 @@ class Student {
 }
 
 class StudentService {
-  static const String baseUrl = 'http://192.168.18.15:3000';
+  // URL base da API - agora centralizada
+  static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<List<Student>> getAllStudents() async {
-    final response = await http.get(Uri.parse('$baseUrl/students'));
+  static Future<List<Map<String, dynamic>>> getAllStudents() async {
+    final response = await http.get(Uri.parse(ApiConfig.getStudentsUrl('')));
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
-      return data.map((e) => Student.fromJson(e)).toList();
+      return List<Map<String, dynamic>>.from(data);
     } else {
       throw Exception('Erro ao buscar alunos');
     }
   }
 
-  static Future<List<Student>> searchStudentsByName(String name) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/students/search/$name'),
-    );
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((e) => Student.fromJson(e)).toList();
-    } else {
-      throw Exception('Erro ao buscar alunos por nome');
+  // Buscar aluno por ID
+  static Future<Map<String, dynamic>> getStudentById(String id) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getStudentsUrl('/$id')),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Map<String, dynamic>.from(data);
+      } else {
+        throw Exception('Erro ao buscar aluno: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getStudentSubjects(
-    String studentId,
+  // Buscar aluno por ID do usuário
+  static Future<Map<String, dynamic>> getStudentByUserId(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getStudentsUrl('/user/$userId')),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Map<String, dynamic>.from(data);
+      } else {
+        throw Exception('Erro ao buscar aluno: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
+  }
+
+  // Atualizar aluno
+  static Future<Map<String, dynamic>> updateStudent(
+    String id,
+    Map<String, dynamic> data,
   ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/students/$studentId/subjects'),
+    final response = await http.put(
+      Uri.parse(ApiConfig.getStudentsUrl('/$id')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
     );
+
     if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
     } else {
-      throw Exception('Erro ao buscar disciplinas do aluno');
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao atualizar aluno');
+    }
+  }
+
+  // Atualizar foto do aluno
+  static Future<Map<String, dynamic>> updateStudentPhoto(
+    String id,
+    String photoUrl,
+  ) async {
+    final response = await http.put(
+      Uri.parse(ApiConfig.getStudentsUrl('/$id/photo')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'photoUrl': photoUrl}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao atualizar foto do aluno');
+    }
+  }
+
+  // Deletar aluno
+  static Future<void> deleteStudent(String id) async {
+    final response = await http.delete(
+      Uri.parse(ApiConfig.getStudentsUrl('/$id')),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao deletar aluno');
     }
   }
 }

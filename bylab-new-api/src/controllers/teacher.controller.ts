@@ -30,7 +30,8 @@ export const getByName = async (req: Request, res: Response, next: NextFunction)
 export const getTeacherClasses = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const teacherId = req.params.id;
-    const classes = await TeacherService.getTeacherClasses(teacherId);
+    const subjectId = req.query.subjectId as string;
+    const classes = await TeacherService.getTeacherClasses(teacherId, subjectId);
     res.json(classes);
   } catch (error) {
     next(error);

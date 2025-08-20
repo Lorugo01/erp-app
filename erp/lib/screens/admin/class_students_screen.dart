@@ -72,7 +72,9 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
     // Filtrar alunos já matriculados
     final idsMatriculados = _enrollments.map((e) => e['student']['id']).toSet();
     final alunosDisponiveis =
-        alunos.where((aluno) => !idsMatriculados.contains(aluno.id)).toList();
+        alunos
+            .where((aluno) => !idsMatriculados.contains(aluno['id']))
+            .toList();
     final selected = <String>{};
     String search = '';
 
@@ -85,8 +87,10 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
               final filteredAlunos =
                   alunosDisponiveis.where((aluno) {
                     final query = search.toLowerCase();
-                    return aluno.name.toLowerCase().contains(query) ||
-                        (aluno.registrationNumber?.toLowerCase() ?? '')
+                    return (aluno['name'] ?? '').toLowerCase().contains(
+                          query,
+                        ) ||
+                        (aluno['registrationNumber']?.toLowerCase() ?? '')
                             .contains(query);
                   }).toList();
               return AlertDialog(
@@ -118,19 +122,21 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                   itemBuilder: (context, i) {
                                     final aluno = filteredAlunos[i];
                                     return CheckboxListTile(
-                                      value: selected.contains(aluno.id),
+                                      value: selected.contains(aluno['id']),
                                       onChanged: (v) {
                                         setState(() {
                                           if (v == true) {
-                                            selected.add(aluno.id);
+                                            selected.add(aluno['id']);
                                           } else {
-                                            selected.remove(aluno.id);
+                                            selected.remove(aluno['id']);
                                           }
                                         });
                                       },
-                                      title: Text(aluno.name),
+                                      title: Text(aluno['name'] ?? ''),
                                       subtitle: Text(
-                                        aluno.registrationNumber ?? aluno.email,
+                                        aluno['registrationNumber'] ??
+                                            aluno['email'] ??
+                                            '',
                                       ),
                                     );
                                   },

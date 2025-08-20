@@ -30,6 +30,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   // Adicionar variável de estado para turma selecionada
   String? selectedClassId;
 
+  // Variáveis para filtros de frequência
+  String? selectedSubjectIdForAttendance;
+  int maxAttendancesToShow = 10;
+  bool showAllAttendances = false;
+
   @override
   void initState() {
     super.initState();
@@ -493,11 +498,64 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                             ],
                           ),
                         ),
+                        // Filtro por matéria para frequência
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20.0,
+                            vertical: 8.0,
+                          ),
+                          child: DropdownButtonFormField<String>(
+                            value: selectedSubjectIdForAttendance,
+                            decoration: InputDecoration(
+                              labelText: 'Filtrar por matéria',
+                              prefixIcon: const Icon(
+                                Icons.filter_list,
+                                color: Color(0xFF2953A5),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Todas as matérias'),
+                              ),
+                              if (_studentDetails != null &&
+                                  _studentDetails!['enrollments'] != null)
+                                ..._getUniqueSubjectsFromEnrollments(
+                                  (_studentDetails!['enrollments'] as List)
+                                      .where(
+                                        (e) =>
+                                            selectedClassId == null ||
+                                            e['class']['id'] == selectedClassId,
+                                      )
+                                      .toList(),
+                                ).map(
+                                  (subject) => DropdownMenuItem<String>(
+                                    value:
+                                        subject['groupedType'] ?? subject['id'],
+                                    child: Text(subject['name']),
+                                  ),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                selectedSubjectIdForAttendance = value;
+                                showAllAttendances = false; // Reset ao filtrar
+                              });
+                            },
+                          ),
+                        ),
                         if (_studentDetails != null &&
                             _studentDetails!['attendances'] != null &&
                             (_studentDetails!['attendances'] as List)
                                 .isNotEmpty)
-                          ...(_studentDetails!['attendances'] as List).map(
+                          ..._getFilteredAttendances().map(
                             (attendance) => _buildAttendanceTile(attendance),
                           )
                         else
@@ -508,6 +566,39 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               style: TextStyle(
                                 color: Colors.grey,
                                 fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        // Botão "Ver mais" se houver mais frequências para mostrar
+                        if (_studentDetails != null &&
+                            _studentDetails!['attendances'] != null &&
+                            _shouldShowMoreButton())
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0,
+                              vertical: 16.0,
+                            ),
+                            child: Center(
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    showAllAttendances = !showAllAttendances;
+                                  });
+                                },
+                                icon: Icon(
+                                  showAllAttendances
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                ),
+                                label: Text(
+                                  showAllAttendances
+                                      ? 'Ver menos'
+                                      : 'Ver mais (${_getTotalFilteredAttendances() - maxAttendancesToShow} restantes)',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2953A5),
+                                  foregroundColor: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -729,80 +820,187 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   Widget _buildAttendanceTile(Map attendance) {
     final lesson =
         _lessonsById != null ? _lessonsById![attendance['lessonId']] : null;
-    final presente = attendance['present'] == true;
+
+    // Determinar status da frequência (novo sistema ou compatibilidade)
+    String status =
+        attendance['status'] ??
+        (attendance['present'] == true ? 'PRESENT' : 'ABSENT');
+    final justification = attendance['justification'];
+
+    // Definir cores e ícones baseado no status
+    Color statusColor;
+    Color backgroundColor;
+    Color borderColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (status) {
+      case 'PRESENT':
+        statusColor = Colors.green;
+        backgroundColor = Colors.green.withAlpha(30);
+        borderColor = Colors.green.withAlpha(80);
+        statusIcon = Icons.check_circle;
+        statusText = 'Presente';
+        break;
+      case 'JUSTIFIED_ABSENT':
+        statusColor = Colors.orange;
+        backgroundColor = Colors.orange.withAlpha(30);
+        borderColor = Colors.orange.withAlpha(80);
+        statusIcon = Icons.assignment_late;
+        statusText = 'Falta Justificada';
+        break;
+      case 'ABSENT':
+      default:
+        statusColor = Colors.red;
+        backgroundColor = Colors.red.withAlpha(30);
+        borderColor = Colors.red.withAlpha(80);
+        statusIcon = Icons.cancel;
+        statusText = 'Ausente';
+        break;
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: presente ? Colors.green.withAlpha(30) : Colors.red.withAlpha(30),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color:
-              presente ? Colors.green.withAlpha(80) : Colors.red.withAlpha(80),
-        ),
+        border: Border.all(color: borderColor),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            presente ? Icons.check_circle : Icons.cancel,
-            color: presente ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lesson != null && lesson['subject'] != null
-                      ? lesson['subject']['name'] ?? 'Disciplina'
-                      : 'Disciplina',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
+          Row(
+            children: [
+              Icon(statusIcon, color: statusColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(width: 4),
                     Text(
-                      lesson != null && lesson['date'] != null
-                          ? _formatDate(lesson['date'])
-                          : 'Data',
-                      style: TextStyle(color: Colors.grey[600]),
+                      lesson != null && lesson['subject'] != null
+                          ? lesson['subject']['name'] ?? 'Disciplina'
+                          : 'Disciplina',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          lesson != null && lesson['date'] != null
+                              ? _formatDate(lesson['date'])
+                              : 'Data',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                    if (lesson != null && lesson['teacher'] != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            lesson['teacher']['name'] ?? 'Professor',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
-                if (lesson != null && lesson['teacher'] != null) ...[
-                  const SizedBox(height: 4),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed:
+                            () => _showEditAttendanceDialog(
+                              Map<String, dynamic>.from(attendance),
+                            ),
+                        tooltip: 'Editar frequência',
+                        color: Colors.blue,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        padding: const EdgeInsets.all(4),
+                      ),
                       const SizedBox(width: 4),
-                      Text(
-                        lesson['teacher']['name'] ?? 'Professor',
-                        style: TextStyle(color: Colors.grey[600]),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 20),
+                        onPressed:
+                            () => _showDeleteAttendanceDialog(
+                              Map<String, dynamic>.from(attendance),
+                            ),
+                        tooltip: 'Excluir frequência',
+                        color: Colors.red,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        padding: const EdgeInsets.all(4),
                       ),
                     ],
                   ),
                 ],
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Text(
-            presente ? 'Presente' : 'Ausente',
-            style: TextStyle(
-              color: presente ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+          // Mostrar justificativa se houver
+          if (justification != null && justification.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Justificativa:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    justification,
+                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1304,137 +1502,148 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   void _showEditGradeDialog(Grade grade) async {
     final formKey = GlobalKey<FormState>();
-    double? newValue = grade.value;
-    String? newGradeTypeId = grade.gradeTypeId;
-    newPeriodId =
-        grade.periodId ??
-        (periods.isNotEmpty ? periods.first['id'] as String : null);
+    final valueController = TextEditingController(text: grade.value.toString());
+    bool isLoading = false;
+    String? error;
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar Nota'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  initialValue: grade.value.toString(),
-                  decoration: const InputDecoration(labelText: 'Valor da Nota'),
-                  keyboardType: TextInputType.number,
-                  validator:
-                      (v) => v == null || v.isEmpty ? 'Informe o valor' : null,
-                  onChanged: (v) => newValue = double.tryParse(v),
-                ),
-                DropdownButtonFormField<String>(
-                  value: newGradeTypeId,
-                  items: [
-                    DropdownMenuItem(value: 'PROVA_1', child: Text('Prova 1')),
-                    DropdownMenuItem(value: 'PROVA_2', child: Text('Prova 2')),
-                    DropdownMenuItem(
-                      value: 'RECUPERACAO',
-                      child: Text('Recuperação'),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                'Editar Nota - ${getGradeTypeName(grade.gradeTypeId)}',
+              ),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: valueController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nota (0-10)',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Informe a nota';
+                        final value = double.tryParse(v);
+                        if (value == null) return 'Nota deve ser um número';
+                        if (value < 0 || value > 10) {
+                          return 'Nota deve estar entre 0 e 10';
+                        }
+                        return null;
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: 'RECUPERACAO_FINAL',
-                      child: Text('Recuperação Final'),
-                    ),
+                    if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
                   ],
-                  onChanged: (v) => newGradeTypeId = v,
-                  decoration: const InputDecoration(labelText: 'Tipo de Nota'),
-                  validator:
-                      (v) => v == null ? 'Selecione o tipo de nota' : null,
                 ),
-                DropdownButtonFormField<String>(
-                  value: newPeriodId,
-                  items:
-                      periods
-                          .map<DropdownMenuItem<String>>(
-                            (p) => DropdownMenuItem<String>(
-                              value: p['id'] as String,
-                              child: Text(p['name']),
-                            ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      isLoading
+                          ? null
+                          : () async {
+                            // Excluir nota
+                            setState(() => isLoading = true);
+                            try {
+                              await GradeService.deleteGrade(grade.id);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                this.setState(
+                                  () {},
+                                ); // Atualiza a tela principal
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Nota excluída com sucesso!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              setState(() {
+                                error = 'Erro ao excluir nota';
+                                isLoading = false;
+                              });
+                            }
+                          },
+                  child:
+                      isLoading
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                          .toList(),
-                  onChanged: (v) => newPeriodId = v,
-                  decoration: const InputDecoration(
-                    labelText: 'Período Avaliativo',
-                  ),
-                  validator: (v) => v == null ? 'Selecione o período' : null,
+                          : const Text(
+                            'Excluir',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                ),
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      isLoading
+                          ? null
+                          : () async {
+                            if (formKey.currentState!.validate()) {
+                              setState(() {
+                                isLoading = true;
+                                error = null;
+                              });
+
+                              try {
+                                final newValue = double.parse(
+                                  valueController.text,
+                                );
+                                await GradeService.updateGrade(grade.id, {
+                                  'value': newValue,
+                                });
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  this.setState(
+                                    () {},
+                                  ); // Atualiza a tela principal
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Nota atualizada com sucesso!',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                setState(() {
+                                  error = 'Erro ao atualizar nota';
+                                  isLoading = false;
+                                });
+                              }
+                            }
+                          },
+                  child:
+                      isLoading
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text('Salvar'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                // Excluir nota
-                final dialogContext = context;
-                try {
-                  await GradeService.deleteGrade(grade.id);
-                  if (dialogContext.mounted) {
-                    Navigator.pop(dialogContext);
-                  }
-                  setState(() {});
-                  if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('Nota excluída com sucesso!'),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      const SnackBar(content: Text('Erro ao excluir nota')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate() &&
-                    newValue != null &&
-                    newPeriodId != null &&
-                    newGradeTypeId != null) {
-                  final dialogContext = context;
-                  try {
-                    await GradeService.updateGrade(
-                      gradeId: grade.id,
-                      value: newValue,
-                      typeId: newGradeTypeId,
-                      periodId: newPeriodId,
-                    );
-                    if (dialogContext.mounted) {
-                      Navigator.pop(dialogContext);
-                    }
-                    setState(() {}); // Atualiza a tela
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(
-                          content: Text('Nota atualizada com sucesso!'),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(content: Text('Erro ao atualizar nota')),
-                      );
-                    }
-                  }
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -1444,7 +1653,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final formKey = GlobalKey<FormState>();
     double? value;
     String? gradeTypeId;
-    String? subjectId = subject != null ? subject['id'] as String : null;
+
+    // Para disciplinas agrupadas, usar o primeiro ID relacionado
+    String? subjectId;
+    if (subject != null) {
+      final relatedIds = subject['relatedSubjectIds'] as List<String>?;
+      if (relatedIds != null && relatedIds.isNotEmpty) {
+        subjectId = relatedIds.first;
+      } else {
+        subjectId = subject['id'] as String;
+      }
+    }
     // Aguarda carregar os períodos, se necessário
     if (periods.isEmpty) {
       await _fetchPeriods();
@@ -1471,6 +1690,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       }
     }
     bool loadingTypes = true;
+    List<Map<String, dynamic>> gradeTypes = [];
     await showDialog(
       // ignore: use_build_context_synchronously
       context: context,
@@ -1478,11 +1698,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             if (loadingTypes) {
-              GradeTypeService.getAllGradeTypes().then((types) {
-                setState(() {
-                  loadingTypes = false;
-                });
-              });
+              GradeTypeService.getAllGradeTypes()
+                  .then((types) {
+                    setState(() {
+                      gradeTypes = types;
+                      loadingTypes = false;
+                    });
+                  })
+                  .catchError((error) {
+                    setState(() {
+                      loadingTypes = false;
+                      // Fallback para tipos padrão se a API falhar
+                      gradeTypes = [
+                        {'id': 'PROVA_1', 'name': 'Prova 1'},
+                        {'id': 'PROVA_2', 'name': 'Prova 2'},
+                      ];
+                    });
+                  });
               return const Center(child: CircularProgressIndicator());
             }
             // Garante que o Dropdown de período sempre tem valor inicial válido
@@ -1518,24 +1750,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     ),
                     DropdownButtonFormField<String>(
                       value: gradeTypeId,
-                      items: [
-                        DropdownMenuItem(
-                          value: 'PROVA_1',
-                          child: Text('Prova 1'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'PROVA_2',
-                          child: Text('Prova 2'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'RECUPERACAO',
-                          child: Text('Recuperação'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'RECUPERACAO_FINAL',
-                          child: Text('Recuperação Final'),
-                        ),
-                      ],
+                      items:
+                          gradeTypes
+                              .map<DropdownMenuItem<String>>(
+                                (type) => DropdownMenuItem<String>(
+                                  value: type['id'] as String,
+                                  child: Text(type['name'] as String),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (v) => gradeTypeId = v, // Sempre habilitado
                       decoration: const InputDecoration(
                         labelText: 'Tipo de Nota',
@@ -1587,14 +1810,49 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         subjectId != null &&
                         periodId != null) {
                       final dialogContext = context;
+
+                      // Verificar se já existe uma nota do mesmo tipo no mesmo bimestre
+                      // Para disciplinas agrupadas, verificar em todas as disciplinas relacionadas
+                      List<String> subjectIdsToCheck = [subjectId!];
+                      if (subject != null) {
+                        final relatedIds =
+                            subject['relatedSubjectIds'] as List<String>?;
+                        if (relatedIds != null && relatedIds.isNotEmpty) {
+                          subjectIdsToCheck = relatedIds;
+                        }
+                      }
+
+                      final existingGrade =
+                          await _checkExistingGradeInMultipleSubjects(
+                            subjectIds: subjectIdsToCheck,
+                            typeId: gradeTypeId!,
+                            periodId: periodId!,
+                          );
+
+                      if (existingGrade != null) {
+                        // Mostrar aviso ao usuário
+                        if (dialogContext.mounted) {
+                          final shouldReplace = await _showReplaceGradeDialog(
+                            context: dialogContext,
+                            existingGrade: existingGrade,
+                            gradeTypeName: _getGradeTypeNameById(gradeTypeId!),
+                            periodName: _getPeriodNameById(periodId!),
+                          );
+
+                          if (!shouldReplace) {
+                            return; // Usuário cancelou
+                          }
+                        }
+                      }
+
                       try {
-                        await GradeService.createGrade(
-                          studentId: widget.student.id,
-                          subjectId: subjectId!,
-                          typeId: gradeTypeId!,
-                          periodId: periodId!,
-                          value: value!,
-                        );
+                        await GradeService.createGrade({
+                          'studentId': widget.student.id,
+                          'subjectId': subjectId!,
+                          'typeId': gradeTypeId!,
+                          'periodId': periodId!,
+                          'value': value!,
+                        });
                         if (dialogContext.mounted) {
                           Navigator.pop(dialogContext);
                         }
@@ -1607,17 +1865,21 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           );
                         }
                       } catch (e) {
-                        if (e is http.Response) {
-                          debugPrint(
-                            'Erro ao lançar nota: statusCode=${e.statusCode}, body=${e.body}',
-                          );
-                        } else {
-                          debugPrint('Erro ao lançar nota: $e');
-                        }
+                        debugPrint('Erro ao lançar nota: $e');
+                        debugPrint('Dados enviados:');
+                        debugPrint('  studentId: ${widget.student.id}');
+                        debugPrint('  subjectId: $subjectId');
+                        debugPrint('  typeId: $gradeTypeId');
+                        debugPrint('  periodId: $periodId');
+                        debugPrint('  value: $value');
+
                         if (dialogContext.mounted) {
                           ScaffoldMessenger.of(dialogContext).showSnackBar(
-                            const SnackBar(
-                              content: Text('Erro ao lançar nota'),
+                            SnackBar(
+                              content: Text(
+                                'Erro ao lançar nota: ${e.toString()}',
+                              ),
+                              backgroundColor: Colors.red,
                             ),
                           );
                         }
@@ -1637,14 +1899,37 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   List<Map<String, dynamic>> _getUniqueSubjectsFromEnrollments(
     List enrollments,
   ) {
-    final subjectIds = <String>{};
+    final subjectTypes = <String>{};
     List<Map<String, dynamic>> uniqueSubjects = [];
+
     for (var enrollment in enrollments) {
       if (enrollment['class']?['subjects'] != null) {
         for (var s in enrollment['class']['subjects']) {
-          if (s['id'] != null && !subjectIds.contains(s['id'])) {
-            subjectIds.add(s['id']);
-            uniqueSubjects.add(s);
+          final subjectType = s['type'] ?? s['name'] ?? '';
+
+          // Agrupar por tipo de disciplina ao invés de ID
+          // Isso evita duplicatas quando há múltiplos professores para a mesma matéria
+          if (subjectType.isNotEmpty && !subjectTypes.contains(subjectType)) {
+            subjectTypes.add(subjectType);
+
+            // Criar um objeto disciplina agrupado
+            final groupedSubject = Map<String, dynamic>.from(s);
+            groupedSubject['groupedType'] = subjectType;
+
+            // Coletar todos os IDs das disciplinas do mesmo tipo para buscar notas
+            List<String> relatedSubjectIds = [];
+            for (var enrollment2 in enrollments) {
+              if (enrollment2['class']?['subjects'] != null) {
+                for (var s2 in enrollment2['class']['subjects']) {
+                  if ((s2['type'] ?? s2['name'] ?? '') == subjectType) {
+                    relatedSubjectIds.add(s2['id']);
+                  }
+                }
+              }
+            }
+            groupedSubject['relatedSubjectIds'] = relatedSubjectIds;
+
+            uniqueSubjects.add(groupedSubject);
           }
         }
       }
@@ -1668,10 +1953,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               if (snapshot.hasError) {
                 return const Text('Erro ao carregar notas');
               }
+              // Usar todos os IDs relacionados para buscar notas de todas as disciplinas do mesmo tipo
+              final relatedSubjectIds =
+                  subject['relatedSubjectIds'] as List<String>? ??
+                  [subject['id']];
               final grades =
                   (snapshot.data ?? [])
-                      .where((g) => g['subjectId'] == subject['id'])
+                      .where((g) => relatedSubjectIds.contains(g['subjectId']))
                       .toList();
+
+              // Debug: verificar estrutura dos dados
+              if (grades.isNotEmpty) {
+                debugPrint('Estrutura da primeira nota:');
+                debugPrint('${grades.first}');
+                debugPrint('TypeId: ${grades.first['typeId']}');
+                debugPrint('GradeTypeId: ${grades.first['gradeTypeId']}');
+                debugPrint('Type object: ${grades.first['type']}');
+              }
               if (grades.isEmpty) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1691,7 +1989,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               }
               final gradesByPeriod = <String, List<Map<String, dynamic>>>{};
               for (final g in grades) {
-                final periodId = g['periodId'] ?? '-';
+                final periodId = g['periodId']?.toString() ?? 'sem-periodo';
                 gradesByPeriod.putIfAbsent(periodId, () => []).add(g);
               }
               return SingleChildScrollView(
@@ -1705,7 +2003,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 12, bottom: 4),
                             child: Text(
-                              'Bimestre: ${periods.firstWhere((p) => p['id'] == periodId, orElse: () => <String, dynamic>{})['name'] ?? periodId}',
+                              'Bimestre: ${periods.firstWhere((p) => p['id'] == periodId, orElse: () => {'name': periodId})['name'] ?? periodId}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -1715,9 +2013,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           ),
                           ...gradesByPeriod[periodId]!.map((g) {
                             return ListTile(
-                              title: Text('Nota:  ${g['value']}'),
+                              title: Text('Nota:  ${g['value'] ?? 'N/A'}'),
                               subtitle: Text(
-                                'Tipo:  ${getGradeTypeName(g['gradeTypeId'])}',
+                                'Tipo:  ${_getGradeTypeDisplayName(g)}',
                               ),
                               trailing: IconButton(
                                 icon: const Icon(
@@ -1728,14 +2026,21 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                   Navigator.pop(context);
                                   _showEditGradeDialog(
                                     Grade(
-                                      id: g['id'],
-                                      value: g['value'].toDouble(),
-                                      gradeTypeId: g['gradeTypeId'],
-                                      periodId: g['periodId'],
-                                      subjectId: g['subjectId'],
-                                      studentId: g['studentId'],
-                                      createdAt: DateTime.parse(g['createdAt']),
-                                      updatedAt: DateTime.parse(g['updatedAt']),
+                                      id: g['id'] ?? '',
+                                      value: (g['value'] ?? 0.0).toDouble(),
+                                      gradeTypeId:
+                                          g['typeId'] ?? g['gradeTypeId'] ?? '',
+                                      periodId: g['periodId'] ?? '',
+                                      subjectId: g['subjectId'] ?? '',
+                                      studentId: g['studentId'] ?? '',
+                                      createdAt:
+                                          g['createdAt'] != null
+                                              ? DateTime.parse(g['createdAt'])
+                                              : DateTime.now(),
+                                      updatedAt:
+                                          g['updatedAt'] != null
+                                              ? DateTime.parse(g['updatedAt'])
+                                              : DateTime.now(),
                                     ),
                                   );
                                 },
@@ -1770,19 +2075,185 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  String getGradeTypeName(String id) {
+  String _getGradeTypeDisplayName(Map<String, dynamic> grade) {
+    // 1. Verificar se há o objeto 'type' populado
+    if (grade['type'] != null && grade['type']['name'] != null) {
+      return grade['type']['name'];
+    }
+
+    // 2. Verificar typeId específicos
+    final typeId = grade['typeId'] ?? grade['gradeTypeId'];
+    if (typeId != null && typeId.isNotEmpty) {
+      return getGradeTypeName(typeId);
+    }
+
+    // 3. Fallback baseado na posição da nota (para notas antigas sem tipo)
+    return 'Avaliação';
+  }
+
+  String getGradeTypeName(String? id) {
+    // Se o ID está vazio ou nulo, tentar inferir um tipo padrão
+    if (id == null || id.isEmpty) {
+      return 'Avaliação';
+    }
+
     switch (id) {
       case 'PROVA_1':
         return 'Prova 1';
       case 'PROVA_2':
         return 'Prova 2';
-      case 'RECUPERACAO':
-        return 'Recuperação';
-      case 'RECUPERACAO_FINAL':
-        return 'Recuperação Final';
+      // Possíveis IDs da API (caso sejam UUIDs)
       default:
+        // Se for um UUID, tentar descobrir o tipo pela API ou usar um nome genérico
+        if (id.length > 10) {
+          return 'Avaliação';
+        }
         return id;
     }
+  }
+
+  // Função para verificar se já existe uma nota do mesmo tipo no mesmo bimestre
+  Future<Map<String, dynamic>?> _checkExistingGrade({
+    required String subjectId,
+    required String typeId,
+    required String periodId,
+  }) async {
+    try {
+      final grades = await GradeService.getGradesByStudent(widget.student.id);
+
+      // Procurar por uma nota existente com os mesmos critérios
+      for (final grade in grades) {
+        if (grade['subjectId'] == subjectId &&
+            (grade['typeId'] == typeId || grade['gradeTypeId'] == typeId) &&
+            grade['periodId'] == periodId) {
+          return grade;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erro ao verificar nota existente: $e');
+      return null;
+    }
+  }
+
+  // Função para verificar se já existe uma nota do mesmo tipo no mesmo bimestre em múltiplas disciplinas
+  Future<Map<String, dynamic>?> _checkExistingGradeInMultipleSubjects({
+    required List<String> subjectIds,
+    required String typeId,
+    required String periodId,
+  }) async {
+    try {
+      final grades = await GradeService.getGradesByStudent(widget.student.id);
+
+      // Procurar por uma nota existente com os mesmos critérios em qualquer das disciplinas relacionadas
+      for (final grade in grades) {
+        if (subjectIds.contains(grade['subjectId']) &&
+            (grade['typeId'] == typeId || grade['gradeTypeId'] == typeId) &&
+            grade['periodId'] == periodId) {
+          return grade;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erro ao verificar nota existente: $e');
+      return null;
+    }
+  }
+
+  // Função para obter o nome do tipo de nota pelo ID
+  String _getGradeTypeNameById(String typeId) {
+    switch (typeId) {
+      case 'PROVA_1':
+        return 'Prova 1';
+      case 'PROVA_2':
+        return 'Prova 2';
+      case 'TRABALHO':
+        return 'Trabalho';
+      default:
+        return typeId;
+    }
+  }
+
+  // Função para obter o nome do período pelo ID
+  String _getPeriodNameById(String periodId) {
+    final period = periods.firstWhere(
+      (p) => p['id'] == periodId,
+      orElse: () => {'name': 'Período'},
+    );
+    return period['name'] ?? 'Período';
+  }
+
+  // Dialog para confirmar substituição da nota existente
+  Future<bool> _showReplaceGradeDialog({
+    required BuildContext context,
+    required Map<String, dynamic> existingGrade,
+    required String gradeTypeName,
+    required String periodName,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Nota já existe'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Já existe uma nota do tipo "$gradeTypeName" no $periodName para esta disciplina.',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Nota atual:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Valor: ${existingGrade['value'] ?? 'N/A'}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Deseja substituir a nota existente pela nova nota?',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Substituir'),
+              ),
+            ],
+          ),
+    );
+
+    return result ?? false;
   }
 
   String _formatClassLabel(Map classData) {
@@ -1793,5 +2264,412 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     return [name, year, shift]
         .where((e) => e != null && e.toString().isNotEmpty && e != 'null')
         .join(' - ');
+  }
+
+  // Função para filtrar frequências por matéria e aplicar limitação
+  List<Map<String, dynamic>> _getFilteredAttendances() {
+    if (_studentDetails == null || _studentDetails!['attendances'] == null) {
+      return [];
+    }
+
+    List<Map<String, dynamic>> attendances = List<Map<String, dynamic>>.from(
+      _studentDetails!['attendances'],
+    );
+
+    // Filtrar por matéria selecionada
+    if (selectedSubjectIdForAttendance != null) {
+      // Obter IDs relacionados para a matéria selecionada
+      final relatedSubjectIds = _getRelatedSubjectIds(
+        selectedSubjectIdForAttendance!,
+      );
+
+      attendances =
+          attendances.where((attendance) {
+            final lesson = _lessonsById?[attendance['lessonId']];
+            return lesson != null &&
+                relatedSubjectIds.contains(lesson['subjectId']);
+          }).toList();
+    }
+
+    // Ordenar por data (mais recente primeiro)
+    attendances.sort((a, b) {
+      final lessonA = _lessonsById?[a['lessonId']];
+      final lessonB = _lessonsById?[b['lessonId']];
+
+      if (lessonA?['date'] == null || lessonB?['date'] == null) {
+        return 0;
+      }
+
+      final dateA = DateTime.parse(lessonA['date']);
+      final dateB = DateTime.parse(lessonB['date']);
+      return dateB.compareTo(dateA);
+    });
+
+    // Aplicar limitação de quantidade
+    if (!showAllAttendances && attendances.length > maxAttendancesToShow) {
+      return attendances.take(maxAttendancesToShow).toList();
+    }
+
+    return attendances;
+  }
+
+  // Função para verificar se deve mostrar o botão "Ver mais"
+  bool _shouldShowMoreButton() {
+    final totalAttendances = _getTotalFilteredAttendances();
+    return !showAllAttendances && totalAttendances > maxAttendancesToShow;
+  }
+
+  // Função para obter o total de frequências filtradas
+  int _getTotalFilteredAttendances() {
+    if (_studentDetails == null || _studentDetails!['attendances'] == null) {
+      return 0;
+    }
+
+    List<Map<String, dynamic>> attendances = List<Map<String, dynamic>>.from(
+      _studentDetails!['attendances'],
+    );
+
+    // Aplicar filtro por matéria
+    if (selectedSubjectIdForAttendance != null) {
+      // Obter IDs relacionados para a matéria selecionada
+      final relatedSubjectIds = _getRelatedSubjectIds(
+        selectedSubjectIdForAttendance!,
+      );
+
+      attendances =
+          attendances.where((attendance) {
+            final lesson = _lessonsById?[attendance['lessonId']];
+            return lesson != null &&
+                relatedSubjectIds.contains(lesson['subjectId']);
+          }).toList();
+    }
+
+    return attendances.length;
+  }
+
+  // Função para obter IDs relacionados de uma disciplina
+  List<String> _getRelatedSubjectIds(String selectedValue) {
+    if (_studentDetails == null || _studentDetails!['enrollments'] == null) {
+      return [selectedValue];
+    }
+
+    // Buscar pela disciplina agrupada
+    final uniqueSubjects = _getUniqueSubjectsFromEnrollments(
+      (_studentDetails!['enrollments'] as List)
+          .where(
+            (e) =>
+                selectedClassId == null || e['class']['id'] == selectedClassId,
+          )
+          .toList(),
+    );
+
+    for (final subject in uniqueSubjects) {
+      if (subject['groupedType'] == selectedValue ||
+          subject['id'] == selectedValue) {
+        final relatedIds = subject['relatedSubjectIds'] as List<String>?;
+        return relatedIds ?? [subject['id']];
+      }
+    }
+
+    return [selectedValue];
+  }
+
+  // Função para mostrar dialog de edição de frequência
+  void _showEditAttendanceDialog(Map<String, dynamic> attendance) {
+    final lesson = _lessonsById?[attendance['lessonId']];
+    String currentStatus =
+        attendance['status'] ??
+        (attendance['present'] == true ? 'PRESENT' : 'ABSENT');
+    String currentJustification = attendance['justification'] ?? '';
+
+    final formKey = GlobalKey<FormState>();
+    final justificationController = TextEditingController(
+      text: currentJustification,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Editar Frequência'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Informações da aula
+                    Text(
+                      'Aula: ${lesson?['subject']?['name'] ?? 'Disciplina'}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Data: ${lesson?['date'] != null ? _formatDate(lesson['date']) : 'N/A'}',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Dropdown para status
+                    DropdownButtonFormField<String>(
+                      value: currentStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Status da Frequência',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'PRESENT',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text('Presente'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ABSENT',
+                          child: Row(
+                            children: [
+                              Icon(Icons.cancel, color: Colors.red, size: 20),
+                              SizedBox(width: 8),
+                              Text('Ausente'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'JUSTIFIED_ABSENT',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.assignment_late,
+                                color: Colors.orange,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text('Falta Justificada'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          currentStatus = value!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Campo de justificativa (habilitado apenas para falta justificada)
+                    TextFormField(
+                      controller: justificationController,
+                      decoration: InputDecoration(
+                        labelText: 'Justificativa',
+                        hintText:
+                            currentStatus == 'JUSTIFIED_ABSENT'
+                                ? 'Descreva o motivo da falta...'
+                                : 'Justificativa não necessária',
+                        border: const OutlineInputBorder(),
+                        enabled: currentStatus == 'JUSTIFIED_ABSENT',
+                      ),
+                      maxLines: 3,
+                      validator: (value) {
+                        if (currentStatus == 'JUSTIFIED_ABSENT' &&
+                            (value == null || value.trim().isEmpty)) {
+                          return 'Justificativa é obrigatória para falta justificada';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState!.validate()) {
+                      await _updateAttendance(
+                        attendance['id'],
+                        currentStatus,
+                        currentStatus == 'JUSTIFIED_ABSENT'
+                            ? justificationController.text.trim()
+                            : null,
+                      );
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Função para mostrar dialog de confirmação de exclusão
+  void _showDeleteAttendanceDialog(Map<String, dynamic> attendance) {
+    final lesson = _lessonsById?[attendance['lessonId']];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Excluir Frequência'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Tem certeza que deseja excluir esta frequência?'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Disciplina: ${lesson?['subject']?['name'] ?? 'N/A'}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Data: ${lesson?['date'] != null ? _formatDate(lesson['date']) : 'N/A'}',
+                    ),
+                    Text(
+                      'Status: ${_getStatusDisplayName(attendance['status'] ?? (attendance['present'] == true ? 'PRESENT' : 'ABSENT'))}',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Esta ação não pode ser desfeita.',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _deleteAttendance(attendance['id']);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Função para atualizar frequência
+  Future<void> _updateAttendance(
+    String attendanceId,
+    String status,
+    String? justification,
+  ) async {
+    try {
+      final response = await http.put(
+        Uri.parse('http://192.168.18.15:3000/attendances/$attendanceId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'status': status,
+          'justification': justification,
+          // Manter compatibilidade com campo antigo
+          'present': status == 'PRESENT',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Recarregar dados do estudante
+        await _fetchStudentDetails();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Frequência atualizada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Erro ao atualizar frequência: ${response.body}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar frequência: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Função para excluir frequência
+  Future<void> _deleteAttendance(String attendanceId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('http://192.168.18.15:3000/attendances/$attendanceId'),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // Recarregar dados do estudante
+        await _fetchStudentDetails();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Frequência excluída com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Erro ao excluir frequência');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao excluir frequência: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Função auxiliar para obter nome do status
+  String _getStatusDisplayName(String status) {
+    switch (status) {
+      case 'PRESENT':
+        return 'Presente';
+      case 'JUSTIFIED_ABSENT':
+        return 'Falta Justificada';
+      case 'ABSENT':
+        return 'Ausente';
+      default:
+        return status;
+    }
   }
 }

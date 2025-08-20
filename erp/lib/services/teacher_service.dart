@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class TeacherService {
-  static const String baseUrl = 'http://192.168.18.15:3000';
+  // URL base da API - agora centralizada
+  static String get baseUrl => ApiConfig.baseUrl;
 
   static Future<List<Map<String, dynamic>>> getAllTeachers() async {
-    final response = await http.get(Uri.parse('$baseUrl/teachers'));
+    final response = await http.get(Uri.parse(ApiConfig.getTeachersUrl('')));
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
@@ -18,7 +20,7 @@ class TeacherService {
   static Future<Map<String, dynamic>> getTeacherById(String id) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/teachers/$id'),
+        Uri.parse(ApiConfig.getTeachersUrl('/$id')),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -38,7 +40,7 @@ class TeacherService {
     Map<String, dynamic> data,
   ) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/teachers/$id'),
+      Uri.parse(ApiConfig.getTeachersUrl('/$id')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
@@ -57,89 +59,81 @@ class TeacherService {
     String id,
     String photoUrl,
   ) async {
+    final response = await http.put(
+      Uri.parse(ApiConfig.getTeachersUrl('/$id/photo')),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'photoUrl': photoUrl}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Map<String, dynamic>.from(data);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'Erro ao atualizar foto do professor');
+    }
+  }
+
+  // Buscar turmas de um professor
+  static Future<List<Map<String, dynamic>>> getTeacherClasses(
+    String teacherId,
+  ) async {
     try {
-      final response = await http.put(
-        Uri.parse('$baseUrl/teachers/$id'),
+      final response = await http.get(
+        Uri.parse(ApiConfig.getTeachersUrl('/$teacherId/classes')),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'photoUrl': photoUrl}),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return Map<String, dynamic>.from(data);
+        final List data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(
-          error['error'] ?? 'Erro ao atualizar foto do professor',
-        );
+        throw Exception('Erro ao buscar turmas do professor');
       }
     } catch (e) {
       throw Exception('Erro de conexão: $e');
     }
   }
 
-  // Buscar dados atualizados do professor
-  static Future<Map<String, dynamic>> refreshTeacherData(String id) async {
-    return await getTeacherById(id);
-  }
-
-  static Future<List<Map<String, dynamic>>> getTeacherClasses(
-    String teacherId,
-  ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/teachers/$teacherId/classes'),
-    );
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
-    } else {
-      throw Exception('Erro ao buscar turmas do professor');
-    }
-  }
-
-  static Future<List<Map<String, dynamic>>> getClassStudents(
-    String classId,
-  ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/classes/$classId/students'),
-    );
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
-    } else {
-      throw Exception('Erro ao buscar alunos da turma');
-    }
-  }
-
-  static Future<List<Map<String, dynamic>>> getSubjectsByClassId(
-    String classId,
-  ) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/subjects/class/$classId'),
-    );
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(data);
-    } else {
-      throw Exception('Erro ao buscar disciplinas da turma');
-    }
-  }
-
-  // Buscar disciplinas de uma turma que são lecionadas por um professor específico
+  // Buscar disciplinas de uma turma por professor
   static Future<List<Map<String, dynamic>>> getSubjectsByClassIdAndTeacher(
     String classId,
     String teacherId,
   ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/subjects/class/$classId/teacher/$teacherId'),
+        Uri.parse(
+          ApiConfig.getTeachersUrl('/$teacherId/classes/$classId/subjects'),
+        ),
+        headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return List<Map<String, dynamic>>.from(data);
       } else {
-        throw Exception('Erro ao buscar disciplinas do professor na turma');
+        throw Exception('Erro ao buscar disciplinas da turma');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
+  }
+
+  // Buscar alunos de uma turma
+  static Future<List<Map<String, dynamic>>> getClassStudents(
+    String classId,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getClassesUrl('/$classId/students')),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception('Erro ao buscar alunos da turma');
       }
     } catch (e) {
       throw Exception('Erro de conexão: $e');

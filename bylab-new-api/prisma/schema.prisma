@@ -144,12 +144,18 @@ model Lesson {
 }
 
 model Attendance {
-  id        String  @id @default(uuid())
-  studentId String
-  lessonId  String
-  present   Boolean
-  lesson    Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id           String          @id @default(uuid())
+  studentId    String
+  lessonId     String
+  status       AttendanceStatus @default(PRESENT)
+  justification String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  lesson       Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student      Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  // Manter compatibilidade com o campo antigo
+  present      Boolean         @default(true)
 }
 
 model GradePeriod {
@@ -259,4 +265,10 @@ enum SubjectType {
   FILOSOFIA
   SOCIOLOGIA
   CONTEUDO_INTERDISCIPLINAR
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  JUSTIFIED_ABSENT
 }

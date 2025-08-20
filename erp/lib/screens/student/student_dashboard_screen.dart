@@ -403,13 +403,82 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     }
   }
 
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.help_outline, color: Color(0xFF2953A5)),
+                SizedBox(width: 8),
+                Text('Ajuda'),
+              ],
+            ),
+            content: const SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Como usar o app:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 16),
+                  Text('📚 Dashboard:'),
+                  Text('• Visualize suas turmas e notas atuais'),
+                  Text('• Acompanhe sua frequência'),
+                  Text('• Veja as aulas do dia'),
+                  SizedBox(height: 12),
+                  Text('🎓 Turmas:'),
+                  Text('• Acesse detalhes de cada turma'),
+                  Text('• Veja disciplinas e professores'),
+                  Text('• Consulte atividades e notas'),
+                  SizedBox(height: 12),
+                  Text('📅 Calendário:'),
+                  Text('• Visualize seu cronograma de aulas'),
+                  Text('• Acompanhe eventos acadêmicos'),
+                  Text('• Planeje seus estudos'),
+                  SizedBox(height: 12),
+                  Text('⚙️ Dicas:'),
+                  Text('• Mantenha seu perfil atualizado'),
+                  Text('• Verifique suas notas regularmente'),
+                  Text('• Acompanhe sua frequência'),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Entendi'),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Sair'),
-          content: const Text('Tem certeza que deseja sair da aplicação?'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Confirmar Saída'),
+            ],
+          ),
+          content: const Text(
+            'Tem certeza que deseja sair da sua conta?\n\n'
+            'Você será redirecionado para a tela de login.',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -423,7 +492,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 _logout();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Sair'),
@@ -442,13 +511,110 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     // Não precisamos navegar manualmente
   }
 
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.settings, color: Color(0xFF2953A5)),
+                SizedBox(width: 8),
+                Text('Configurações'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Perfil:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2953A5),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.person, color: Color(0xFF2953A5)),
+                    title: const Text('Editar Perfil'),
+                    subtitle: const Text('Atualizar dados pessoais e foto'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _showEditProfileDialog();
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Preferências:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2953A5),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const ListTile(
+                    leading: Icon(Icons.notifications, color: Colors.orange),
+                    title: Text('Notificações'),
+                    subtitle: Text('Ativado'),
+                  ),
+                  const ListTile(
+                    leading: Icon(Icons.color_lens, color: Colors.purple),
+                    title: Text('Tema'),
+                    subtitle: Text('Claro'),
+                  ),
+                  const ListTile(
+                    leading: Icon(Icons.language, color: Colors.green),
+                    title: Text('Idioma'),
+                    subtitle: Text('Português'),
+                  ),
+                  const ListTile(
+                    leading: Icon(Icons.refresh, color: Colors.blue),
+                    title: Text('Sincronização'),
+                    subtitle: Text('Ativado'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Fechar'),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _showEditProfileDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Editar Perfil'),
-          content: const Text('Funcionalidade em desenvolvimento...'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.person, color: Color(0xFF2953A5)),
+              SizedBox(width: 8),
+              Text('Editar Perfil'),
+            ],
+          ),
+          content: const Text(
+            'A funcionalidade de edição de perfil para estudantes estará disponível em breve!\n\n'
+            'Em futuras atualizações você poderá:\n'
+            '• Alterar sua foto de perfil\n'
+            '• Atualizar informações pessoais\n'
+            '• Configurar preferências',
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -554,6 +720,19 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             onTap: () => setState(() => _selectedIndex = 2),
           ),
           const Spacer(),
+          const Divider(color: Colors.white54, indent: 16, endIndent: 16),
+          _SidebarButton(
+            icon: Icons.help_outline,
+            label: 'Ajuda',
+            selected: false,
+            onTap: _showHelpDialog,
+          ),
+          _SidebarButton(
+            icon: Icons.settings,
+            label: 'Configurações',
+            selected: false,
+            onTap: _showSettingsDialog,
+          ),
           _SidebarButton(
             icon: Icons.logout,
             label: 'Sair',
@@ -571,10 +750,22 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       title: Text(_getPageTitle()),
       backgroundColor: const Color(0xFF2953A5),
       foregroundColor: Colors.white,
+      elevation: 0,
       actions: [
         IconButton(
-          icon: const Icon(Icons.logout),
+          icon: const Icon(Icons.help_outline, color: Colors.white),
+          onPressed: _showHelpDialog,
+          tooltip: 'Ajuda',
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings, color: Colors.white),
+          onPressed: _showSettingsDialog,
+          tooltip: 'Configurações',
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout, color: Colors.white),
           onPressed: _showLogoutDialog,
+          tooltip: 'Sair',
         ),
       ],
     );

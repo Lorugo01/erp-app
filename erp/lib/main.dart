@@ -9,6 +9,7 @@ import 'screens/teacher/teacher_dashboard_screen.dart';
 import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'config/environment.dart';
+import 'config/app_config.dart';
 
 void main() async {
   // Inicializar dados de localização para formatação de datas
@@ -16,6 +17,18 @@ void main() async {
 
   // Configurar ambiente de desenvolvimento
   EnvironmentConfig.setEnvironment(Environment.development);
+
+  // Imprimir configurações atuais para debug
+  AppConfig.printCurrentConfig();
+
+  // Validar configurações
+  final configErrors = AppConfig.validateConfig();
+  if (configErrors.isNotEmpty) {
+    debugPrint('❌ ERROS DE CONFIGURAÇÃO:');
+    for (final error in configErrors) {
+      debugPrint('   - $error');
+    }
+  }
 
   runApp(const MyApp());
 }

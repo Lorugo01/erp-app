@@ -44,7 +44,9 @@ export const getAttendanceById = async (id: string) => {
 export const createAttendance = async (data: {
   studentId: string;
   lessonId: string;
-  present: boolean;
+  status?: string;
+  justification?: string;
+  present?: boolean; // Para compatibilidade
 }) => {
   // 1. Buscar a aula
   const lesson = await prisma.lesson.findUnique({
@@ -69,14 +71,28 @@ export const createAttendance = async (data: {
     throw new Error('Aluno não está matriculado atualmente na turma desta aula');
   }
 
-  // 3. Criar presença
-  return prisma.attendance.create({ data });
+  // 3. Preparar dados para criação
+  const createData: any = {
+    studentId: data.studentId,
+    lessonId: data.lessonId,
+    status: data.status || (data.present === true ? 'PRESENT' : 'ABSENT'),
+    justification: data.justification,
+    present: data.present !== undefined ? data.present : (data.status === 'PRESENT')
+  };
+
+  // 4. Criar presença
+  return prisma.attendance.create({ data: createData });
 };
 
 // 4. Criar presença em massa
 export const createBulkAttendance = async (data: {
   lessonId: string;
-  presences: { studentId: string; present: boolean }[];
+  presences: { 
+    studentId: string; 
+    present?: boolean; 
+    status?: string; 
+    justification?: string; 
+  }[];
 }) => {
   const lesson = await prisma.lesson.findUnique({
     where: { id: data.lessonId },
@@ -86,6 +102,11 @@ export const createBulkAttendance = async (data: {
   if (!lesson) throw new Error('Aula não encontrada');
 
   const created = [];
+
+  // Primeiro, deletar attendances existentes para esta aula
+  await prisma.attendance.deleteMany({
+    where: { lessonId: data.lessonId }
+  });
 
   for (const p of data.presences) {
     const isEnrolled = await prisma.enrollment.findFirst({
@@ -100,12 +121,17 @@ export const createBulkAttendance = async (data: {
       throw new Error(`Aluno ${p.studentId} não está matriculado atualmente na turma desta aula`);
     }
 
+    // Preparar dados para criação
+    const createData: any = {
+      lessonId: data.lessonId,
+      studentId: p.studentId,
+      status: p.status || (p.present === true ? 'PRESENT' : 'ABSENT'),
+      justification: p.justification,
+      present: p.present !== undefined ? p.present : (p.status === 'PRESENT')
+    };
+
     const attendance = await prisma.attendance.create({
-      data: {
-        lessonId: data.lessonId,
-        studentId: p.studentId,
-        present: p.present
-      }
+      data: createData
     });
 
     created.push(attendance);
@@ -115,11 +141,28 @@ export const createBulkAttendance = async (data: {
 };
 
 export const updateAttendance = async (id: string, data: Partial<{
-  present: boolean;
+  present?: boolean;
+  status?: string;
+  justification?: string;
 }>) => {
+  // Preparar dados para atualização
+  const updateData: any = {};
+  
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+    updateData.present = data.status === 'PRESENT';
+  } else if (data.present !== undefined) {
+    updateData.present = data.present;
+    updateData.status = data.present ? 'PRESENT' : 'ABSENT';
+  }
+  
+  if (data.justification !== undefined) {
+    updateData.justification = data.justification;
+  }
+
   return prisma.attendance.update({
     where: { id },
-    data,
+    data: updateData,
     include: {
       student: true,
       lesson: {
