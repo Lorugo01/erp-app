@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../services/teacher_service.dart';
+import '../../providers/auth_provider.dart';
 
 class ClassTeachersScreen extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -24,9 +26,19 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
   Future<void> _fetchSubjects() async {
     setState(() => _loading = true);
     final classId = widget.classData['id'];
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
     try {
       final response = await http.get(
         Uri.parse('http://192.168.18.15:3000/classes/$classId'),
+        headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
@@ -39,7 +51,20 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
   }
 
   void _showAddTeacherToClassDialog() async {
-    final professores = await TeacherService.getAllTeachers();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Token de autenticação não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final professores = await TeacherService.getAllTeachers(token: token);
     // Filtrar professores já vinculados à turma
     final idsVinculados = _subjects.map((s) => s['teacherId']).toSet();
     final professoresDisponiveis =
@@ -146,6 +171,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
+                                      'Authorization': 'Bearer $token',
                                     },
                                     body: jsonEncode({
                                       'type': subjectType,
@@ -184,6 +210,18 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     required Map<String, dynamic> teacher,
     required List<Map<String, dynamic>> currentSubjects,
   }) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Token de autenticação não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     final subjectTypes = [
       'LINGUA_INGLESA',
       'ARTE',
@@ -481,6 +519,9 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                       Uri.parse(
                                         'http://192.168.18.15:3000/subjects/$subjectId',
                                       ),
+                                      headers: {
+                                        'Authorization': 'Bearer $token',
+                                      },
                                     );
                                     if (response.statusCode == 200 ||
                                         response.statusCode == 204) {
@@ -496,6 +537,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                       ),
                                       headers: {
                                         'Content-Type': 'application/json',
+                                        'Authorization': 'Bearer $token',
                                       },
                                       body: jsonEncode({
                                         'type': subjectType,

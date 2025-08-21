@@ -1,4 +1,4 @@
-enum Role { admin, student, teacher }
+enum Role { developer, admin, student, teacher }
 
 class Student {
   final String id;
@@ -58,6 +58,8 @@ class User {
   final Student? student;
   final Teacher? teacher;
   final DateTime createdAt;
+  final String? token;
+  final String? schoolId;
 
   User({
     required this.id,
@@ -67,6 +69,8 @@ class User {
     this.student,
     this.teacher,
     required this.createdAt,
+    this.token,
+    this.schoolId,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -87,6 +91,8 @@ class User {
       createdAt: json['createdAt'] != null 
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
           : DateTime.now(),
+      token: json['token'],
+      schoolId: json['schoolId'],
     );
   }
 
@@ -99,6 +105,8 @@ class User {
       'student': student?.toJson(),
       'teacher': teacher?.toJson(),
       'createdAt': createdAt.toIso8601String(),
+      'token': token,
+      'schoolId': schoolId,
     };
   }
 
@@ -108,6 +116,7 @@ class User {
     return email;
   }
 
+  bool get isDeveloper => role == Role.developer;
   bool get isAdmin => role == Role.admin;
   bool get isStudent => role == Role.student;
   bool get isTeacher => role == Role.teacher;

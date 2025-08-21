@@ -4,9 +4,19 @@ import { renameStudentPhoto } from '../middlewares/upload.middleware';
 import path from 'path';
 import fs from 'fs';
 
-export const getAll = async (_: Request, res: Response) => {
-  const teachers = await TeacherService.getAllTeachers();
-  res.json(teachers);
+export const getAll = async (req: Request, res: Response) => {
+  try {
+    // DEVELOPER pode ver todos os professores de todas as escolas
+    // Outros usuários só veem professores da sua escola
+    const whereClause = req.user?.role === 'DEVELOPER'
+      ? {}
+      : { schoolId: req.user?.schoolId };
+
+    const teachers = await TeacherService.getAllTeachers(whereClause);
+    res.json(teachers);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
 };
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
@@ -47,7 +57,20 @@ export const create = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Nome e email são obrigatórios' });
     }
 
-    const teacher = await TeacherService.createTeacher({ name, email });
+    // DEVELOPER pode criar professores em qualquer escola ou sem escola
+    // ADMIN só pode criar professores na sua escola
+    let schoolId: string | undefined;
+    if (req.user?.role === 'DEVELOPER') {
+      schoolId = req.body.schoolId; // Developer can specify schoolId or leave it undefined
+    } else {
+      schoolId = req.user?.schoolId; // Admin can only create in their own school
+    }
+
+    const teacher = await TeacherService.createTeacher({ 
+      name, 
+      email, 
+      schoolId: schoolId 
+    });
     
     // Retorna resposta com informações do usuário criado
     res.status(201).json({

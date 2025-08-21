@@ -5,9 +5,19 @@ import path from 'path';
 import { renameStudentPhoto } from '../middlewares/upload.middleware';
 import fs from 'fs';
 
-export const getAll = async (_: Request, res: Response) => {
-  const students = await StudentService.getAllStudents();
-  res.json(students);
+export const getAll = async (req: Request, res: Response) => {
+  try {
+    // DEVELOPER pode ver todos os alunos de todas as escolas
+    // Outros usuários só veem alunos da sua escola
+    const whereClause = req.user?.role === 'DEVELOPER'
+      ? {}
+      : { schoolId: req.user?.schoolId };
+
+    const students = await StudentService.getAllStudents(whereClause);
+    res.json(students);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
 };
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
@@ -77,12 +87,22 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
     const tempFilePath = req.file ? path.join(__dirname, '../../uploads', req.file.filename) : undefined;
     let profilePicture: string | undefined = undefined;
 
+    // DEVELOPER pode criar alunos em qualquer escola ou sem escola
+    // ADMIN só pode criar alunos na sua escola
+    let schoolId: string | undefined;
+    if (req.user?.role === 'DEVELOPER') {
+      schoolId = req.body.schoolId; // Developer can specify schoolId or leave it undefined
+    } else {
+      schoolId = req.user?.schoolId; // Admin can only create in their own school
+    }
+
     // Cria o aluno e usuário
     const student = await StudentService.createStudent({
       name,
       email,
       registrationNumber,
-      profilePicture
+      profilePicture,
+      schoolId: schoolId
     });
     
     // Se tiver arquivo temporário, renomeia para o ID do aluno

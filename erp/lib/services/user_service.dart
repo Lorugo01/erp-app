@@ -7,11 +7,20 @@ class UserService {
   // URL base da API - agora centralizada
   static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<List<User>> getAllUsers() async {
+  // Obter headers com autenticação
+  static Map<String, String> _getAuthHeaders(String? token) {
+    final headers = {'Content-Type': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  static Future<List<User>> getAllUsers({String? token}) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getUsersUrl('')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {
@@ -25,11 +34,11 @@ class UserService {
     }
   }
 
-  static Future<User> getUserById(String id) async {
+  static Future<User> getUserById(String id, {String? token}) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getUsersUrl('/$id')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {
@@ -43,10 +52,14 @@ class UserService {
     }
   }
 
-  static Future<User> updateUser(String id, Map<String, dynamic> data) async {
+  static Future<User> updateUser(
+    String id,
+    Map<String, dynamic> data, {
+    String? token,
+  }) async {
     final response = await http.put(
       Uri.parse(ApiConfig.getUsersUrl('/$id')),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getAuthHeaders(token),
       body: jsonEncode(data),
     );
 
@@ -59,10 +72,14 @@ class UserService {
     }
   }
 
-  static Future<User> updateUserPhoto(String id, String photoUrl) async {
+  static Future<User> updateUserPhoto(
+    String id,
+    String photoUrl, {
+    String? token,
+  }) async {
     final response = await http.put(
       Uri.parse(ApiConfig.getUsersUrl('/$id/photo')),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getAuthHeaders(token),
       body: jsonEncode({'photoUrl': photoUrl}),
     );
 
@@ -75,10 +92,10 @@ class UserService {
     }
   }
 
-  static Future<void> deleteUser(String id) async {
+  static Future<void> deleteUser(String id, {String? token}) async {
     final response = await http.delete(
       Uri.parse(ApiConfig.getUsersUrl('/$id')),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getAuthHeaders(token),
     );
 
     if (response.statusCode != 200) {
@@ -92,11 +109,12 @@ class UserService {
     required String email,
     required String password,
     required Role role,
+    String? token,
   }) async {
     try {
       final response = await http.post(
         Uri.parse(ApiConfig.getAuthUrl('/register')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
         body: jsonEncode({
           'name': name,
           'email': email,

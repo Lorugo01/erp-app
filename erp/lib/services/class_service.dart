@@ -6,8 +6,20 @@ class ClassService {
   // URL base da API - agora centralizada
   static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<List<Map<String, dynamic>>> getAllClasses() async {
-    final response = await http.get(Uri.parse(ApiConfig.getClassesUrl('')));
+  // Obter headers com autenticação
+  static Map<String, String> _getAuthHeaders(String? token) {
+    final headers = {'Content-Type': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllClasses({String? token}) async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.getClassesUrl('')),
+      headers: _getAuthHeaders(token),
+    );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
@@ -16,11 +28,11 @@ class ClassService {
     }
   }
 
-  static Future<Map<String, dynamic>> getClassById(String id) async {
+  static Future<Map<String, dynamic>> getClassById(String id, {String? token}) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getClassesUrl('/$id')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {
@@ -34,10 +46,10 @@ class ClassService {
     }
   }
 
-  static Future<void> deleteClass(String id) async {
+  static Future<void> deleteClass(String id, {String? token}) async {
     final response = await http.delete(
       Uri.parse(ApiConfig.getClassesUrl('/$id')),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getAuthHeaders(token),
     );
 
     if (response.statusCode != 200) {

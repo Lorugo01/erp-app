@@ -6,6 +6,19 @@ export const createEnrollment = async (data: {
   year: number;
   current?: boolean;
 }) => {
+  // Verificar se já existe matrícula para este aluno nesta turma neste ano
+  const existingEnrollment = await prisma.enrollment.findFirst({
+    where: {
+      studentId: data.studentId,
+      classId: data.classId,
+      year: data.year
+    }
+  });
+
+  if (existingEnrollment) {
+    throw new Error(`Aluno já está matriculado nesta turma no ano ${data.year}`);
+  }
+
   // Zera current anterior se necessário
   if (data.current) {
     await prisma.enrollment.updateMany({

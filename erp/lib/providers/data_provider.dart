@@ -49,12 +49,12 @@ class DataProvider extends ChangeNotifier {
   }
 
   // Atualizar dados do aluno atual
-  Future<void> refreshCurrentStudent(String studentId) async {
+  Future<void> refreshCurrentStudent(String studentId, {String? token}) async {
     _setLoading(true);
     _clearError();
     try {
       // Buscar aluno da lista atual ou fazer nova requisição
-      final allStudents = await StudentService.getAllStudents();
+      final allStudents = await StudentService.getAllStudents(token: token);
       final student = allStudents.firstWhere((s) => s['id'] == studentId);
       _currentStudent = {
         'id': student['id'],
@@ -72,11 +72,11 @@ class DataProvider extends ChangeNotifier {
   }
 
   // Atualizar lista de professores
-  Future<void> refreshTeachers() async {
+  Future<void> refreshTeachers({String? token}) async {
     _setLoading(true);
     _clearError();
     try {
-      final updatedTeachers = await TeacherService.getAllTeachers();
+      final updatedTeachers = await TeacherService.getAllTeachers(token: token);
       _teachers = updatedTeachers;
       _setLoading(false);
     } catch (e) {
@@ -86,11 +86,11 @@ class DataProvider extends ChangeNotifier {
   }
 
   // Atualizar lista de alunos
-  Future<void> refreshStudents() async {
+  Future<void> refreshStudents({String? token}) async {
     _setLoading(true);
     _clearError();
     try {
-      final updatedStudents = await StudentService.getAllStudents();
+      final updatedStudents = await StudentService.getAllStudents(token: token);
       _students =
           updatedStudents
               .map(

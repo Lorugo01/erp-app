@@ -44,8 +44,22 @@ class StudentService {
   // URL base da API - agora centralizada
   static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<List<Map<String, dynamic>>> getAllStudents() async {
-    final response = await http.get(Uri.parse(ApiConfig.getStudentsUrl('')));
+  // Obter headers com autenticação
+  static Map<String, String> _getAuthHeaders(String? token) {
+    final headers = {'Content-Type': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllStudents({
+    String? token,
+  }) async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.getStudentsUrl('')),
+      headers: _getAuthHeaders(token),
+    );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);

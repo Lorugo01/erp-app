@@ -3,9 +3,19 @@ import * as ClassService from '../services/class.service';
 import * as EventService from '../services/event.service';
 import prisma from '../prisma/client';
 
-export const getAll = async (_: Request, res: Response) => {
-  const classes = await ClassService.getAllClasses();
-  res.json(classes);
+export const getAll = async (req: Request, res: Response) => {
+  try {
+    // DEVELOPER pode ver todas as turmas de todas as escolas
+    // Outros usuários só veem turmas da sua escola
+    const whereClause = req.user?.role === 'DEVELOPER'
+      ? {}
+      : { schoolId: req.user?.schoolId };
+
+    const classes = await ClassService.getAllClasses(whereClause);
+    res.json(classes);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
 };
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
@@ -58,7 +68,12 @@ export const getEvents = async (req: Request, res: Response, next: NextFunction)
 export const addEvent = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const classId = req.params.id;
-    const event = await EventService.createEvent({ ...req.body, classId });
+    const user = req.user;
+    const event = await EventService.createEvent(
+      { ...req.body, classId }, 
+      user?.schoolId, 
+      user?.role
+    );
     res.status(201).json(event);
   } catch (error) {
     next(error);
@@ -86,8 +101,43 @@ export const deleteEvent = async (req: Request, res: Response, next: NextFunctio
 };
 
 export const create = async (req: Request, res: Response) => {
-  const turma = await ClassService.createClass(req.body);
-  res.status(201).json(turma);
+  try {
+    const { grade, letter, academicYear, shift, evaluationModel } = req.body;
+    
+    if (!grade || !letter || !academicYear || !shift || !evaluationModel) {
+      return res.status(400).json({ 
+        error: 'Todos os campos são obrigatórios: grade, letter, academicYear, shift, evaluationModel' 
+      });
+    }
+
+    // DEVELOPER pode criar turmas em qualquer escola ou sem escola
+    // ADMIN só pode criar turmas na sua escola
+    let schoolId: string | undefined;
+    if (req.user?.role === 'DEVELOPER') {
+      schoolId = req.body.schoolId; // Developer can specify schoolId or leave it undefined
+    } else {
+      schoolId = req.user?.schoolId; // Admin can only create in their own school
+    }
+
+    if (!schoolId) {
+      return res.status(400).json({ 
+        error: 'schoolId é obrigatório para criar turmas' 
+      });
+    }
+
+    const turma = await ClassService.createClass({
+      grade,
+      letter,
+      academicYear,
+      shift,
+      evaluationModel,
+      schoolId
+    });
+    
+    res.status(201).json(turma);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
 };
 
 export const update = async (req: Request, res: Response, next: NextFunction) => {

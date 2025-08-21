@@ -36,6 +36,7 @@ class AuthService {
     required String password,
     required String name,
     required Role role,
+    String? schoolId,
   }) async {
     try {
       final response = await http.post(
@@ -46,6 +47,7 @@ class AuthService {
           'password': password,
           'name': name,
           'role': role.toString().split('.').last.toUpperCase(),
+          if (schoolId != null) 'schoolId': schoolId,
         }),
       );
 

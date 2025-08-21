@@ -4,8 +4,9 @@ import { Role } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
 
-export const getAllStudents = () => {
+export const getAllStudents = (whereClause?: any) => {
   return prisma.student.findMany({
+    where: whereClause,
     include: {
       enrollments: {
         where: { current: true },
@@ -96,27 +97,47 @@ export const createStudent = async (data: {
   email: string;
   registrationNumber: string;
   profilePicture?: string;
+  schoolId?: string;
 }) => {
   if (!data.registrationNumber) {
     throw new Error('Número de matrícula é obrigatório');
   }
 
-  // Verifica se já existe um aluno com o mesmo número de matrícula
-  const existingStudent = await prisma.student.findUnique({
-    where: { registrationNumber: data.registrationNumber }
-  });
+  // Verifica se já existe um aluno com o mesmo número de matrícula na mesma escola
+  if (data.schoolId) {
+    const existingStudent = await prisma.student.findFirst({
+      where: { 
+        registrationNumber: data.registrationNumber,
+        schoolId: data.schoolId
+      }
+    });
 
-  if (existingStudent) {
-    throw new Error('Já existe um aluno com este número de matrícula');
+    if (existingStudent) {
+      throw new Error('Já existe um aluno com este número de matrícula nesta escola');
+    }
   }
 
-  // Verifica se já existe um usuário com o mesmo email
-  const existingUser = await prisma.user.findUnique({
-    where: { email: data.email }
-  });
+  // Verifica se já existe um usuário com o mesmo email na mesma escola
+  if (data.schoolId) {
+    const existingUser = await prisma.user.findFirst({
+      where: { 
+        email: data.email,
+        schoolId: data.schoolId
+      }
+    });
 
-  if (existingUser) {
-    throw new Error('Já existe um usuário com este email');
+    if (existingUser) {
+      throw new Error('Já existe um usuário com este email nesta escola');
+    }
+  } else {
+    // Se não tiver escola, verifica globalmente
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email }
+    });
+
+    if (existingUser) {
+      throw new Error('Já existe um usuário com este email');
+    }
   }
 
   // Cria o usuário primeiro
@@ -127,6 +148,7 @@ export const createStudent = async (data: {
       email: data.email,
       password: hashedPassword,
       role: Role.STUDENT,
+      schoolId: data.schoolId,
     }
   });
 
@@ -137,7 +159,8 @@ export const createStudent = async (data: {
       email: data.email,
       registrationNumber: data.registrationNumber,
       profilePicture: data.profilePicture,
-      userId: user.id
+      userId: user.id,
+      schoolId: data.schoolId,
     },
     include: {
       user: {

@@ -2,8 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import * as EnrollmentService from '../services/enrollment.service';
 
 export const create = async (req: Request, res: Response) => {
-  const enrollment = await EnrollmentService.createEnrollment(req.body);
-  res.status(201).json(enrollment);
+  try {
+    const enrollment = await EnrollmentService.createEnrollment(req.body);
+    res.status(201).json(enrollment);
+  } catch (error: any) {
+    if (error.message.includes('já está matriculado')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+  }
 };
 
 export const getAll = async (_: Request, res: Response) => {

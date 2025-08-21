@@ -4,8 +4,9 @@ import { Role } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
 
-export const getAllTeachers = () => {
+export const getAllTeachers = (whereClause?: any) => {
   return prisma.teacher.findMany({
+    where: whereClause,
     include: {
       subjects: true,
       lessons: true,
@@ -79,23 +80,49 @@ export const getTeachersByName = async (name: string) => {
 export const createTeacher = async (data: {
   name: string;
   email: string;
+  schoolId?: string;
 }) => {
-  // Verifica se já existe um usuário com o mesmo email
-  const existingUser = await prisma.user.findUnique({
-    where: { email: data.email }
-  });
+  // Verifica se já existe um usuário com o mesmo email na mesma escola
+  if (data.schoolId) {
+    const existingUser = await prisma.user.findFirst({
+      where: { 
+        email: data.email,
+        schoolId: data.schoolId
+      }
+    });
 
-  if (existingUser) {
-    throw new Error('Já existe um usuário com este email');
-  }
+    if (existingUser) {
+      throw new Error('Já existe um usuário com este email nesta escola');
+    }
 
-  // Verifica se já existe um professor com o mesmo email
-  const existingTeacher = await prisma.teacher.findUnique({
-    where: { email: data.email }
-  });
+    // Verifica se já existe um professor com o mesmo email na mesma escola
+    const existingTeacher = await prisma.teacher.findFirst({
+      where: { 
+        email: data.email,
+        schoolId: data.schoolId
+      }
+    });
 
-  if (existingTeacher) {
-    throw new Error('Já existe um professor com este email');
+    if (existingTeacher) {
+      throw new Error('Já existe um professor com este email nesta escola');
+    }
+  } else {
+    // Se não tiver escola, verifica globalmente
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email }
+    });
+
+    if (existingUser) {
+      throw new Error('Já existe um usuário com este email');
+    }
+
+    const existingTeacher = await prisma.teacher.findUnique({
+      where: { email: data.email }
+    });
+
+    if (existingTeacher) {
+      throw new Error('Já existe um professor com este email');
+    }
   }
 
   // Cria o usuário primeiro
@@ -106,6 +133,7 @@ export const createTeacher = async (data: {
       email: data.email,
       password: hashedPassword,
       role: Role.TEACHER,
+      schoolId: data.schoolId,
     }
   });
 
@@ -114,7 +142,8 @@ export const createTeacher = async (data: {
     data: {
       name: data.name,
       email: data.email,
-      userId: user.id
+      userId: user.id,
+      schoolId: data.schoolId,
     },
     include: {
       user: {

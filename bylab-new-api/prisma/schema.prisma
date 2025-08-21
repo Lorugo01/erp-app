@@ -7,6 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model School {
+  id          String   @id @default(uuid())
+  name        String
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  logo        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamentos
+  users           User[]
+  students        Student[]
+  teachers        Teacher[]
+  classes         Class[]
+  subjects        Subject[]
+  events          Event[]
+  chats           chat[]
+  configs         Config[]
+  gradePeriods    GradePeriod[]
+  gradeTypes      GradeType[]
+  
+  @@map("schools")
+}
+
 model User {
   id               String            @id @default(uuid())
   email            String            @unique
@@ -14,36 +40,53 @@ model User {
   role             Role
   createdAt        DateTime          @default(now())
   photoUrl         String?
+  schoolId         String?
   student          Student?
   teacher          Teacher?
   chatParticipants chatparticipant[]
   messages         message[]
+  
+  // Relacionamentos
+  school           School?           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  @@unique([email, schoolId])
 }
 
 model Student {
   id                    String                 @id @default(uuid())
   name                  String
-  email                 String                 @unique
+  email                 String
   createdAt             DateTime               @default(now())
   profilePicture        String?
-  registrationNumber    String?                @unique
+  registrationNumber    String?
   userId                String?                @unique
   address               String?
   birthDate             DateTime?
   phone                 String?
+  schoolId              String
   assignmentSubmissions AssignmentSubmission[]
   attendances           Attendance[]
   enrollments           Enrollment[]
   grades                Grade[]
+  
+  // Relacionamentos
   user                  User?                  @relation(fields: [userId], references: [id])
+  school                School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  @@unique([email, schoolId])
+  @@unique([registrationNumber, schoolId])
 }
 
 model chat {
   id           String            @id @default(uuid())
   title        String
   created_at   DateTime          @default(now())
+  schoolId     String
   participants chatparticipant[]
   messages     message[]
+  
+  // Relacionamentos
+  school       School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model chatparticipant {
@@ -101,6 +144,10 @@ model Class {
   events          Event[]
   lessons         Lesson[]
   subjects        Subject[]
+  schoolId        String
+  
+  // Relacionamentos
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model Teacher {
@@ -114,6 +161,10 @@ model Teacher {
   lessons   Lesson[]
   subjects  Subject[]
   user      User?     @relation(fields: [userId], references: [id])
+  schoolId  String
+  
+  // Relacionamentos
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model Subject {
@@ -129,6 +180,10 @@ model Subject {
   lessons     Lesson[]
   class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
   teacher     Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  schoolId    String
+  
+  // Relacionamentos
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model Lesson {
@@ -144,25 +199,27 @@ model Lesson {
 }
 
 model Attendance {
-  id           String          @id @default(uuid())
-  studentId    String
-  lessonId     String
-  status       AttendanceStatus @default(PRESENT)
+  id            String           @id @default(uuid())
+  studentId     String
+  lessonId      String
+  present       Boolean          @default(true)
+  createdAt     DateTime         @default(now())
   justification String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  lesson       Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  student      Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
-  // Manter compatibilidade com o campo antigo
-  present      Boolean         @default(true)
+  status        AttendanceStatus @default(PRESENT)
+  updatedAt     DateTime         @updatedAt
+  lesson        Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student       Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model GradePeriod {
-  id     String  @id @default(uuid())
-  name   String
-  order  Int
-  grades Grade[]
+  id       String  @id @default(uuid())
+  name     String
+  order    Int
+  schoolId String
+  grades   Grade[]
+  
+  // Relacionamentos
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model GradeType {
@@ -170,7 +227,11 @@ model GradeType {
   name        String
   description String?
   isConcept   Boolean @default(false)
+  schoolId    String
   grades      Grade[]
+  
+  // Relacionamentos
+  school      School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model Grade {
@@ -191,10 +252,16 @@ model Grade {
 }
 
 model Config {
-  id              Int    @id @default(1)
+  id              String @id @default(uuid())
   evaluationModel String
   minGrade        Float  @default(5.0)
   minAttendance   Float  @default(75.0)
+  schoolId        String
+  
+  // Relacionamentos
+  school          School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  
+  @@unique([schoolId])
 }
 
 model Event {
@@ -210,6 +277,10 @@ model Event {
   teacherId   String
   class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
   teacher     Teacher   @relation("TeacherToEvent", fields: [teacherId], references: [id])
+  schoolId    String
+  
+  // Relacionamentos
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model Assignment {
@@ -238,6 +309,7 @@ model AssignmentSubmission {
 }
 
 enum Role {
+  DEVELOPER
   ADMIN
   STUDENT
   TEACHER

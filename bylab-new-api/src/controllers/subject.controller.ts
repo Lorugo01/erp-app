@@ -1,9 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import * as SubjectService from '../services/subject.service';
 
-export const getAll = async (_: Request, res: Response) => {
-  const subjects = await SubjectService.getAllSubjects();
-  res.json(subjects);
+export const getAll = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    const subjects = await SubjectService.getAllSubjects(user?.schoolId, user?.role);
+    res.json(subjects);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 };
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
@@ -16,8 +21,13 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
 };
 
 export const create = async (req: Request, res: Response) => {
-  const subject = await SubjectService.createSubject(req.body);
-  res.status(201).json(subject);
+  try {
+    const user = req.user;
+    const subject = await SubjectService.createSubject(req.body, user?.schoolId, user?.role);
+    res.status(201).json(subject);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Erro interno do servidor' });
+  }
 };
 
 export const update = async (req: Request, res: Response) => {

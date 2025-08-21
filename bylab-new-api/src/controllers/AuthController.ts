@@ -10,8 +10,8 @@ export class AuthController {
 
   async register(req: Request, res: Response) {
     try {
-      const { email, password, role, name } = req.body;
-      const user = await this.authService.createUser({ email, password, role, name });
+      const { email, password, role, name, schoolId } = req.body;
+      const user = await this.authService.createUser({ email, password, role, name, schoolId });
       return res.status(201).json(user);
     } catch (error) {
       return res.status(400).json({ error: error.message });
@@ -20,8 +20,8 @@ export class AuthController {
 
   async registerAdmin(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
-      const admin = await this.authService.createAdmin({ email, password });
+      const { email, password, schoolId } = req.body;
+      const admin = await this.authService.createAdmin({ email, password, schoolId });
       return res.status(201).json(admin);
     } catch (error) {
       return res.status(400).json({ error: error.message });

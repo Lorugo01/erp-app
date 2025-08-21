@@ -5,7 +5,12 @@ import '../models/user.dart';
 
 class RegisterScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
-  const RegisterScreen({super.key, this.onLoginTap});
+  final bool? isDeveloperRegistration;
+  const RegisterScreen({
+    super.key,
+    this.onLoginTap,
+    this.isDeveloperRegistration,
+  });
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -109,6 +114,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ),
+                              // Opção DEVELOPER apenas para usuários autorizados
+                              if (widget.isDeveloperRegistration ?? false)
+                                DropdownMenuItem(
+                                  value: Role.developer,
+                                  child: Text(
+                                    'Desenvolvedor',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                             ],
                             onChanged: (role) {
                               setState(() {

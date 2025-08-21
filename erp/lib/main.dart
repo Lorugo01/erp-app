@@ -8,6 +8,7 @@ import 'screens/register_screen.dart';
 import 'screens/teacher/teacher_dashboard_screen.dart';
 import 'screens/student/student_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/developer/developer_dashboard_screen.dart';
 import 'config/environment.dart';
 import 'config/app_config.dart';
 
@@ -71,6 +72,9 @@ class _AuthFlowState extends State<AuthFlow> {
     final authProvider = Provider.of<AuthProvider>(context);
     if (authProvider.isAuthenticated) {
       // Redireciona para dashboard conforme o tipo de usuário
+      if (authProvider.user!.isDeveloper) {
+        return const DeveloperDashboardScreen();
+      }
       if (authProvider.user!.isTeacher) {
         return TeacherDashboardScreen();
       }

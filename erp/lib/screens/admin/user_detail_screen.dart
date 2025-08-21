@@ -256,6 +256,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   Color _getRoleColor(Role role) {
     switch (role) {
+      case Role.developer:
+        return Colors.purple;
       case Role.admin:
         return Colors.red;
       case Role.teacher:
@@ -267,6 +269,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   String _getRoleText(Role role) {
     switch (role) {
+      case Role.developer:
+        return 'Desenvolvedor';
       case Role.admin:
         return 'Administrador';
       case Role.teacher:

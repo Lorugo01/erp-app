@@ -63,7 +63,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     }
     try {
-      final teachers = await TeacherService.getAllTeachers();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
+      final teachers = await TeacherService.getAllTeachers(token: token);
       if (mounted) {
         setState(() {
           _teachers = teachers;
@@ -140,7 +147,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     }
     try {
-      final students = await student_service.StudentService.getAllStudents();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
+      final students = await student_service.StudentService.getAllStudents(
+        token: token,
+      );
       if (mounted) {
         setState(() {
           _students = students;
@@ -215,7 +231,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     }
     try {
-      final classes = await ClassService.getAllClasses();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
+      final classes = await ClassService.getAllClasses(token: token);
       if (mounted) {
         setState(() {
           _classes = classes;
@@ -238,7 +261,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _deleteClass(Map<String, dynamic> turma) async {
     try {
-      await ClassService.deleteClass(turma['id']);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
+      await ClassService.deleteClass(turma['id'], token: token);
       if (mounted) {
         setState(() {
           _classes.removeWhere((c) => c['id'] == turma['id']);
@@ -272,7 +302,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     }
     try {
-      final users = await UserService.getAllUsers();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
+      final users = await UserService.getAllUsers(token: token);
       if (mounted) {
         setState(() {
           _users = users;
@@ -295,7 +332,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _deleteUser(User user) async {
     try {
-      await UserService.deleteUser(user.id);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
+      await UserService.deleteUser(user.id, token: token);
       if (mounted) {
         setState(() {
           _users.removeWhere((u) => u.id == user.id);
@@ -366,9 +410,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 });
               }
               try {
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                final token = authProvider.user?.token;
+
+                if (token == null) {
+                  throw Exception('Token de autenticação não encontrado');
+                }
+
                 final response = await http.post(
                   Uri.parse('http://192.168.18.15:3000/teachers'),
-                  headers: {'Content-Type': 'application/json'},
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
                   body: jsonEncode({
                     'name': name,
                     'email': email,
@@ -442,9 +499,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 });
               }
               try {
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                final token = authProvider.user?.token;
+
+                if (token == null) {
+                  throw Exception('Token de autenticação não encontrado');
+                }
+
                 final response = await http.post(
                   Uri.parse('http://192.168.18.15:3000/students'),
-                  headers: {'Content-Type': 'application/json'},
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
                   body: jsonEncode({
                     'name': name,
                     'email': email,
@@ -514,14 +584,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 });
               }
               try {
+                final authProvider = Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                );
+                final token = authProvider.user?.token;
+
+                if (token == null) {
+                  throw Exception('Token de autenticação não encontrado');
+                }
+
                 final response = await http.post(
                   Uri.parse('http://192.168.18.15:3000/classes'),
-                  headers: {'Content-Type': 'application/json'},
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
                   body: jsonEncode({
                     'grade': grade,
                     'letter': letter,
                     'academicYear': academicYear,
                     'shift': shift,
+                    'evaluationModel': 'TRADICIONAL', // Valor padrão
                   }),
                 );
                 if (!context.mounted) return;
@@ -2237,6 +2321,8 @@ class _UserCardGrid extends StatelessWidget {
 
   Color _getRoleColor(Role role) {
     switch (role) {
+      case Role.developer:
+        return Colors.purple;
       case Role.admin:
         return Colors.red;
       case Role.teacher:
@@ -2248,6 +2334,8 @@ class _UserCardGrid extends StatelessWidget {
 
   String _getRoleText(Role role) {
     switch (role) {
+      case Role.developer:
+        return 'DESENVOLVEDOR';
       case Role.admin:
         return 'ADMIN';
       case Role.teacher:
@@ -3168,6 +3256,8 @@ class _AddUserDialogState extends State<_AddUserDialog> {
 
   String _getRoleDisplayName(Role role) {
     switch (role) {
+      case Role.developer:
+        return 'Desenvolvedor';
       case Role.admin:
         return 'Administrador';
       case Role.teacher:

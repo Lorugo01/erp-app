@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'class_students_screen.dart';
 import 'class_teachers_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../providers/auth_provider.dart';
 
 class ClassDetailScreen extends StatelessWidget {
   final Map<String, dynamic> classData;
@@ -288,9 +290,21 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     debugPrint('Enviando evento para o backend: $event');
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
     final turmaId = parent?.classData['id'] ?? '';
+    
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+    
+    if (token == null) {
+      throw Exception('Token de autenticação não encontrado');
+    }
+    
     final response = await http.post(
       Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
       body: json.encode(event),
     );
     debugPrint('Status da resposta: ${response.statusCode}');
@@ -321,9 +335,20 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   }
 
   Future<void> updateEvent(String id, Map<String, dynamic> data) async {
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+    
+    if (token == null) {
+      throw Exception('Token de autenticação não encontrado');
+    }
+    
     final response = await http.put(
       Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
       body: json.encode(data),
     );
     if (response.statusCode == 200) {
@@ -333,8 +358,17 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   }
 
   Future<void> deleteEvent(String id) async {
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+    
+    if (token == null) {
+      throw Exception('Token de autenticação não encontrado');
+    }
+    
     final response = await http.delete(
       Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
+      headers: {'Authorization': 'Bearer $token'},
     );
     if (response.statusCode == 204) {
       fetchEvents();
@@ -819,8 +853,23 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
     if (!mounted) return;
 
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Token de autenticação não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final response = await http.get(
       Uri.parse('http://192.168.18.15:3000/classes/$turmaId'),
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (!mounted) return;
@@ -844,6 +893,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
     final eventsResponse = await http.get(
       Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (!mounted) return;

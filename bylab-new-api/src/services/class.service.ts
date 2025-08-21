@@ -9,8 +9,9 @@ function getGradeLabel(grade: number): string {
   return labels[grade - 1] || `Ano ${grade}`;
 }
 
-export const getAllClasses = () => {
+export const getAllClasses = (whereClause?: any) => {
   return prisma.class.findMany({
+    where: whereClause,
     include: {
       enrollments: {
         include: { student: true }
@@ -119,6 +120,7 @@ export const createClass = (data: {
   academicYear: number;
   shift: 'MATUTINO' | 'VESPERTINO' | 'NOTURNO';
   evaluationModel: string;
+  schoolId: string;
 }) => {
   const gradeLabel = getGradeLabel(data.grade);
   const turmaLetra = data.letter.toUpperCase();
@@ -128,7 +130,8 @@ export const createClass = (data: {
     data: {
       ...data,
       letter: turmaLetra,
-      name
+      name,
+      schoolId: data.schoolId
     }
   });
 };

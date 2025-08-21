@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../services/student_service.dart' as student_service;
+import '../../providers/auth_provider.dart';
 import 'student_detail_screen.dart';
 
 class ClassStudentsScreen extends StatefulWidget {
@@ -25,9 +27,19 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
   Future<void> _fetchEnrollments() async {
     setState(() => _loading = true);
     final classId = widget.classData['id'];
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
     try {
       final response = await http.get(
         Uri.parse('http://192.168.18.15:3000/classes/$classId'),
+        headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
@@ -46,8 +58,22 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
       if (!mounted) return;
       final messenger = ScaffoldMessenger.of(context);
 
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Token de autenticação não encontrado'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       await http.delete(
         Uri.parse('http://192.168.18.15:3000/enrollments/$enrollmentId'),
+        headers: {'Authorization': 'Bearer $token'},
       );
       await _fetchEnrollments();
 
@@ -66,7 +92,22 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
   void _showAddStudentToClassDialog() async {
     if (!mounted) return;
 
-    final alunos = await student_service.StudentService.getAllStudents();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Token de autenticação não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final alunos = await student_service.StudentService.getAllStudents(
+      token: token,
+    );
     if (!mounted) return;
 
     // Filtrar alunos já matriculados
@@ -229,7 +270,10 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
                                   Uri.parse(
                                     'http://192.168.18.15:3000/enrollments',
                                   ),
-                                  headers: {'Content-Type': 'application/json'},
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer $token',
+                                  },
                                   body: jsonEncode({
                                     'studentId': studentId,
                                     'classId': classId,
