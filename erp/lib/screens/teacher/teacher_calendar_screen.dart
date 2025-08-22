@@ -7,6 +7,65 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Classe utilitária para logging estruturado
+class TeacherCalendarLogger {
+  static const String _prefix = '📅 [TeacherCalendar]';
+
+  static void info(String message) {
+    debugPrint('$_prefix ℹ️ $message');
+  }
+
+  static void success(String message) {
+    debugPrint('$_prefix ✅ $message');
+  }
+
+  static void warning(String message) {
+    debugPrint('$_prefix ⚠️ $message');
+  }
+
+  static void error(String message, [dynamic error, StackTrace? stackTrace]) {
+    debugPrint('$_prefix ❌ $message');
+    if (error != null) {
+      debugPrint('$_prefix 🔍 Erro detalhado: $error');
+    }
+    if (stackTrace != null) {
+      debugPrint('$_prefix 📍 Stack trace: $stackTrace');
+    }
+  }
+
+  static void debug(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 🐛 $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados: $data');
+    }
+  }
+
+  static void api(
+    String endpoint,
+    String method, [
+    Map<String, dynamic>? params,
+  ]) {
+    debugPrint('$_prefix 🌐 API: $method $endpoint');
+    if (params != null) {
+      debugPrint('$_prefix 📝 Parâmetros: $params');
+    }
+  }
+
+  static void state(String message, [Map<String, dynamic>? state]) {
+    debugPrint('$_prefix 🔄 Estado: $message');
+    if (state != null) {
+      debugPrint('$_prefix 📊 Estado atual: $state');
+    }
+  }
+
+  static void calendar(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 📆 [Calendário] $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados do calendário: $data');
+    }
+  }
+}
+
 class TeacherCalendarScreen extends StatefulWidget {
   const TeacherCalendarScreen({super.key});
 
@@ -41,24 +100,68 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
   bool _syncEnabled = false;
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? false;
-      _syncEnabled = prefs.getBool('sync_enabled') ?? false;
-    });
+    TeacherCalendarLogger.info('Carregando configurações do calendário');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notificationsEnabled =
+          prefs.getBool('notifications_enabled') ?? false;
+      final syncEnabled = prefs.getBool('sync_enabled') ?? false;
+
+      TeacherCalendarLogger.debug('Configurações carregadas', {
+        'notificationsEnabled': notificationsEnabled,
+        'syncEnabled': syncEnabled,
+      });
+
+      setState(() {
+        _notificationsEnabled = notificationsEnabled;
+        _syncEnabled = syncEnabled;
+      });
+    } catch (e, stackTrace) {
+      TeacherCalendarLogger.error(
+        'Erro ao carregar configurações',
+        e,
+        stackTrace,
+      );
+    }
   }
 
   Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notifications_enabled', _notificationsEnabled);
-    await prefs.setBool('sync_enabled', _syncEnabled);
+    TeacherCalendarLogger.info('Salvando configurações do calendário');
+    TeacherCalendarLogger.debug('Configurações para salvar', {
+      'notificationsEnabled': _notificationsEnabled,
+      'syncEnabled': _syncEnabled,
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notifications_enabled', _notificationsEnabled);
+      await prefs.setBool('sync_enabled', _syncEnabled);
+
+      TeacherCalendarLogger.success('Configurações salvas com sucesso');
+    } catch (e, stackTrace) {
+      TeacherCalendarLogger.error(
+        'Erro ao salvar configurações',
+        e,
+        stackTrace,
+      );
+    }
   }
 
   @override
   void initState() {
     super.initState();
+
+    // Inicializar _currentMonth ANTES de usar nos logs
     _currentMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
     _pageController = PageController(initialPage: 0);
+
+    TeacherCalendarLogger.info('Inicializando tela de calendário do professor');
+    TeacherCalendarLogger.debug('Estado inicial', {
+      'selectedDate': _selectedDate.toIso8601String(),
+      'currentMonth': _currentMonth.toIso8601String(),
+    });
+
     _loadClasses();
     _loadSettings();
   }
@@ -70,20 +173,29 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
   }
 
   Future<void> _loadClasses() async {
+    TeacherCalendarLogger.info('Iniciando carregamento de turmas do professor');
+
     setState(() {
       _loadingClasses = true;
       _errorClasses = null;
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO TURMAS DO PROFESSOR ===');
+      TeacherCalendarLogger.debug('Carregando turmas do professor');
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
       String? teacherId;
 
       if (user?.teacher?.id != null) {
         teacherId = user!.teacher!.id;
+        TeacherCalendarLogger.debug('Teacher ID encontrado no user', {
+          'teacherId': teacherId,
+        });
       } else if (user?.id != null) {
+        TeacherCalendarLogger.debug('Buscando teacher ID via API', {
+          'userId': user?.id,
+        });
+
         final teacherResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/teachers/user/${user?.id}'),
           headers: ApiConfig.defaultHeaders,
@@ -92,48 +204,88 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
         if (teacherResponse.statusCode == 200) {
           final teacherData = jsonDecode(teacherResponse.body);
           teacherId = teacherData['id'];
+
+          TeacherCalendarLogger.success('Teacher ID obtido via API');
+          TeacherCalendarLogger.debug('Dados do teacher', {
+            'teacherId': teacherId,
+            'teacherData': teacherData,
+          });
+        } else {
+          TeacherCalendarLogger.warning('Resposta da API não foi bem-sucedida');
+          TeacherCalendarLogger.debug('Resposta da API', {
+            'statusCode': teacherResponse.statusCode,
+            'body': teacherResponse.body,
+          });
         }
       }
 
       if (teacherId != null) {
+        // SOLUÇÃO: Usar a rota /classes que funciona
+        TeacherCalendarLogger.info(
+          'Usando rota /classes que retorna todos os dados',
+        );
+        TeacherCalendarLogger.api('/classes', 'GET', {'teacherId': teacherId});
+
         final response = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/teachers/$teacherId/classes'),
-          headers: ApiConfig.defaultHeaders,
+          Uri.parse('${ApiConfig.baseUrl}/classes'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${authProvider.user?.token}',
+          },
         );
 
-        debugPrint('🔍 Status da resposta das turmas: ${response.statusCode}');
-        debugPrint('🔍 Corpo da resposta das turmas: ${response.body}');
-
         if (response.statusCode == 200) {
-          final List data = jsonDecode(response.body);
-          debugPrint('🔍 Dados das turmas: $data');
+          final List<dynamic> allClasses = jsonDecode(response.body);
+
+          // Filtrar apenas as turmas que têm disciplinas do professor atual
+          final teacherClasses =
+              allClasses
+                  .where((classData) {
+                    if (classData['subjects'] != null) {
+                      final subjects = classData['subjects'] as List;
+                      return subjects.any(
+                        (subject) => subject['teacherId'] == teacherId,
+                      );
+                    }
+                    return false;
+                  })
+                  .cast<Map<String, dynamic>>()
+                  .toList();
+
+          TeacherCalendarLogger.success('Turmas carregadas via /classes');
+          TeacherCalendarLogger.debug('Turmas encontradas', {
+            'totalClasses': allClasses.length,
+            'teacherClasses': teacherClasses.length,
+            'teacherId': teacherId,
+          });
 
           setState(() {
-            _classes = List<Map<String, dynamic>>.from(data);
-            if (_classes.isNotEmpty && _selectedClass == null) {
-              _selectedClass = _classes.first;
-              _selectedClassId = _selectedClass!['id'];
-              _loadLessons();
-            }
+            _classes = teacherClasses;
+            _loadingClasses = false;
           });
         } else {
-          debugPrint('❌ Erro ao carregar turmas: ${response.statusCode}');
+          TeacherCalendarLogger.warning('Resposta da API não foi bem-sucedida');
+          TeacherCalendarLogger.debug('Resposta da API', {
+            'statusCode': response.statusCode,
+            'body': response.body,
+          });
+
           setState(() {
-            _errorClasses = 'Erro ao carregar turmas';
+            _errorClasses = 'Erro ao carregar turmas: ${response.statusCode}';
+            _loadingClasses = false;
           });
         }
       } else {
+        TeacherCalendarLogger.error('Teacher ID não encontrado');
         setState(() {
-          _errorClasses = 'ID do professor não encontrado';
+          _errorClasses = 'Professor não encontrado';
+          _loadingClasses = false;
         });
       }
-    } catch (e) {
-      debugPrint('❌ Erro ao carregar turmas: $e');
+    } catch (e, stackTrace) {
+      TeacherCalendarLogger.error('Erro ao carregar turmas', e, stackTrace);
       setState(() {
-        _errorClasses = e.toString();
-      });
-    } finally {
-      setState(() {
+        _errorClasses = 'Erro ao carregar turmas: $e';
         _loadingClasses = false;
       });
     }
@@ -148,20 +300,19 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO EVENTOS DA TURMA ===');
-      debugPrint('🔍 Class ID: $_selectedClassId');
+      TeacherCalendarLogger.calendar('Carregando eventos da turma');
+      TeacherCalendarLogger.debug('Class ID', {'classId': _selectedClassId});
 
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/classes/$_selectedClassId/events'),
         headers: ApiConfig.defaultHeaders,
       );
 
-      debugPrint('🔍 Status da resposta dos eventos: ${response.statusCode}');
-      debugPrint('🔍 Corpo da resposta dos eventos: ${response.body}');
-
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados dos eventos: $data');
+        TeacherCalendarLogger.debug('Dados dos eventos', {
+          'count': data.length,
+        });
 
         // Filtrar apenas eventos recorrentes (sem data específica)
         final recurringEvents =
@@ -179,13 +330,17 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
           _lessons = List<Map<String, dynamic>>.from(recurringEvents);
         });
       } else {
-        debugPrint('❌ Erro ao carregar eventos: ${response.statusCode}');
+        TeacherCalendarLogger.warning('Resposta da API não foi bem-sucedida');
+        TeacherCalendarLogger.debug('Resposta da API', {
+          'statusCode': response.statusCode,
+          'body': response.body,
+        });
         setState(() {
-          _errorLessons = 'Erro ao carregar eventos';
+          _errorLessons = 'Erro ao carregar eventos: ${response.statusCode}';
         });
       }
-    } catch (e) {
-      debugPrint('❌ Erro ao carregar eventos: $e');
+    } catch (e, stackTrace) {
+      TeacherCalendarLogger.error('Erro ao carregar eventos', e, stackTrace);
       setState(() {
         _errorLessons = e.toString();
       });

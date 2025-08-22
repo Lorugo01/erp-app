@@ -5,6 +5,65 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+// Classe utilitária para logging estruturado
+class TaskSubmissionsLogger {
+  static const String _prefix = '📝 [TaskSubmissions]';
+
+  static void info(String message) {
+    debugPrint('$_prefix ℹ️ $message');
+  }
+
+  static void success(String message) {
+    debugPrint('$_prefix ✅ $message');
+  }
+
+  static void warning(String message) {
+    debugPrint('$_prefix ⚠️ $message');
+  }
+
+  static void error(String message, [dynamic error, StackTrace? stackTrace]) {
+    debugPrint('$_prefix ❌ $message');
+    if (error != null) {
+      debugPrint('$_prefix 🔍 Erro detalhado: $error');
+    }
+    if (stackTrace != null) {
+      debugPrint('$_prefix 📍 Stack trace: $stackTrace');
+    }
+  }
+
+  static void debug(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 🐛 $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados: $data');
+    }
+  }
+
+  static void api(
+    String endpoint,
+    String method, [
+    Map<String, dynamic>? params,
+  ]) {
+    debugPrint('$_prefix 🌐 API: $method $endpoint');
+    if (params != null) {
+      debugPrint('$_prefix 📝 Parâmetros: $params');
+    }
+  }
+
+  static void state(String message, [Map<String, dynamic>? state]) {
+    debugPrint('$_prefix 🔄 Estado: $message');
+    if (state != null) {
+      debugPrint('$_prefix 📊 Estado atual: $state');
+    }
+  }
+
+  static void submission(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 📤 [Submissão] $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados da submissão: $data');
+    }
+  }
+}
+
 class TaskSubmissionsScreen extends StatefulWidget {
   final Map<String, dynamic> assignment;
   final List<Map<String, dynamic>> students;
@@ -36,23 +95,46 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
   @override
   void initState() {
     super.initState();
+    TaskSubmissionsLogger.info('Inicializando tela de submissões de tarefas');
+    TaskSubmissionsLogger.debug('Dados recebidos', {
+      'assignmentId': widget.assignment['id'],
+      'assignmentDescription': widget.assignment['description'],
+      'studentsCount': widget.students.length,
+      'classId': widget.assignment['classId'],
+      'subjectId': widget.assignment['subjectId'],
+    });
+
     _fetchSubmissions();
     _fetchAvailableClasses();
   }
 
   Future<void> _fetchSubmissions() async {
+    TaskSubmissionsLogger.info('Iniciando busca por submissões da atividade');
+    TaskSubmissionsLogger.debug('Parâmetros da busca', {
+      'assignmentId': widget.assignment['id'],
+    });
+
     setState(() {
       _loading = true;
       _error = null;
     });
+
     try {
       final submissions = await AssignmentService.getAssignmentSubmissions(
         widget.assignment['id'],
       );
+
+      TaskSubmissionsLogger.success('Submissões carregadas com sucesso');
+      TaskSubmissionsLogger.debug('Submissões encontradas', {
+        'count': submissions.length,
+        'assignmentId': widget.assignment['id'],
+      });
+
       setState(() {
         _submissions = submissions;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      TaskSubmissionsLogger.error('Erro ao carregar submissões', e, stackTrace);
       setState(() {
         _error = e.toString();
       });
@@ -65,6 +147,14 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
 
   // Buscar turmas disponíveis para duplicação
   Future<void> _fetchAvailableClasses() async {
+    TaskSubmissionsLogger.info(
+      'Iniciando busca por turmas disponíveis para duplicação',
+    );
+    TaskSubmissionsLogger.debug('Parâmetros da busca', {
+      'subjectId': widget.assignment['subjectId'],
+      'currentClassId': widget.assignment['classId'],
+    });
+
     setState(() {
       _loadingClasses = true;
     });
@@ -72,10 +162,14 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     try {
       // Buscar turmas onde o professor leciona a mesma disciplina
       // Esta é uma implementação básica - você pode expandir conforme necessário
+      final endpoint =
+          '/teachers/classes?subjectId=${widget.assignment['subjectId']}';
+      TaskSubmissionsLogger.api(endpoint, 'GET', {
+        'subjectId': widget.assignment['subjectId'],
+      });
+
       final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.baseUrl}/teachers/classes?subjectId=${widget.assignment['subjectId']}',
-        ),
+        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -89,18 +183,37 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                 .where((cls) => cls['id'] != widget.assignment['classId'])
                 .toList();
 
+        TaskSubmissionsLogger.success(
+          'Turmas disponíveis carregadas com sucesso',
+        );
+        TaskSubmissionsLogger.debug('Turmas encontradas', {
+          'totalCount': classes.length,
+          'filteredCount': filteredClasses.length,
+          'excludedClassId': widget.assignment['classId'],
+        });
+
         setState(() {
           _availableClasses = filteredClasses;
           _loadingClasses = false;
         });
       } else {
+        TaskSubmissionsLogger.warning('Resposta da API não foi bem-sucedida');
+        TaskSubmissionsLogger.debug('Resposta da API', {
+          'statusCode': response.statusCode,
+          'body': response.body,
+        });
+
         setState(() {
           _availableClasses = [];
           _loadingClasses = false;
         });
       }
-    } catch (e) {
-      debugPrint('Erro ao buscar turmas disponíveis: $e');
+    } catch (e, stackTrace) {
+      TaskSubmissionsLogger.error(
+        'Erro ao buscar turmas disponíveis',
+        e,
+        stackTrace,
+      );
       setState(() {
         _availableClasses = [];
         _loadingClasses = false;

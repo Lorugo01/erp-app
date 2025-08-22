@@ -15,7 +15,9 @@ class TeacherService {
     return headers;
   }
 
-  static Future<List<Map<String, dynamic>>> getAllTeachers({String? token}) async {
+  static Future<List<Map<String, dynamic>>> getAllTeachers({
+    String? token,
+  }) async {
     final response = await http.get(
       Uri.parse(ApiConfig.getTeachersUrl('')),
       headers: _getAuthHeaders(token),
@@ -88,12 +90,13 @@ class TeacherService {
 
   // Buscar turmas de um professor
   static Future<List<Map<String, dynamic>>> getTeacherClasses(
-    String teacherId,
-  ) async {
+    String teacherId, {
+    String? token,
+  }) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getTeachersUrl('/$teacherId/classes')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {
@@ -110,14 +113,15 @@ class TeacherService {
   // Buscar disciplinas de uma turma por professor
   static Future<List<Map<String, dynamic>>> getSubjectsByClassIdAndTeacher(
     String classId,
-    String teacherId,
-  ) async {
+    String teacherId, {
+    String? token,
+  }) async {
     try {
       final response = await http.get(
         Uri.parse(
           ApiConfig.getTeachersUrl('/$teacherId/classes/$classId/subjects'),
         ),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {
@@ -133,12 +137,13 @@ class TeacherService {
 
   // Buscar alunos de uma turma
   static Future<List<Map<String, dynamic>>> getClassStudents(
-    String classId,
-  ) async {
+    String classId, {
+    String? token,
+  }) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getClassesUrl('/$classId/students')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {

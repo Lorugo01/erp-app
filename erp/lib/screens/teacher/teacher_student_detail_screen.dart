@@ -5,6 +5,58 @@ import '../../services/attendance_service.dart';
 import '../../services/grade_period_service.dart';
 import 'package:intl/intl.dart';
 
+// Classe utilitária para logging estruturado
+class TeacherStudentDetailLogger {
+  static const String _prefix = '👤 [TeacherStudentDetail]';
+
+  static void info(String message) {
+    debugPrint('$_prefix ℹ️ $message');
+  }
+
+  static void success(String message) {
+    debugPrint('$_prefix ✅ $message');
+  }
+
+  static void warning(String message) {
+    debugPrint('$_prefix ⚠️ $message');
+  }
+
+  static void error(String message, [dynamic error, StackTrace? stackTrace]) {
+    debugPrint('$_prefix ❌ $message');
+    if (error != null) {
+      debugPrint('$_prefix 🔍 Erro detalhado: $error');
+    }
+    if (stackTrace != null) {
+      debugPrint('$_prefix 📍 Stack trace: $stackTrace');
+    }
+  }
+
+  static void debug(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 🐛 $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados: $data');
+    }
+  }
+
+  static void api(
+    String endpoint,
+    String method, [
+    Map<String, dynamic>? params,
+  ]) {
+    debugPrint('$_prefix 🌐 API: $method $endpoint');
+    if (params != null) {
+      debugPrint('$_prefix 📝 Parâmetros: $params');
+    }
+  }
+
+  static void state(String message, [Map<String, dynamic>? state]) {
+    debugPrint('$_prefix 🔄 Estado: $message');
+    if (state != null) {
+      debugPrint('$_prefix 📊 Estado atual: $state');
+    }
+  }
+}
+
 class TeacherStudentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> student;
   final Map<String, dynamic> classData;
@@ -37,6 +89,16 @@ class _TeacherStudentDetailScreenState
   @override
   void initState() {
     super.initState();
+    TeacherStudentDetailLogger.info('Inicializando tela de detalhes do aluno');
+    TeacherStudentDetailLogger.debug('Dados recebidos', {
+      'studentId': widget.student['id'],
+      'studentName': widget.student['name'],
+      'classId': widget.classData['id'],
+      'className': widget.classData['name'],
+      'subjectId': widget.subjectId,
+      'teacherId': widget.teacherId,
+    });
+
     _fetchPeriods();
     _fetchGradeTypes();
     _fetchGrades();
@@ -44,46 +106,118 @@ class _TeacherStudentDetailScreenState
   }
 
   Future<void> _fetchPeriods() async {
+    TeacherStudentDetailLogger.info(
+      'Iniciando busca por períodos de avaliação',
+    );
+
     try {
       final periods = await GradePeriodService.getAllGradePeriods();
+
+      TeacherStudentDetailLogger.success('Períodos carregados com sucesso');
+      TeacherStudentDetailLogger.debug('Períodos encontrados', {
+        'count': periods.length,
+        'periods':
+            periods.map((p) => {'id': p['id'], 'name': p['name']}).toList(),
+      });
+
       setState(() {
         _periods = periods;
       });
-    } catch (e) {
-      debugPrint('Erro ao carregar períodos: $e');
+    } catch (e, stackTrace) {
+      TeacherStudentDetailLogger.error(
+        'Erro ao carregar períodos',
+        e,
+        stackTrace,
+      );
     }
   }
 
   Future<void> _fetchGradeTypes() async {
+    TeacherStudentDetailLogger.info('Iniciando busca por tipos de nota');
+
     try {
       final types = await GradeTypeService.getAllGradeTypes();
+
+      TeacherStudentDetailLogger.success(
+        'Tipos de nota carregados com sucesso',
+      );
+      TeacherStudentDetailLogger.debug('Tipos encontrados', {
+        'count': types.length,
+        'types':
+            types
+                .map(
+                  (t) => {
+                    'id': t['id'],
+                    'name': t['name'],
+                    'isConcept': t['isConcept'],
+                  },
+                )
+                .toList(),
+      });
+
       setState(() {
         _gradeTypes = types;
       });
-    } catch (e) {
-      debugPrint('Erro ao carregar tipos de nota: $e');
+    } catch (e, stackTrace) {
+      TeacherStudentDetailLogger.error(
+        'Erro ao carregar tipos de nota',
+        e,
+        stackTrace,
+      );
     }
   }
 
   Future<void> _fetchGrades() async {
+    TeacherStudentDetailLogger.info('Iniciando busca por notas do aluno');
+    TeacherStudentDetailLogger.debug('Parâmetros da busca', {
+      'studentId': widget.student['id'],
+      'subjectId': widget.subjectId,
+    });
+
     try {
       final grades = await GradeService.getGradesByStudent(
         widget.student['id'],
       );
+
+      TeacherStudentDetailLogger.success('Notas carregadas com sucesso');
+      TeacherStudentDetailLogger.debug('Notas encontradas', {
+        'totalCount': grades.length,
+        'filteredCount':
+            grades.where((g) => g['subjectId'] == widget.subjectId).length,
+        'subjectId': widget.subjectId,
+      });
+
       setState(() {
         _grades =
             grades.where((g) => g['subjectId'] == widget.subjectId).toList();
       });
-    } catch (e) {
-      debugPrint('Erro ao carregar notas: $e');
+    } catch (e, stackTrace) {
+      TeacherStudentDetailLogger.error('Erro ao carregar notas', e, stackTrace);
     }
   }
 
   Future<void> _fetchAttendances() async {
+    TeacherStudentDetailLogger.info('Iniciando busca por frequências do aluno');
+    TeacherStudentDetailLogger.debug('Parâmetros da busca', {
+      'studentId': widget.student['id'],
+      'subjectId': widget.subjectId,
+    });
+
     try {
       final attendances = await AttendanceService.getAttendancesByStudent(
         widget.student['id'],
       );
+
+      TeacherStudentDetailLogger.success('Frequências carregadas com sucesso');
+      TeacherStudentDetailLogger.debug('Frequências encontradas', {
+        'totalCount': attendances.length,
+        'filteredCount':
+            attendances
+                .where((a) => a['lesson']['subjectId'] == widget.subjectId)
+                .length,
+        'subjectId': widget.subjectId,
+      });
+
       setState(() {
         // Filtrar apenas as frequências da disciplina atual
         _attendances =
@@ -91,8 +225,12 @@ class _TeacherStudentDetailScreenState
                 .where((a) => a['lesson']['subjectId'] == widget.subjectId)
                 .toList();
       });
-    } catch (e) {
-      debugPrint('Erro ao carregar frequências: $e');
+    } catch (e, stackTrace) {
+      TeacherStudentDetailLogger.error(
+        'Erro ao carregar frequências',
+        e,
+        stackTrace,
+      );
     }
   }
 

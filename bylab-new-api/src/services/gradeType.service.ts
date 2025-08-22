@@ -1,25 +1,48 @@
 import prisma from '../prisma/client';
 
-export const getAllGradeTypes = () => {
+export const getAllGradeTypes = (schoolId?: string) => {
   return prisma.gradeType.findMany({
+    where: schoolId ? { schoolId } : {},
     orderBy: { name: 'asc' },
   });
 };
 
-export const getGradeTypeById = (id: string) => {
+export const getGradeTypeById = (id: string, schoolId?: string) => {
   return prisma.gradeType.findUnique({
-    where: { id },
+    where: { 
+      id,
+      ...(schoolId ? { schoolId } : {})
+    },
   });
 };
 
-export const createGradeType = (data: { name: string; description?: string }) => {
+export const createGradeType = (data: { 
+  name: string; 
+  description?: string;
+  schoolId: string;
+}) => {
   return prisma.gradeType.create({ data });
 };
 
-export const updateGradeType = (id: string, data: Partial<{ name: string; description?: string }>) => {
-  return prisma.gradeType.update({ where: { id }, data });
+export const updateGradeType = (
+  id: string, 
+  data: Partial<{ name: string; description?: string }>,
+  schoolId?: string
+) => {
+  return prisma.gradeType.update({ 
+    where: { 
+      id,
+      ...(schoolId ? { schoolId } : {})
+    }, 
+    data 
+  });
 };
 
-export const deleteGradeType = (id: string) => {
-  return prisma.gradeType.delete({ where: { id } });
+export const deleteGradeType = (id: string, schoolId?: string) => {
+  return prisma.gradeType.delete({ 
+    where: { 
+      id,
+      ...(schoolId ? { schoolId } : {})
+    } 
+  });
 }; 

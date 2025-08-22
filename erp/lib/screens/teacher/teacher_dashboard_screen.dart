@@ -15,6 +15,65 @@ import 'teacher_class_detail_screen.dart';
 import 'teacher_student_detail_screen.dart';
 import 'teacher_calendar_screen.dart';
 
+// Classe utilitária para logging estruturado
+class TeacherDashboardLogger {
+  static const String _prefix = '🏫 [TeacherDashboard]';
+
+  static void info(String message) {
+    debugPrint('$_prefix ℹ️ $message');
+  }
+
+  static void success(String message) {
+    debugPrint('$_prefix ✅ $message');
+  }
+
+  static void warning(String message) {
+    debugPrint('$_prefix ⚠️ $message');
+  }
+
+  static void error(String message, [dynamic error, StackTrace? stackTrace]) {
+    debugPrint('$_prefix ❌ $message');
+    if (error != null) {
+      debugPrint('$_prefix 🔍 Erro detalhado: $error');
+    }
+    if (stackTrace != null) {
+      debugPrint('$_prefix 📍 Stack trace: $stackTrace');
+    }
+  }
+
+  static void debug(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 🐛 $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados: $data');
+    }
+  }
+
+  static void api(
+    String endpoint,
+    String method, [
+    Map<String, dynamic>? params,
+  ]) {
+    debugPrint('$_prefix 🌐 API: $method $endpoint');
+    if (params != null) {
+      debugPrint('$_prefix 📝 Parâmetros: $params');
+    }
+  }
+
+  static void state(String message, [Map<String, dynamic>? state]) {
+    debugPrint('$_prefix 🔄 Estado: $message');
+    if (state != null) {
+      debugPrint('$_prefix 📊 Estado atual: $state');
+    }
+  }
+
+  static void armario(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 🗄️ [Armário] $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados do armário: $data');
+    }
+  }
+}
+
 class TeacherDashboardScreen extends StatefulWidget {
   const TeacherDashboardScreen({super.key});
 
@@ -56,13 +115,17 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     _tabController = TabController(length: 4, vsync: this);
 
     // Debug inicial
-    debugPrint('=== INIT STATE ===');
-    debugPrint('_selectedArmario inicial: "$_selectedArmario"');
+    TeacherDashboardLogger.info('Inicializando dashboard do professor');
+    TeacherDashboardLogger.debug('Estado inicial', {
+      'selectedArmario': _selectedArmario,
+      'tabControllerLength': _tabController.length,
+    });
 
     // Garantir que comece como null
     _selectedArmario = null;
-    debugPrint('_selectedArmario após reset: "$_selectedArmario"');
-    debugPrint('========================');
+    TeacherDashboardLogger.debug('Estado após reset', {
+      'selectedArmario': _selectedArmario,
+    });
 
     _loadInitialData();
     _loadArmarioData();
@@ -70,6 +133,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   // Método para mostrar diálogo de confirmação antes de sair
   Future<void> _showLogoutConfirmation() async {
+    TeacherDashboardLogger.info('Mostrando diálogo de confirmação de logout');
+
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -91,11 +156,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                TeacherDashboardLogger.info('Logout cancelado pelo usuário');
+                Navigator.of(context).pop();
+              },
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
+                TeacherDashboardLogger.info('Logout confirmado pelo usuário');
                 Navigator.of(context).pop();
                 // Executar logout após confirmação
                 final authProvider = Provider.of<AuthProvider>(
@@ -155,33 +224,39 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           _filteredArmarioItems = items;
 
           // Debug dos itens carregados
-          debugPrint('=== ITENS CARREGADOS ===');
-          debugPrint('Total de itens: ${items.length}');
-          debugPrint('_selectedArmario: "$_selectedArmario"');
+          TeacherDashboardLogger.info('Itens carregados');
+          TeacherDashboardLogger.debug('Total de itens', {
+            'total': items.length,
+          });
+          TeacherDashboardLogger.debug('selectedArmario', {
+            'selectedArmario': _selectedArmario,
+          });
 
           if (items.isNotEmpty) {
-            debugPrint('Primeiro item:');
-            debugPrint('  Nome: ${items.first.nome}');
-            debugPrint('  Posição: ${items.first.posicao}');
-            debugPrint('  espIp: "${items.first.espIp}"');
-            debugPrint('  espIpOriginal: "${items.first.espIpOriginal}"');
+            TeacherDashboardLogger.debug('Primeiro item', {
+              'nome': items.first.nome,
+              'posicao': items.first.posicao,
+              'espIp': items.first.espIp,
+              'espIpOriginal': items.first.espIpOriginal,
+            });
 
             if (items.length > 1) {
-              debugPrint('Segundo item:');
-              debugPrint('  Nome: ${items[1].nome}');
-              debugPrint('  Posição: ${items[1].posicao}');
-              debugPrint('  espIp: "${items[1].espIp}"');
-              debugPrint('  espIpOriginal: "${items[1].espIpOriginal}"');
+              TeacherDashboardLogger.debug('Segundo item', {
+                'nome': items[1].nome,
+                'posicao': items[1].posicao,
+                'espIp': items[1].espIp,
+                'espIpOriginal': items[1].espIpOriginal,
+              });
             }
           }
-          debugPrint('========================');
+          TeacherDashboardLogger.info('========================');
         });
 
         // Aplicar filtros após carregar os itens
         _applyFilters();
       }
     } catch (e) {
-      debugPrint('Erro ao carregar itens: $e');
+      TeacherDashboardLogger.error('Erro ao carregar itens', e);
     } finally {
       if (mounted) {
         setState(() => _isLoadingArmarios = false);
@@ -190,10 +265,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   }
 
   void _filterArmarioItems(String query) {
-    debugPrint('=== FILTRANDO ITENS ===');
-    debugPrint('Query: "$query"');
-    debugPrint('Filtro de armário: $_selectedArmarioFilter');
-    debugPrint('_selectedArmario: "$_selectedArmario"');
+    TeacherDashboardLogger.info('Filtrando itens');
+    TeacherDashboardLogger.debug('Query', {'query': query});
+    TeacherDashboardLogger.debug('Filtro de armário', {
+      'selectedArmarioFilter': _selectedArmarioFilter,
+    });
+    TeacherDashboardLogger.debug('selectedArmario', {
+      'selectedArmario': _selectedArmario,
+    });
 
     setState(() {
       // Primeiro aplicar filtro de armário
@@ -220,8 +299,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       }
     });
 
-    debugPrint('Itens filtrados: ${_filteredArmarioItems.length}');
-    debugPrint('========================');
+    TeacherDashboardLogger.info('Itens filtrados');
+    TeacherDashboardLogger.debug('Total de itens filtrados', {
+      'total': _filteredArmarioItems.length,
+    });
+    TeacherDashboardLogger.info('========================');
   }
 
   void _filterArmarioItemsByArmario(String? armario) {
@@ -269,6 +351,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       if (authProvider.user?.teacher != null) {
         final classes = await TeacherService.getTeacherClasses(
           authProvider.user!.teacher!.id,
+          token: authProvider.user?.token,
         );
         setState(() {
           _teacherClasses = classes;
@@ -785,9 +868,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
       }
 
-      debugPrint('Foto do professor atualizada com sucesso');
+      TeacherDashboardLogger.info('Foto do professor atualizada com sucesso');
     } catch (e) {
-      debugPrint('Erro no upload da foto: $e');
+      TeacherDashboardLogger.error('Erro no upload da foto', e);
       throw Exception('Erro ao atualizar foto: $e');
     }
   }
@@ -823,12 +906,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       return;
     }
 
-    debugPrint(
-      'Fazendo requisição para: http://192.168.18.15:3000/teachers/$teacherId/classes',
-    );
+    TeacherDashboardLogger.api('/teachers/$teacherId/classes', 'GET');
     try {
-      final classes = await TeacherService.getTeacherClasses(teacherId);
-      debugPrint('Classes encontradas: ${classes.length}');
+      final classes = await TeacherService.getTeacherClasses(
+        teacherId,
+        token: authProvider.user?.token,
+      );
+      TeacherDashboardLogger.debug('Classes encontradas', {
+        'total': classes.length,
+      });
       if (!mounted) return;
       setState(() {
         _teacherClasses = classes;
@@ -855,11 +941,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     });
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       List<Map<String, dynamic>> allStudents = [];
 
       for (final classData in _teacherClasses) {
         final classId = classData['id'];
-        final students = await TeacherService.getClassStudents(classId);
+        final students = await TeacherService.getClassStudents(
+          classId,
+          token: authProvider.user?.token,
+        );
         allStudents.addAll(students);
       }
 
@@ -1494,11 +1584,17 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   Widget _buildArmariosTab() {
     // Debug inicial
-    debugPrint('=== BUILD ARMARIOS TAB ===');
-    debugPrint('_selectedArmario: "$_selectedArmario"');
-    debugPrint('_armarioItems.length: ${_armarioItems.length}');
-    debugPrint('_filteredArmarioItems.length: ${_filteredArmarioItems.length}');
-    debugPrint('========================');
+    TeacherDashboardLogger.armario('Construindo aba de armários');
+    TeacherDashboardLogger.debug('selectedArmario', {
+      'selectedArmario': _selectedArmario,
+    });
+    TeacherDashboardLogger.debug('armarioItems.length', {
+      'total': _armarioItems.length,
+    });
+    TeacherDashboardLogger.debug('filteredArmarioItems.length', {
+      'total': _filteredArmarioItems.length,
+    });
+    TeacherDashboardLogger.info('========================');
 
     if (_isLoadingArmarios) {
       return const Center(child: CircularProgressIndicator());
@@ -1704,14 +1800,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                           final itemId = '${item.nome}_${item.posicao}';
 
                           // Debug simplificado
-                          debugPrint(
-                            'Item $index: ${item.nome} - ID: "$itemId" - selected: "$_selectedArmario"',
-                          );
+                          TeacherDashboardLogger.debug('Item', {
+                            'index': index,
+                            'nome': item.nome,
+                            'ID': itemId,
+                            'selectedArmario': _selectedArmario,
+                          });
 
                           // Comparação usando o ID único do item
                           final isSelected = _selectedArmario == itemId;
 
-                          debugPrint('  isSelected: $isSelected');
+                          TeacherDashboardLogger.debug('isSelected', {
+                            'isSelected': isSelected,
+                          });
 
                           return Container(
                             margin: const EdgeInsets.symmetric(
@@ -1737,23 +1838,28 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(50),
                                 onTap: () {
-                                  debugPrint('=== CLIQUE NO ITEM ===');
-                                  debugPrint('Item clicado: ${item.nome}');
-                                  debugPrint('ID do item: "$itemId"');
-                                  debugPrint(
-                                    '_selectedArmario atual: "$_selectedArmario"',
+                                  TeacherDashboardLogger.info('Clique no item');
+                                  TeacherDashboardLogger.debug('Item clicado', {
+                                    'nome': item.nome,
+                                    'ID': itemId,
+                                  });
+                                  TeacherDashboardLogger.debug(
+                                    'selectedArmario atual',
+                                    {'selectedArmario': _selectedArmario},
                                   );
 
                                   setState(() {
                                     if (_selectedArmario == itemId) {
                                       // Se já está selecionado, deseleciona
                                       _selectedArmario = null;
-                                      debugPrint('Item DESELECIONADO');
+                                      TeacherDashboardLogger.info(
+                                        'Item DESELECIONADO',
+                                      );
                                     } else {
                                       // Seleciona o novo item
                                       _selectedArmario = itemId;
-                                      debugPrint(
-                                        'Item SELECIONADO: "$_selectedArmario"',
+                                      TeacherDashboardLogger.info(
+                                        'Item SELECIONADO',
                                       );
                                     }
                                   });
@@ -2102,8 +2208,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           ),
     );
 
-    debugPrint('Item selecionado para localização: ${selectedItem.nome}');
-    debugPrint('ID único: $_selectedArmario');
+    TeacherDashboardLogger.info(
+      'Item selecionado para localização: ${selectedItem.nome}',
+    );
+    TeacherDashboardLogger.debug('ID único', {
+      'selectedArmario': _selectedArmario,
+    });
 
     try {
       final user = Provider.of<AuthProvider>(context, listen: false).user!;
@@ -2146,9 +2256,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       }
     }
 
-    debugPrint('=== ARMÁRIOS DISPONÍVEIS ===');
-    debugPrint('Armários encontrados: ${uniqueArmarios.toList()}');
-    debugPrint('========================');
+    TeacherDashboardLogger.info('Armários disponíveis');
+    TeacherDashboardLogger.debug('Armários encontrados', {
+      'armarios': uniqueArmarios.toList(),
+    });
+    TeacherDashboardLogger.info('========================');
 
     return uniqueArmarios.toList()..sort();
   }
@@ -2166,10 +2278,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       }
     });
 
-    debugPrint('=== FILTROS APLICADOS ===');
-    debugPrint('Filtro de armário: $_selectedArmarioFilter');
-    debugPrint('Itens filtrados: ${_filteredArmarioItems.length}');
-    debugPrint('========================');
+    TeacherDashboardLogger.info('Filtros aplicados');
+    TeacherDashboardLogger.debug('Filtro de armário', {
+      'selectedArmarioFilter': _selectedArmarioFilter,
+    });
+    TeacherDashboardLogger.debug('Itens filtrados', {
+      'total': _filteredArmarioItems.length,
+    });
+    TeacherDashboardLogger.info('========================');
   }
 
   void _clearFilters() {
@@ -2179,10 +2295,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       _filteredArmarioItems = _armarioItems;
     });
 
-    debugPrint('=== FILTROS LIMPOS ===');
-    debugPrint('Filtros resetados para valores padrão');
-    debugPrint('Itens filtrados: ${_filteredArmarioItems.length}');
-    debugPrint('========================');
+    TeacherDashboardLogger.info('Filtros limpos');
+    TeacherDashboardLogger.info('Filtros resetados para valores padrão');
+    TeacherDashboardLogger.debug('Itens filtrados', {
+      'total': _filteredArmarioItems.length,
+    });
+    TeacherDashboardLogger.info('========================');
   }
 }
 
@@ -2417,11 +2535,15 @@ class _StudentCard extends StatefulWidget {
 class _StudentCardState extends State<_StudentCard> {
   Future<void> _onStudentCardTap(String teacherId) async {
     try {
-      final classes = await TeacherService.getTeacherClasses(teacherId);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final classes = await TeacherService.getTeacherClasses(
+        teacherId,
+        token: authProvider.user?.token,
+      );
       if (!mounted) return;
 
       // Debug: verificar turmas retornadas
-      debugPrint('Turmas retornadas: $classes');
+      TeacherDashboardLogger.debug('Turmas retornadas', {'turmas': classes});
 
       // Filtrar as turmas que contêm este aluno
       final studentClasses =
@@ -2433,7 +2555,9 @@ class _StudentCardState extends State<_StudentCard> {
           }).toList();
 
       // Debug: verificar turmas filtradas
-      debugPrint('Turmas do aluno: $studentClasses');
+      TeacherDashboardLogger.debug('Turmas do aluno', {
+        'turmas': studentClasses,
+      });
 
       if (!mounted) return;
 
@@ -2454,7 +2578,9 @@ class _StudentCardState extends State<_StudentCard> {
         final subjects = classData['subjects'] as List? ?? [];
 
         // Debug: verificar disciplinas da turma
-        debugPrint('Disciplinas da turma: $subjects');
+        TeacherDashboardLogger.debug('Disciplinas da turma', {
+          'disciplinas': subjects,
+        });
 
         // Se não houver disciplinas
         if (subjects.isEmpty) {
@@ -2513,7 +2639,7 @@ class _StudentCardState extends State<_StudentCard> {
       }
     } catch (error) {
       if (!mounted) return;
-      debugPrint('Erro ao carregar turmas: $error');
+      TeacherDashboardLogger.error('Erro ao carregar turmas', error);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erro ao carregar turmas: $error'),
@@ -2660,8 +2786,10 @@ class _StudentCardState extends State<_StudentCard> {
         }
 
         // Debug: verificar dados do professor
-        debugPrint('ID do Professor: $teacherId');
-        debugPrint('Dados do aluno: ${widget.student}');
+        TeacherDashboardLogger.debug('ID do Professor', {'id': teacherId});
+        TeacherDashboardLogger.debug('Dados do aluno', {
+          'aluno': widget.student,
+        });
 
         _onStudentCardTap(teacherId);
       },

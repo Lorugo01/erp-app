@@ -3,6 +3,7 @@ import * as TeacherService from '../services/teacher.service';
 import { renameStudentPhoto } from '../middlewares/upload.middleware';
 import path from 'path';
 import fs from 'fs';
+import prisma from '../prisma/client';
 
 export const getAll = async (req: Request, res: Response) => {
   try {
@@ -21,8 +22,27 @@ export const getAll = async (req: Request, res: Response) => {
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const teacher = await TeacherService.getTeacherById(req.params.id);
-    res.json(teacher);
+    const teacherId = req.params.id;
+    const user = req.user;
+    
+    // Verificar se o usuário tem acesso ao professor
+    const teacher = await prisma.teacher.findUnique({
+      where: { id: teacherId },
+      select: { id: true, schoolId: true }
+    });
+    
+    if (!teacher) {
+      return res.status(404).json({ error: 'Professor não encontrado' });
+    }
+    
+    // DEVELOPER pode ver professores de qualquer escola
+    // Outros usuários só podem ver professores da sua escola
+    if (user?.role !== 'DEVELOPER' && user?.schoolId && teacher.schoolId !== user.schoolId) {
+      return res.status(403).json({ error: 'Acesso negado a este professor' });
+    }
+    
+    const teacherDetails = await TeacherService.getTeacherById(teacherId);
+    res.json(teacherDetails);
   } catch (error) {
     next(error);
   }

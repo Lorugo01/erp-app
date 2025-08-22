@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/grade_period_service.dart';
 import '../../services/grade_type_service.dart';
 
@@ -45,7 +47,9 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
       });
     }
     try {
-      final periods = await GradePeriodService.getAllGradePeriods();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+      final periods = await GradePeriodService.getAllGradePeriods(token: token);
       if (mounted) {
         setState(() {
           _periods = periods;
@@ -74,7 +78,9 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
       });
     }
     try {
-      final types = await GradeTypeService.getAllGradeTypes();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+      final types = await GradeTypeService.getAllGradeTypes(token: token);
       if (mounted) {
         setState(() {
           _gradeTypes = types;
@@ -120,7 +126,9 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
 
     if (confirm == true) {
       try {
-        await GradePeriodService.deleteGradePeriod(id);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final token = authProvider.user?.token;
+        await GradePeriodService.deleteGradePeriod(id, token: token);
         await _fetchPeriods();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -168,7 +176,9 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
 
     if (confirm == true) {
       try {
-        await GradeTypeService.deleteGradeType(id);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final token = authProvider.user?.token;
+        await GradeTypeService.deleteGradeType(id, token: token);
         await _fetchGradeTypes();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -509,9 +519,12 @@ class _AddPeriodDialogState extends State<AddPeriodDialog> {
     }
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
       await GradePeriodService.createGradePeriod(
         name: _nameController.text,
         order: int.parse(_orderController.text),
+        token: token,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -626,10 +639,13 @@ class _EditPeriodDialogState extends State<EditPeriodDialog> {
     }
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
       await GradePeriodService.updateGradePeriod(
         id: widget.period['id'],
         name: _nameController.text,
         order: int.parse(_orderController.text),
+        token: token,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -736,6 +752,8 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
     }
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
       await GradeTypeService.createGradeType(
         name: _nameController.text,
         description:
@@ -743,6 +761,7 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
                 ? _descriptionController.text
                 : null,
         isConcept: _isConcept,
+        token: token,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -870,6 +889,8 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
     }
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
       await GradeTypeService.updateGradeType(
         id: widget.gradeType['id'],
         name: _nameController.text,
@@ -878,6 +899,7 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
                 ? _descriptionController.text
                 : null,
         isConcept: _isConcept,
+        token: token,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {

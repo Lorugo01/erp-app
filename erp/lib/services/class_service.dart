@@ -15,7 +15,9 @@ class ClassService {
     return headers;
   }
 
-  static Future<List<Map<String, dynamic>>> getAllClasses({String? token}) async {
+  static Future<List<Map<String, dynamic>>> getAllClasses({
+    String? token,
+  }) async {
     final response = await http.get(
       Uri.parse(ApiConfig.getClassesUrl('')),
       headers: _getAuthHeaders(token),
@@ -28,7 +30,10 @@ class ClassService {
     }
   }
 
-  static Future<Map<String, dynamic>> getClassById(String id, {String? token}) async {
+  static Future<Map<String, dynamic>> getClassById(
+    String id, {
+    String? token,
+  }) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getClassesUrl('/$id')),
@@ -52,7 +57,8 @@ class ClassService {
       headers: _getAuthHeaders(token),
     );
 
-    if (response.statusCode != 200) {
+    // 200 OK ou 204 No Content são sucesso para DELETE
+    if (response.statusCode != 200 && response.statusCode != 204) {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? 'Erro ao deletar turma');
     }

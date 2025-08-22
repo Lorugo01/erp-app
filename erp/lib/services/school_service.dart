@@ -133,18 +133,17 @@ class SchoolService {
   // Deletar escola
   static Future<void> deleteSchool(String id, {bool force = false}) async {
     try {
-      final uri = force 
-          ? Uri.parse('${ApiConfig.baseUrl}/schools/$id?force=true')
-          : Uri.parse('${ApiConfig.baseUrl}/schools/$id');
-          
+      final uri =
+          force
+              ? Uri.parse('${ApiConfig.baseUrl}/schools/$id?force=true')
+              : Uri.parse('${ApiConfig.baseUrl}/schools/$id');
+
       final response = await http
-          .delete(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-          )
+          .delete(uri, headers: {'Content-Type': 'application/json'})
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 
-      if (response.statusCode != 200) {
+      // 200 OK ou 204 No Content são sucesso para DELETE
+      if (response.statusCode != 200 && response.statusCode != 204) {
         debugPrint('❌ Erro HTTP: ${response.statusCode} - ${response.body}');
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'Erro ao deletar escola');

@@ -6,8 +6,22 @@ class GradeTypeService {
   // URL base da API - agora centralizada
   static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<List<Map<String, dynamic>>> getAllGradeTypes() async {
-    final response = await http.get(Uri.parse(ApiConfig.getGradeTypesUrl('')));
+  // Helper para criar headers com autenticação
+  static Map<String, String> _getAuthHeaders(String? token) {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllGradeTypes({
+    String? token,
+  }) async {
+    final response = await http.get(
+      Uri.parse(ApiConfig.getGradeTypesUrl('')),
+      headers: _getAuthHeaders(token),
+    );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
@@ -16,11 +30,14 @@ class GradeTypeService {
     }
   }
 
-  static Future<Map<String, dynamic>> getGradeTypeById(String id) async {
+  static Future<Map<String, dynamic>> getGradeTypeById(
+    String id, {
+    String? token,
+  }) async {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.getGradeTypesUrl('/$id')),
-        headers: {'Content-Type': 'application/json'},
+        headers: _getAuthHeaders(token),
       );
 
       if (response.statusCode == 200) {
@@ -39,10 +56,11 @@ class GradeTypeService {
     required String name,
     String? description,
     bool isConcept = false,
+    String? token,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/grade-types'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getAuthHeaders(token),
       body: jsonEncode({
         'name': name,
         if (description != null) 'description': description,
@@ -62,10 +80,11 @@ class GradeTypeService {
     String? name,
     String? description,
     bool? isConcept,
+    String? token,
   }) async {
     final response = await http.put(
       Uri.parse('$baseUrl/grade-types/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getAuthHeaders(token),
       body: jsonEncode({
         if (name != null) 'name': name,
         if (description != null) 'description': description,
@@ -80,10 +99,13 @@ class GradeTypeService {
   }
 
   // Deletar tipo de nota
-  static Future<void> deleteGradeType(String id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/grade-types/$id'));
+  static Future<void> deleteGradeType(String id, {String? token}) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/grade-types/$id'),
+      headers: _getAuthHeaders(token),
+    );
     if (response.statusCode != 204) {
-      throw Exception('Erro ao deletar tipo de nota');
+      throw Exception('Erro ao deletar tipo de nota: ${response.body}');
     }
   }
 }

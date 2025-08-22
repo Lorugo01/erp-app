@@ -5,10 +5,12 @@ import 'package:http/http.dart' as http;
 // ignore: depend_on_referenced_packages
 import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
 import '../../services/student_service.dart' as student_service;
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../models/grade.dart';
+import '../../providers/auth_provider.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final student_service.Student student;
@@ -49,9 +51,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     });
 
     try {
+      // Obter token de autenticação
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        setState(() {
+          _error = 'Token de autenticação não encontrado';
+        });
+        return;
+      }
+
       final response = await http.get(
         Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
       if (!mounted) return;
@@ -92,12 +108,22 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     // Coletar todos os lessonIds únicos
     final lessonIds = attendances.map((a) => a['lessonId']).toSet().toList();
     if (lessonIds.isEmpty) return;
+
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) return; // Se não há token, não busca lessons
+
     Map<String, dynamic> lessonsMap = {};
     for (final lessonId in lessonIds) {
       if (lessonId == null) continue;
       final response = await http.get(
         Uri.parse('http://192.168.18.15:3000/lessons/$lessonId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
       if (response.statusCode == 200) {
         final lesson = jsonDecode(response.body);
@@ -110,8 +136,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Future<void> _fetchPeriods() async {
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) return; // Se não há token, não busca períodos
+
     final response = await http.get(
       Uri.parse('http://192.168.18.15:3000/grade-periods'),
+      headers: {'Authorization': 'Bearer $token'},
     );
     if (response.statusCode == 200) {
       setState(() {

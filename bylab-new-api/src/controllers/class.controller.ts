@@ -58,6 +58,24 @@ export const getByName = async (req: Request, res: Response, next: NextFunction)
 export const getEvents = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const classId = req.params.id;
+    const user = req.user;
+    
+    // Verificar se o usuário tem acesso à turma
+    const turma = await prisma.class.findUnique({
+      where: { id: classId },
+      select: { id: true, schoolId: true }
+    });
+    
+    if (!turma) {
+      return res.status(404).json({ error: 'Turma não encontrada' });
+    }
+    
+    // DEVELOPER pode ver eventos de qualquer turma
+    // Outros usuários só podem ver eventos de turmas da sua escola
+    if (user?.role !== 'DEVELOPER' && user?.schoolId && turma.schoolId !== user.schoolId) {
+      return res.status(403).json({ error: 'Acesso negado a esta turma' });
+    }
+    
     const events = await EventService.getEventsByClassId(classId);
     res.json(events);
   } catch (error) {

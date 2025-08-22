@@ -39,9 +39,23 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     });
 
     try {
+      // Obter token de autenticação
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        setState(() {
+          _error = 'Token de autenticação não encontrado';
+        });
+        return;
+      }
+
       final response = await http.get(
         Uri.parse('http://192.168.18.15:3000/teachers/${widget.teacher['id']}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
       if (!mounted) return;
@@ -801,9 +815,20 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     });
 
     try {
+      // Obter token de autenticação
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        throw Exception('Token de autenticação não encontrado');
+      }
+
       final response = await http.delete(
         Uri.parse('http://192.168.18.15:3000/teachers/${widget.teacher['id']}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
       if (!mounted) return;

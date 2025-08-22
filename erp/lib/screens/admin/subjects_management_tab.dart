@@ -22,12 +22,15 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
   }
 
   Future<void> _fetchSubjects() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       // Dados mock para teste - remover quando a API estiver funcionando
       await Future.delayed(
         const Duration(milliseconds: 500),
       ); // Simular delay da API
+
+      if (!mounted) return;
 
       final mockData = [
         {
@@ -86,10 +89,12 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
         },
       ];
 
-      setState(() {
-        _subjects = mockData;
-        _error = null;
-      });
+      if (mounted) {
+        setState(() {
+          _subjects = mockData;
+          _error = null;
+        });
+      }
 
       // Comentado temporariamente - descomentar quando a API estiver funcionando
       /*
@@ -98,18 +103,24 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
       );
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        setState(() {
-          _subjects = data.cast<Map<String, dynamic>>();
-          _error = null;
-        });
+        if (mounted) {
+          setState(() {
+            _subjects = data.cast<Map<String, dynamic>>();
+            _error = null;
+          });
+        }
       } else {
         throw Exception('Erro ao carregar matérias');
       }
       */
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

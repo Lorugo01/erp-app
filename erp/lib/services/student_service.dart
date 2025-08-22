@@ -153,7 +153,8 @@ class StudentService {
       headers: {'Content-Type': 'application/json'},
     );
 
-    if (response.statusCode != 200) {
+    // 200 OK ou 204 No Content são sucesso para DELETE
+    if (response.statusCode != 200 && response.statusCode != 204) {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? 'Erro ao deletar aluno');
     }

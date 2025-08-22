@@ -4,6 +4,65 @@ import '../../providers/auth_provider.dart';
 import '../../providers/data_provider.dart';
 import '../../widgets/data_refresh_widget.dart';
 
+// Classe utilitária para logging estruturado
+class TeacherProfileLogger {
+  static const String _prefix = '👨‍🏫 [TeacherProfile]';
+
+  static void info(String message) {
+    debugPrint('$_prefix ℹ️ $message');
+  }
+
+  static void success(String message) {
+    debugPrint('$_prefix ✅ $message');
+  }
+
+  static void warning(String message) {
+    debugPrint('$_prefix ⚠️ $message');
+  }
+
+  static void error(String message, [dynamic error, StackTrace? stackTrace]) {
+    debugPrint('$_prefix ❌ $message');
+    if (error != null) {
+      debugPrint('$_prefix 🔍 Erro detalhado: $error');
+    }
+    if (stackTrace != null) {
+      debugPrint('$_prefix 📍 Stack trace: $stackTrace');
+    }
+  }
+
+  static void debug(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 🐛 $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados: $data');
+    }
+  }
+
+  static void api(
+    String endpoint,
+    String method, [
+    Map<String, dynamic>? params,
+  ]) {
+    debugPrint('$_prefix 🌐 API: $method $endpoint');
+    if (params != null) {
+      debugPrint('$_prefix 📝 Parâmetros: $params');
+    }
+  }
+
+  static void state(String message, [Map<String, dynamic>? state]) {
+    debugPrint('$_prefix 🔄 Estado: $message');
+    if (state != null) {
+      debugPrint('$_prefix 📊 Estado atual: $state');
+    }
+  }
+
+  static void profile(String message, [Map<String, dynamic>? data]) {
+    debugPrint('$_prefix 👤 [Perfil] $message');
+    if (data != null) {
+      debugPrint('$_prefix 📊 Dados do perfil: $data');
+    }
+  }
+}
+
 class TeacherProfileScreen extends StatefulWidget {
   final String teacherId;
 
@@ -24,10 +83,17 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
   @override
   void initState() {
     super.initState();
+    TeacherProfileLogger.info('Inicializando tela de perfil do professor');
+    TeacherProfileLogger.debug('Dados recebidos', {
+      'teacherId': widget.teacherId,
+    });
+
     _loadTeacherData();
   }
 
   Future<void> _loadTeacherData() async {
+    TeacherProfileLogger.info('Iniciando carregamento de dados do professor');
+
     setState(() => _isLoading = true);
 
     try {
@@ -36,10 +102,29 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
 
       final teacher = dataProvider.currentTeacher;
       if (teacher != null) {
+        TeacherProfileLogger.success(
+          'Dados do professor carregados com sucesso',
+        );
+        TeacherProfileLogger.debug('Dados do professor', {
+          'id': teacher['id'],
+          'name': teacher['name'],
+          'email': teacher['email'],
+          'photoUrl': teacher['photoUrl'],
+        });
+
         _nameController.text = teacher['name'] ?? '';
         _emailController.text = teacher['email'] ?? '';
+      } else {
+        TeacherProfileLogger.warning(
+          'Professor não encontrado no DataProvider',
+        );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      TeacherProfileLogger.error(
+        'Erro ao carregar dados do professor',
+        e,
+        stackTrace,
+      );
       showErrorSnackBar('Erro ao carregar dados: $e');
     } finally {
       setState(() => _isLoading = false);
@@ -47,7 +132,16 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
   }
 
   Future<void> _updateTeacherData() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      TeacherProfileLogger.warning('Validação do formulário falhou');
+      return;
+    }
+
+    TeacherProfileLogger.info('Iniciando atualização de dados do professor');
+    TeacherProfileLogger.debug('Dados para atualizar', {
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+    });
 
     setState(() => _isLoading = true);
 
@@ -61,14 +155,27 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
         'email': _emailController.text.trim(),
       });
 
+      TeacherProfileLogger.success(
+        'Dados do professor atualizados com sucesso',
+      );
+
       // Atualizar dados do usuário se necessário
       if (authProvider.user != null) {
+        TeacherProfileLogger.info('Atualizando dados do usuário');
         await authProvider.refreshUserData();
+        TeacherProfileLogger.success(
+          'Dados do usuário atualizados com sucesso',
+        );
       }
 
       setState(() => _isEditing = false);
       showRefreshSnackBar('Dados atualizados com sucesso!');
-    } catch (e) {
+    } catch (e, stackTrace) {
+      TeacherProfileLogger.error(
+        'Erro ao atualizar dados do professor',
+        e,
+        stackTrace,
+      );
       showErrorSnackBar('Erro ao atualizar dados: $e');
     } finally {
       setState(() => _isLoading = false);
@@ -76,8 +183,16 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
   }
 
   Future<void> _updateTeacherPhoto() async {
+    TeacherProfileLogger.info('Iniciando atualização de foto do professor');
+    TeacherProfileLogger.debug('Dados da atualização', {
+      'teacherId': widget.teacherId,
+    });
+
     // Implementar upload de foto
     showRefreshSnackBar('Funcionalidade de upload de foto será implementada');
+    TeacherProfileLogger.info(
+      'Funcionalidade de upload de foto não implementada',
+    );
   }
 
   @override

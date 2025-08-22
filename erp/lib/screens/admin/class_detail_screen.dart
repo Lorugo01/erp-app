@@ -105,7 +105,7 @@ class ClassDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     // Widget do horário semanal
-                    SizedBox(height: 420, child: _WeeklyScheduleTab()),
+                    SizedBox(height: 420, child: WeeklyScheduleTab()),
                   ],
                 ),
               ),
@@ -118,12 +118,14 @@ class ClassDetailScreen extends StatelessWidget {
 }
 
 // Aba: Horário Semanal de Aulas
-class _WeeklyScheduleTab extends StatefulWidget {
+class WeeklyScheduleTab extends StatefulWidget {
+  const WeeklyScheduleTab({super.key});
+
   @override
-  State<_WeeklyScheduleTab> createState() => _WeeklyScheduleTabState();
+  State<WeeklyScheduleTab> createState() => _WeeklyScheduleTabState();
 }
 
-class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
+class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
   List<Map<String, dynamic>> events = [];
   List<Map<String, dynamic>> professores = [];
   final List<String> weekDays = [
@@ -269,20 +271,48 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   Future<void> fetchEvents() async {
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
     final turmaId = parent?.classData['id'] ?? '';
-    final response = await http.get(
-      Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
-    );
-    if (response.statusCode == 200) {
-      setState(() {
-        events = List<Map<String, dynamic>>.from(json.decode(response.body));
-      });
-      _gerarHorarios(); // Atualiza a lista de horários após carregar eventos
-      _garantirHorariosMinimos();
 
-      // Garante que não há duplicatas após carregar eventos
-      setState(() {
-        horarios = horarios.toSet().toList()..sort();
-      });
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      debugPrint('❌ Token de autenticação não encontrado');
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      debugPrint('🔍 Status da resposta fetchEvents: ${response.statusCode}');
+      debugPrint('🔍 Corpo da resposta: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final eventos = List<Map<String, dynamic>>.from(
+          json.decode(response.body),
+        );
+        debugPrint('🔍 Eventos encontrados: ${eventos.length}');
+
+        setState(() {
+          events = eventos;
+        });
+        _gerarHorarios(); // Atualiza a lista de horários após carregar eventos
+        _garantirHorariosMinimos();
+
+        // Garante que não há duplicatas após carregar eventos
+        setState(() {
+          horarios = horarios.toSet().toList()..sort();
+        });
+      } else {
+        debugPrint(
+          '❌ Erro ao buscar eventos: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Exceção ao buscar eventos: $e');
     }
   }
 
@@ -290,15 +320,15 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     debugPrint('Enviando evento para o backend: $event');
     final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
     final turmaId = parent?.classData['id'] ?? '';
-    
+
     // Obter token de autenticação
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.user?.token;
-    
+
     if (token == null) {
       throw Exception('Token de autenticação não encontrado');
     }
-    
+
     final response = await http.post(
       Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
       headers: {
@@ -338,11 +368,11 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     // Obter token de autenticação
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.user?.token;
-    
+
     if (token == null) {
       throw Exception('Token de autenticação não encontrado');
     }
-    
+
     final response = await http.put(
       Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
       headers: {
@@ -361,11 +391,11 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     // Obter token de autenticação
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.user?.token;
-    
+
     if (token == null) {
       throw Exception('Token de autenticação não encontrado');
     }
-    
+
     final response = await http.delete(
       Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
       headers: {'Authorization': 'Bearer $token'},
@@ -402,355 +432,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     );
   }
 
-  void _showEditEventDialog(Map<String, dynamic> evento) {
-    // Garante que há horários disponíveis antes de abrir o diálogo
-    _garantirHorariosMinimos();
-
-    String? subjectType = evento['title'];
-    String? description = evento['description'];
-    int dayOfWeek = evento['dayOfWeek'] ?? 1;
-    String startTime =
-        evento['startTime'] ?? (horarios.isNotEmpty ? horarios.first : '07:00');
-    String endTime =
-        evento['endTime'] ?? (horarios.length > 1 ? horarios[1] : '07:50');
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar Aula'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: subjectType,
-                  items:
-                      subjectTypes
-                          .map(
-                            (type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(
-                                type.replaceAll('_', ' ').toUpperCase(),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (v) => subjectType = v,
-                  decoration: const InputDecoration(labelText: 'Disciplina'),
-                  validator: (v) => v == null ? 'Selecione a disciplina' : null,
-                ),
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'Professor/Descrição',
-                  ),
-                  controller: TextEditingController(text: description),
-                  onChanged: (v) => description = v,
-                ),
-                DropdownButtonFormField<int>(
-                  value: dayOfWeek,
-                  items: List.generate(
-                    7,
-                    (i) => DropdownMenuItem(
-                      value: i + 1,
-                      child: Text(weekDays[i]),
-                    ),
-                  ),
-                  onChanged: (v) => dayOfWeek = v ?? 1,
-                  decoration: const InputDecoration(labelText: 'Dia da Semana'),
-                ),
-                DropdownButtonFormField<String>(
-                  value:
-                      horarios.contains(startTime)
-                          ? startTime
-                          : (horarios.isNotEmpty ? horarios.first : null),
-                  items:
-                      horarios
-                          .map(
-                            (h) => DropdownMenuItem(value: h, child: Text(h)),
-                          )
-                          .toList(),
-                  onChanged:
-                      (v) =>
-                          startTime =
-                              v ??
-                              (horarios.isNotEmpty ? horarios.first : '07:00'),
-                  decoration: const InputDecoration(labelText: 'Início'),
-                ),
-                DropdownButtonFormField<String>(
-                  value:
-                      horarios.contains(endTime)
-                          ? endTime
-                          : (horarios.length > 1 ? horarios[1] : null),
-                  items:
-                      horarios
-                          .map(
-                            (h) => DropdownMenuItem(value: h, child: Text(h)),
-                          )
-                          .toList(),
-                  onChanged:
-                      (v) =>
-                          endTime =
-                              v ??
-                              (horarios.length > 1 ? horarios[1] : '07:50'),
-                  decoration: const InputDecoration(labelText: 'Fim'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (subjectType != null && subjectType!.isNotEmpty) {
-                  updateEvent(evento['id'], {
-                    'title': subjectType,
-                    'description': description,
-                    'dayOfWeek': dayOfWeek,
-                    'startTime': startTime,
-                    'endTime': endTime,
-                    'date': null,
-                  });
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                  }
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () async {
-                await deleteEvent(evento['id']);
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Excluir'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Garante que sempre há horários disponíveis antes de renderizar
-    _garantirHorariosMinimos();
-
-    // Garante que não há duplicatas antes de renderizar
-    horarios = horarios.toSet().toList()..sort();
-
-    // Debug: verifica os horários antes de renderizar
-    debugPrint('Horários antes de renderizar: $horarios');
-    debugPrint('Quantidade de horários: ${horarios.length}');
-
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Adicionar Aula',
-                style: TextStyle(color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2953A5),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                elevation: 4,
-              ),
-              onPressed: _showAddEventDialog,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    child: Table(
-                      border: TableBorder.all(color: Colors.grey[300]!),
-                      columnWidths: const {0: FixedColumnWidth(80)},
-                      defaultColumnWidth: FixedColumnWidth(90),
-                      defaultVerticalAlignment:
-                          TableCellVerticalAlignment.middle,
-                      children: [
-                        TableRow(
-                          children: [
-                            const TableCell(
-                              child: Center(
-                                child: Text(
-                                  'Horário',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                            ...weekDays.map(
-                              (d) => TableCell(
-                                child: Center(
-                                  child: Text(
-                                    d,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        ...horarios.map((horario) {
-                          return TableRow(
-                            children: [
-                              TableCell(
-                                child: SizedBox(
-                                  height: 45,
-                                  width: 80,
-                                  child: Center(
-                                    child: Text(
-                                      horario,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              ...List.generate(7, (dia) {
-                                // Verifica se este horário está dentro do intervalo de algum evento
-                                Map<String, dynamic>? evento;
-                                try {
-                                  evento = events.firstWhere((e) {
-                                    if (e['dayOfWeek'] != dia + 1 ||
-                                        e['date'] != null) {
-                                      return false;
-                                    }
-                                    final startIndex = horarios.indexOf(
-                                      e['startTime'],
-                                    );
-                                    final endIndex = horarios.indexOf(
-                                      e['endTime'],
-                                    );
-                                    final currentIndex = horarios.indexOf(
-                                      horario,
-                                    );
-                                    return startIndex != -1 &&
-                                        endIndex != -1 &&
-                                        currentIndex >= startIndex &&
-                                        currentIndex <= endIndex;
-                                  });
-                                } catch (e) {
-                                  evento = null;
-                                }
-
-                                if (evento != null) {
-                                  // Renderiza o evento em cada célula do intervalo
-
-                                  return TableCell(
-                                    child: GestureDetector(
-                                      onDoubleTap:
-                                          () => _showEditEventDialog(evento!),
-                                      child: Container(
-                                        height: 45,
-                                        margin: const EdgeInsets.symmetric(
-                                          vertical: 1,
-                                          horizontal: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(
-                                            0xFF2953A5,
-                                          ).withAlpha(100),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                          border: Border.all(
-                                            color: const Color(0xFF2953A5),
-                                          ),
-                                        ),
-                                        padding: const EdgeInsets.all(1),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              evento['title']?.replaceAll(
-                                                    '_',
-                                                    ' ',
-                                                  ) ??
-                                                  '',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 11,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            if (evento['description'] != null)
-                                              Text(
-                                                evento['description'],
-                                                style: const TextStyle(
-                                                  fontSize: 7,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            Text(
-                                              _getTeacherName(evento),
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  // Célula normal vazia
-                                  return const TableCell(
-                                    child: SizedBox.shrink(),
-                                  );
-                                }
-                              }),
-                            ],
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _gerarHorarioIntermediario(String horaBase) {
+  String gerarHorarioIntermediario(String horaBase) {
     // Converte a string de hora para minutos
     final partes = horaBase.split(':');
     final horas = int.parse(partes[0]);
@@ -767,7 +449,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     return '$novaHora:$novoMinuto';
   }
 
-  List<String> _gerarOpcoesHorarioFim(String horaInicio) {
+  List<String> gerarOpcoesHorarioFim(String horaInicio) {
     // Garante que há horários disponíveis
     _garantirHorariosMinimos();
 
@@ -802,8 +484,20 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
 
   Future<void> fetchProfessores() async {
     try {
+      // Obter token de autenticação
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (token == null) {
+        debugPrint(
+          '❌ Token de autenticação não encontrado para fetchProfessores',
+        );
+        return;
+      }
+
       final response = await http.get(
         Uri.parse('http://192.168.18.15:3000/teachers'),
+        headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
         setState(() {
@@ -817,7 +511,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     }
   }
 
-  String _getTeacherName(Map<String, dynamic> evento) {
+  String getTeacherName(Map<String, dynamic> evento) {
     // Se o evento tem dados do professor diretamente
     if (evento['teacher'] != null && evento['teacher']['name'] != null) {
       return evento['teacher']['name'];
@@ -837,7 +531,250 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     return 'Professor não definido';
   }
 
-  void _showAddEventDialog() async {
+  void showEditEventDialog(Map<String, dynamic> evento) async {
+    // Garante que há horários disponíveis antes de abrir o diálogo
+    _garantirHorariosMinimos();
+
+    String? subjectType = evento['title'];
+    String? teacherId = evento['teacherId'];
+    String? description = evento['description'];
+    int dayOfWeek = evento['dayOfWeek'] ?? 1;
+    String startTime =
+        evento['startTime'] ?? (horarios.isNotEmpty ? horarios.first : '07:00');
+    String endTime =
+        evento['endTime'] ?? (horarios.length > 1 ? horarios[1] : '07:50');
+
+    // Buscar subjects (matérias) da turma
+    final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
+    final turmaId = parent?.classData['id'] ?? '';
+
+    if (!mounted) return;
+
+    // Obter token de autenticação
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.user?.token;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Token de autenticação não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final response = await http.get(
+      Uri.parse('http://192.168.18.15:3000/classes/$turmaId'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (!mounted) return;
+
+    final turma = response.statusCode == 200 ? json.decode(response.body) : {};
+    final List subjects = turma['subjects'] ?? [];
+    final Map<String, List<Map<String, dynamic>>> professoresPorMateria = {};
+
+    for (final subject in subjects) {
+      final type = subject['type'];
+      final teacher = subject['teacher'];
+      if (type != null && teacher != null) {
+        professoresPorMateria.putIfAbsent(type, () => []).add(teacher);
+      }
+    }
+
+    final subjectTypesDisponiveis = professoresPorMateria.keys.toList();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final professoresDisponiveis =
+                subjectType != null
+                    ? professoresPorMateria[subjectType] ?? []
+                    : [];
+
+            return AlertDialog(
+              title: const Text('Editar Aula'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: subjectType,
+                      items:
+                          subjectTypesDisponiveis
+                              .map(
+                                (type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(
+                                    type.replaceAll('_', ' ').toUpperCase(),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          subjectType = v;
+                          teacherId =
+                              null; // Reset teacher when subject changes
+                        });
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Disciplina',
+                      ),
+                      validator:
+                          (v) => v == null ? 'Selecione a disciplina' : null,
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: teacherId,
+                      items:
+                          professoresDisponiveis
+                              .map<DropdownMenuItem<String>>(
+                                (t) => DropdownMenuItem(
+                                  value: t['id'],
+                                  child: Text(t['name']),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (v) => setState(() => teacherId = v),
+                      decoration: const InputDecoration(labelText: 'Professor'),
+                      validator:
+                          (v) => v == null ? 'Selecione o professor' : null,
+                    ),
+                    DropdownButtonFormField<int>(
+                      value: dayOfWeek,
+                      items: List.generate(
+                        7,
+                        (i) => DropdownMenuItem(
+                          value: i + 1,
+                          child: Text(weekDays[i]),
+                        ),
+                      ),
+                      onChanged: (v) => dayOfWeek = v ?? 1,
+                      decoration: const InputDecoration(
+                        labelText: 'Dia da Semana',
+                      ),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value:
+                          horarios.contains(startTime)
+                              ? startTime
+                              : (horarios.isNotEmpty ? horarios.first : null),
+                      items:
+                          horarios
+                              .map(
+                                (h) =>
+                                    DropdownMenuItem(value: h, child: Text(h)),
+                              )
+                              .toList(),
+                      onChanged:
+                          (v) =>
+                              startTime =
+                                  v ??
+                                  (horarios.isNotEmpty
+                                      ? horarios.first
+                                      : '07:00'),
+                      decoration: const InputDecoration(labelText: 'Início'),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value:
+                          horarios.contains(endTime)
+                              ? endTime
+                              : (horarios.length > 1 ? horarios[1] : null),
+                      items:
+                          horarios
+                              .map(
+                                (h) =>
+                                    DropdownMenuItem(value: h, child: Text(h)),
+                              )
+                              .toList(),
+                      onChanged:
+                          (v) =>
+                              endTime =
+                                  v ??
+                                  (horarios.length > 1 ? horarios[1] : '07:50'),
+                      decoration: const InputDecoration(labelText: 'Fim'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text('Confirmar Exclusão'),
+                            content: const Text(
+                              'Tem certeza que deseja excluir esta aula?\n\nEsta ação não pode ser desfeita.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Cancelar'),
+                              ),
+                              const SizedBox(width: 16),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                onPressed: () async {
+                                  Navigator.of(
+                                    context,
+                                  ).pop(); // Fecha o diálogo de confirmação
+                                  await deleteEvent(evento['id']);
+                                  if (context.mounted) {
+                                    Navigator.of(
+                                      context,
+                                    ).pop(); // Fecha o diálogo de edição
+                                  }
+                                },
+                                child: const Text('Excluir'),
+                              ),
+                            ],
+                          ),
+                    );
+                  },
+                  child: const Text('Excluir'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    if (subjectType != null && subjectType!.isNotEmpty) {
+                      updateEvent(evento['id'], {
+                        'title': subjectType,
+                        'teacherId': teacherId,
+                        'description': description,
+                        'dayOfWeek': dayOfWeek,
+                        'startTime': startTime,
+                        'endTime': endTime,
+                        'date': null,
+                      });
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    }
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void showAddEventDialog() async {
     // Garante que há horários disponíveis antes de abrir o diálogo
     _garantirHorariosMinimos();
 
@@ -990,20 +927,20 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                           (v) => setState(() {
                             startTime = v ?? startTime;
                             if (v != null) {
-                              endTime = _gerarHorarioIntermediario(v);
+                              endTime = gerarHorarioIntermediario(v);
                             }
                           }),
                       decoration: const InputDecoration(labelText: 'Início'),
                     ),
                     DropdownButtonFormField<String>(
                       value:
-                          _gerarOpcoesHorarioFim(startTime).contains(endTime)
+                          gerarOpcoesHorarioFim(startTime).contains(endTime)
                               ? endTime
-                              : (_gerarOpcoesHorarioFim(startTime).isNotEmpty
-                                  ? _gerarOpcoesHorarioFim(startTime).first
+                              : (gerarOpcoesHorarioFim(startTime).isNotEmpty
+                                  ? gerarOpcoesHorarioFim(startTime).first
                                   : null),
                       items:
-                          _gerarOpcoesHorarioFim(startTime)
+                          gerarOpcoesHorarioFim(startTime)
                               .map(
                                 (h) =>
                                     DropdownMenuItem(value: h, child: Text(h)),
@@ -1069,6 +1006,220 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
           },
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Garante que sempre há horários disponíveis antes de renderizar
+    _garantirHorariosMinimos();
+
+    // Garante que não há duplicatas antes de renderizar
+    horarios = horarios.toSet().toList()..sort();
+
+    // Debug: verifica os horários antes de renderizar
+    debugPrint('Horários antes de renderizar: $horarios');
+    debugPrint('Quantidade de horários: ${horarios.length}');
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Adicionar Aula',
+                style: TextStyle(color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2953A5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                elevation: 4,
+              ),
+              onPressed: showAddEventDialog,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: Table(
+                      border: TableBorder.all(color: Colors.grey[300]!),
+                      columnWidths: const {0: FixedColumnWidth(80)},
+                      defaultColumnWidth: FixedColumnWidth(90),
+                      defaultVerticalAlignment:
+                          TableCellVerticalAlignment.middle,
+                      children: [
+                        TableRow(
+                          children: [
+                            const TableCell(
+                              child: Center(
+                                child: Text(
+                                  'Horário',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                            ...weekDays.map(
+                              (d) => TableCell(
+                                child: Center(
+                                  child: Text(
+                                    d,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        ...horarios.map((horario) {
+                          return TableRow(
+                            children: [
+                              TableCell(
+                                child: SizedBox(
+                                  height: 45,
+                                  width: 80,
+                                  child: Center(
+                                    child: Text(
+                                      horario,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              ...List.generate(7, (dia) {
+                                // Verifica se este horário está dentro do intervalo de algum evento
+                                Map<String, dynamic>? evento;
+                                try {
+                                  evento = events.firstWhere((e) {
+                                    if (e['dayOfWeek'] != dia + 1 ||
+                                        e['date'] != null) {
+                                      return false;
+                                    }
+                                    final startIndex = horarios.indexOf(
+                                      e['startTime'],
+                                    );
+                                    final endIndex = horarios.indexOf(
+                                      e['endTime'],
+                                    );
+                                    final currentIndex = horarios.indexOf(
+                                      horario,
+                                    );
+                                    return startIndex != -1 &&
+                                        endIndex != -1 &&
+                                        currentIndex >= startIndex &&
+                                        currentIndex <= endIndex;
+                                  });
+                                } catch (e) {
+                                  evento = null;
+                                }
+
+                                if (evento != null) {
+                                  // Renderiza o evento em cada célula do intervalo
+
+                                  return TableCell(
+                                    child: GestureDetector(
+                                      onDoubleTap:
+                                          () => showEditEventDialog(evento!),
+                                      child: Container(
+                                        height: 45,
+                                        margin: const EdgeInsets.symmetric(
+                                          vertical: 1,
+                                          horizontal: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF2953A5,
+                                          ).withAlpha(100),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFF2953A5),
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(1),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              evento['title']?.replaceAll(
+                                                    '_',
+                                                    ' ',
+                                                  ) ??
+                                                  '',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                            ),
+                                            if (evento['description'] != null)
+                                              Text(
+                                                evento['description'],
+                                                style: const TextStyle(
+                                                  fontSize: 7,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            Text(
+                                              getTeacherName(evento),
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  // Célula normal vazia
+                                  return const TableCell(
+                                    child: SizedBox.shrink(),
+                                  );
+                                }
+                              }),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

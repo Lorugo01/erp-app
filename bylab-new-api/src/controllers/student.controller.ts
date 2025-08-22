@@ -4,6 +4,7 @@ import * as EnrollmentService from '../services/enrollment.service';
 import path from 'path';
 import { renameStudentPhoto } from '../middlewares/upload.middleware';
 import fs from 'fs';
+import prisma from '../prisma/client';
 
 export const getAll = async (req: Request, res: Response) => {
   try {
@@ -22,8 +23,27 @@ export const getAll = async (req: Request, res: Response) => {
 
 export const getById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const student = await StudentService.getStudentById(req.params.id);
-    res.json(student);
+    const studentId = req.params.id;
+    const user = req.user;
+    
+    // Verificar se o usuário tem acesso ao aluno
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true, schoolId: true }
+    });
+    
+    if (!student) {
+      return res.status(404).json({ error: 'Aluno não encontrado' });
+    }
+    
+    // DEVELOPER pode ver alunos de qualquer escola
+    // Outros usuários só podem ver alunos da sua escola
+    if (user?.role !== 'DEVELOPER' && user?.schoolId && student.schoolId !== user.schoolId) {
+      return res.status(403).json({ error: 'Acesso negado a este aluno' });
+    }
+    
+    const studentDetails = await StudentService.getStudentById(studentId);
+    res.json(studentDetails);
   } catch (error) {
     next(error);
   }
