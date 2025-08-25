@@ -76,11 +76,17 @@ class AttendanceService {
     required String subjectId,
     required String teacherId,
     required DateTime date,
+    String? token,
   }) async {
     try {
+      final headers = {'Content-Type': 'application/json'};
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
       final response = await http.post(
-        Uri.parse(ApiConfig.getAttendanceUrl('/lesson')),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${ApiConfig.baseUrl}/lessons/get-or-create'),
+        headers: headers,
         body: jsonEncode({
           'classId': classId,
           'subjectId': subjectId,
@@ -93,7 +99,7 @@ class AttendanceService {
         final data = jsonDecode(response.body);
         return Map<String, dynamic>.from(data);
       } else {
-        throw Exception('Erro ao buscar/criar aula');
+        throw Exception('Erro ao buscar/criar aula: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Erro de conexão: $e');
@@ -119,14 +125,20 @@ class AttendanceService {
   static Future<void> markAttendanceByLesson({
     required String lessonId,
     required List<Map<String, dynamic>> presences,
+    String? token,
   }) async {
+    final headers = {'Content-Type': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
     final response = await http.post(
-      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
-      headers: {'Content-Type': 'application/json'},
+      Uri.parse('${ApiConfig.baseUrl}/attendances/bulk'),
+      headers: headers,
       body: jsonEncode({'lessonId': lessonId, 'presences': presences}),
     );
 
-    if (response.statusCode != 200) {
+    if (response.statusCode != 200 && response.statusCode != 201) {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? 'Erro ao marcar frequência');
     }

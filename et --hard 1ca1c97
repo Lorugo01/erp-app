@@ -1,0 +1,20 @@
+[33m89c1a12[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m notas e turmas na tela do professor novo sistema
+[33mf2cfd13[m adição da do ID da escola , novo usuario (developer) e adicição inicial da mudança do sistema
+[33m1ca1c97[m Merge branch 'main' of https://github.com/Lorugo01/erp-app
+[33m3a5841d[m novas otimizações
+[33mfc67918[m Track .rar with Git LFS
+[33m56f4605[m alteração do ip
+[33m26b5f1f[m delete de arquivos denecessarios
+[33ma37abb6[m Atualização de variaveis de hambiente
+[33me5a173d[m Gestão de materias (inicial)
+[33m1904cca[m novas otimizações
+[33m7b60354[m correção no uso da sala pelo professor
+[33m2742e61[m novo metodo do back de chat e reespacividade inicial da dashboard professor
+[33m470c81c[m Atulização da bar da teca para os equipamentos e concerto do bug de navegação
+[33mc438fc4[m Ultima atualização teste antes do oficial
+[33m187d8f0[m Adição com a conexão com a teca
+[33mc8abb38[m melhora no visual mobile
+[33m16899d7[m atualização mobile e correação do http
+[33m174f751[m Tela do aluno funcional
+[33m1f28b7c[m tela do aluno
+[33m3cf6a5a[m Implementação incial da tela do aluno e do algumas correções no dashboard do adm

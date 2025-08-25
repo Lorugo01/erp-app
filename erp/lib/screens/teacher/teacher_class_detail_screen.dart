@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/assignment_service.dart';
+import '../../services/attendance_service.dart';
 import '../../services/grade_period_service.dart';
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
@@ -12,8 +14,9 @@ import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../widgets/attendance_widget.dart';
 import 'task_submissions_screen.dart';
-import 'package:intl/intl.dart';
+
 import 'teacher_student_detail_screen.dart';
 
 // Classe utilitária para logging estruturado
@@ -108,6 +111,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       {}; // Justificativas para faltas justificadas
   String? _errorAttendance;
 
+  // Armazenamento local de chamadas salvas (SharedPreferences)
+  static const String _attendanceCacheKey = 'teacher_attendance_cache';
+
   // Notas
   List<Map<String, dynamic>> _periods = [];
   List<Map<String, dynamic>> _gradeTypes = [];
@@ -137,7 +143,21 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     _testApiConnectivity();
 
     // Carregar apenas disciplinas - que carregará o resto automaticamente
-    _fetchSubjects();
+    _fetchSubjects().then((_) {
+      // Após carregar disciplinas, garantir que um período esteja selecionado
+      if (_periods.isNotEmpty && _selectedPeriodId == null) {
+        setState(() {
+          _selectedPeriodId = _periods.first['id'];
+        });
+        TeacherClassLogger.info(
+          'Período selecionado automaticamente no initState',
+        );
+        TeacherClassLogger.debug('Período selecionado', {
+          'periodId': _selectedPeriodId,
+          'periodName': _periods.first['name'],
+        });
+      }
+    });
 
     _tabController.addListener(() {
       if (_tabController.index == 0 && _assignments.isEmpty) {
@@ -145,19 +165,55 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
           'Aba de atividades selecionada, carregando atividades...',
         );
         _fetchAssignments();
-      } else if (_tabController.index == 1 && _currentLesson == null) {
-        // Aba de chamada - carregar frequência se houver disciplina selecionada
+      } else if (_tabController.index == 1) {
+        // Aba de chamada - sempre carregar/verificar frequência
         if (_selectedSubjectId != null) {
           TeacherClassLogger.info(
-            'Aba de chamada selecionada, carregando frequência...',
+            'Aba de chamada selecionada, verificando frequência...',
           );
-          _loadAttendance();
+
+          // Se não há aula atual ou se a aula é de disciplina/data diferente, carregar
+          if (_currentLesson == null ||
+              _currentLesson!['subjectId'] != _selectedSubjectId ||
+              _currentLesson!['date'] == null ||
+              !_isSameDay(
+                DateTime.parse(_currentLesson!['date']),
+                _selectedDate,
+              )) {
+            TeacherClassLogger.info(
+              'Carregando frequência para nova disciplina/data',
+            );
+            _loadAttendance();
+          } else {
+            TeacherClassLogger.info(
+              'Aula atual válida, reutilizando frequência existente',
+            );
+            // Recarregar mapas de presença se necessário
+            _refreshAttendanceMaps();
+          }
         }
-      } else if (_tabController.index == 2 && _grades.isEmpty) {
+      } else if (_tabController.index == 2) {
         TeacherClassLogger.info(
-          'Aba de notas selecionada, carregando notas...',
+          'Aba de notas selecionada, verificando período...',
         );
-        _fetchGrades();
+
+        // Garantir que um período esteja selecionado
+        if (_selectedPeriodId == null && _periods.isNotEmpty) {
+          _selectedPeriodId = _periods.first['id'];
+          TeacherClassLogger.info(
+            'Período selecionado automaticamente na aba de notas',
+          );
+          TeacherClassLogger.debug('Período selecionado', {
+            'periodId': _selectedPeriodId,
+            'periodName': _periods.first['name'],
+          });
+        }
+
+        // Carregar notas se necessário
+        if (_grades.isEmpty) {
+          TeacherClassLogger.info('Carregando notas...');
+          _fetchGrades();
+        }
       }
     });
   }
@@ -585,6 +641,11 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         _periods = periods;
         if (periods.isNotEmpty && _selectedPeriodId == null) {
           _selectedPeriodId = periods.first['id'];
+          TeacherClassLogger.info('Período selecionado automaticamente');
+          TeacherClassLogger.debug('Período selecionado', {
+            'periodId': _selectedPeriodId,
+            'periodName': periods.first['name'],
+          });
         }
       });
     } catch (e, stackTrace) {
@@ -655,6 +716,15 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         final periods = json.decode(response.body) as List;
         setState(() {
           _periods = periods.cast<Map<String, dynamic>>();
+          // Selecionar automaticamente o primeiro período disponível
+          if (periods.isNotEmpty && _selectedPeriodId == null) {
+            _selectedPeriodId = periods.first['id'];
+            TeacherClassLogger.info('Período selecionado automaticamente');
+            TeacherClassLogger.debug('Período selecionado', {
+              'periodId': _selectedPeriodId,
+              'periodName': periods.first['name'],
+            });
+          }
         });
 
         TeacherClassLogger.success('Períodos carregados via API direta');
@@ -728,6 +798,18 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         'Tentativa de buscar notas sem disciplina selecionada',
       );
       return;
+    }
+
+    // Garantir que um período esteja selecionado
+    if (_selectedPeriodId == null && _periods.isNotEmpty) {
+      _selectedPeriodId = _periods.first['id'];
+      TeacherClassLogger.info(
+        'Período selecionado automaticamente antes de buscar notas',
+      );
+      TeacherClassLogger.debug('Período selecionado', {
+        'periodId': _selectedPeriodId,
+        'periodName': _periods.first['name'],
+      });
     }
 
     TeacherClassLogger.info('Iniciando busca por notas da disciplina');
@@ -858,80 +940,186 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         throw Exception('Professor não encontrado');
       }
 
-      TeacherClassLogger.api('/attendances/lesson', 'POST', {
-        'classId': widget.classData['id'],
-        'subjectId': _selectedSubjectId!,
-        'teacherId': teacherId,
-        'date': _selectedDate.toIso8601String(),
-      });
+      // Verificar se já existe uma aula para a data/disciplina atual
+      if (_currentLesson != null &&
+          _currentLesson!['subjectId'] == _selectedSubjectId &&
+          _currentLesson!['date'] != null &&
+          _isSameDay(DateTime.parse(_currentLesson!['date']), _selectedDate)) {
+        TeacherClassLogger.info(
+          'Aula já existe para data/disciplina atual, reutilizando',
+        );
+        TeacherClassLogger.debug('Aula existente', {
+          'lessonId': _currentLesson!['id'],
+          'date': _currentLesson!['date'],
+          'subjectId': _currentLesson!['subjectId'],
+        });
 
-      // SOLUÇÃO: Como o endpoint falha, criar aula simulada
-      TeacherClassLogger.info(
-        'Endpoint /attendances/lesson falha, criando aula simulada',
-      );
+        // Verificar se há frequência salva para esta aula
+        await _loadSavedAttendanceForLesson(_currentLesson!);
+        return; // Não precisa criar nova aula
+      } else {
+        TeacherClassLogger.info('Criando nova aula para data/disciplina atual');
 
-      final lesson = {
-        'id':
-            'lesson_${_selectedSubjectId}_${_selectedDate.millisecondsSinceEpoch}',
-        'classId': widget.classData['id'],
-        'subjectId': _selectedSubjectId,
-        'teacherId': teacherId,
-        'date': _selectedDate.toIso8601String(),
-        'createdAt': DateTime.now().toIso8601String(),
-      };
+        TeacherClassLogger.api('/lessons/get-or-create', 'POST', {
+          'classId': widget.classData['id'],
+          'subjectId': _selectedSubjectId!,
+          'teacherId': teacherId,
+          'date': _selectedDate.toIso8601String(),
+        });
 
-      TeacherClassLogger.success('Aula encontrada/criada com sucesso');
-      TeacherClassLogger.debug('Dados da aula', {
-        'lessonId': lesson['id'],
-        'date': lesson['date'],
-        'subjectId': lesson['subjectId'],
-      });
+        // Tentar buscar/criar aula usando o backend real
+        try {
+          final lesson = await AttendanceService.getOrCreateLesson(
+            classId: widget.classData['id'],
+            subjectId: _selectedSubjectId!,
+            teacherId: teacherId,
+            date: _selectedDate,
+            token: authProvider.user?.token,
+          );
 
-      setState(() {
-        _currentLesson = lesson;
-      });
+          TeacherClassLogger.success('Aula encontrada/criada via API');
+          TeacherClassLogger.debug('Dados da aula da API', {
+            'lessonId': lesson['id'],
+            'date': lesson['date'],
+            'subjectId': lesson['subjectId'],
+          });
 
-      // SOLUÇÃO: Como o serviço falha, simular frequência vazia
-      TeacherClassLogger.info('Simulando frequência vazia para a aula');
-      final attendances = <Map<String, dynamic>>[];
+          setState(() {
+            _currentLesson = lesson;
+          });
 
-      TeacherClassLogger.debug('Frequências encontradas', {
-        'count': attendances.length,
-        'lessonId': lesson['id'],
-      });
+          // Carregar frequência existente da API ou cache local
+          try {
+            final attendances = await AttendanceService.getAttendanceByLesson(
+              lesson['id'],
+            );
+            TeacherClassLogger.info('Frequência carregada da API');
+            TeacherClassLogger.debug('Frequências da API', {
+              'count': attendances.length,
+              'lessonId': lesson['id'],
+            });
 
-      // Inicializa os mapas de presença e justificativa sem valores marcados
-      final newAttendanceMap = <String, String?>{};
-      final newJustificationMap = <String, String>{};
+            _processAttendanceData(attendances);
+          } catch (e) {
+            TeacherClassLogger.warning(
+              'Erro ao carregar frequência da API, tentando cache local: $e',
+            );
 
-      // Por padrão, todos os alunos começam sem marcação
-      for (var student in _students) {
-        newAttendanceMap[student['id']] = null;
-        newJustificationMap[student['id']] = '';
-      }
+            // Tentar carregar do cache local (SharedPreferences)
+            final normalizedDate = _normalizeDateKey(lesson['date']);
+            final lessonKey = '${lesson['subjectId']}_$normalizedDate';
 
-      // Sobrescreve com os dados existentes da API
-      for (var attendance in attendances) {
-        final studentId = attendance['studentId'];
-        // Determinar status baseado nos novos campos ou compatibilidade
-        String? status = attendance['status'];
-        if (status == null) {
-          final present = attendance['present'];
-          status = present == true ? 'PRESENT' : 'ABSENT';
+            Map<String, dynamic>? savedData;
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              final cacheJson = prefs.getString(_attendanceCacheKey) ?? '{}';
+              final Map<String, dynamic> cache = jsonDecode(cacheJson);
+
+              // Buscar no cache com fallback para data aproximada
+              savedData = cache[lessonKey];
+
+              // Se não encontrou, tentar buscar por data aproximada (mesmo dia)
+              if (savedData == null) {
+                TeacherClassLogger.info(
+                  'Cache não encontrado para chave exata, buscando por data aproximada',
+                );
+
+                final targetDate = DateTime.parse(lesson['date']);
+                final targetDay =
+                    '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
+
+                // Procurar por qualquer entrada que tenha a mesma data
+                for (var entry in cache.entries) {
+                  final entryKey = entry.key;
+                  final entryData = entry.value;
+
+                  if (entryKey.contains('_$targetDay')) {
+                    TeacherClassLogger.info(
+                      'Cache encontrado por data aproximada',
+                    );
+                    TeacherClassLogger.debug('Dados do cache aproximado', {
+                      'originalKey': entryKey,
+                      'targetKey': lessonKey,
+                      'targetDay': targetDay,
+                      'savedAt': entryData['savedAt'],
+                    });
+
+                    savedData = entryData;
+                    break;
+                  }
+                }
+              }
+
+              TeacherClassLogger.debug('Buscando no cache local', {
+                'lessonKey': lessonKey,
+                'normalizedDate': normalizedDate,
+                'originalDate': lesson['date'],
+                'cacheKeys': cache.keys.toList(),
+                'foundData': savedData != null,
+              });
+            } catch (e) {
+              TeacherClassLogger.error(
+                'Erro ao carregar cache do SharedPreferences',
+                e,
+              );
+            }
+
+            // Debug completo do cache
+            await _debugCacheStatus();
+
+            if (savedData != null) {
+              TeacherClassLogger.info(
+                'Cache local encontrado, carregando dados salvos',
+              );
+              TeacherClassLogger.debug('Dados do cache', {
+                'lessonKey': lessonKey,
+                'savedAt': savedData['savedAt'],
+                'presencesCount': savedData['presences'].length,
+              });
+
+              final presences =
+                  savedData['presences'] as List<Map<String, dynamic>>;
+              _processAttendanceDataFromCache(presences);
+            } else {
+              TeacherClassLogger.info(
+                'Nenhum cache local encontrado, inicializando vazio',
+              );
+              _initializeEmptyAttendance();
+            }
+          }
+
+          return; // Sucesso com API real
+        } catch (e) {
+          TeacherClassLogger.warning('API falhou, usando aula simulada: $e');
         }
-        newAttendanceMap[studentId] = status;
-        newJustificationMap[studentId] = attendance['justification'] ?? '';
-      }
 
-      setState(() {
-        _attendanceMap = newAttendanceMap;
-        _justificationMap = newJustificationMap;
-      });
+        // Fallback: criar aula simulada
+        TeacherClassLogger.info('Usando aula simulada como fallback');
 
-      TeacherClassLogger.debug('Mapas de frequência atualizados', {
-        'attendanceMap': _attendanceMap,
-        'justificationMap': _justificationMap,
-      });
+        final lesson = {
+          'id':
+              'lesson_${_selectedSubjectId}_${_selectedDate.millisecondsSinceEpoch}',
+          'classId': widget.classData['id'],
+          'subjectId': _selectedSubjectId,
+          'teacherId': teacherId,
+          'date': _selectedDate.toIso8601String(),
+          'createdAt': DateTime.now().toIso8601String(),
+        };
+
+        TeacherClassLogger.success('Aula simulada criada como fallback');
+        TeacherClassLogger.debug('Dados da aula simulada', {
+          'lessonId': lesson['id'],
+          'date': lesson['date'],
+          'subjectId': lesson['subjectId'],
+        });
+
+        setState(() {
+          _currentLesson = lesson;
+        });
+
+        // Inicializar frequência vazia para aula simulada
+        _initializeEmptyAttendance();
+      } // Fechamento do else
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao carregar frequência', e, stackTrace);
       setState(() {
@@ -959,6 +1147,59 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       TeacherClassLogger.warning(
         'Tentativa de salvar frequência sem aula selecionada',
       );
+      return;
+    }
+
+    // Verificar se há mudanças na frequência
+    bool hasChanges = false;
+    TeacherClassLogger.debug('Verificando mudanças na frequência', {
+      'totalStudents': _students.length,
+      'attendanceMapKeys': _attendanceMap.keys.length,
+      'attendanceMapValues': _attendanceMap.values.toList(),
+    });
+
+    for (var student in _students) {
+      final studentId = student['id'];
+      final currentStatus = _attendanceMap[studentId];
+
+      TeacherClassLogger.debug('Verificando aluno', {
+        'studentName': student['name'],
+        'studentId': studentId,
+        'currentStatus': currentStatus,
+        'hasStatus': currentStatus != null,
+      });
+
+      // Se algum aluno tem status marcado, há mudanças
+      if (currentStatus != null) {
+        hasChanges = true;
+        TeacherClassLogger.info(
+          'Mudança detectada no aluno: ${student['name']}',
+        );
+        break;
+      }
+    }
+
+    TeacherClassLogger.info('Verificação de mudanças concluída');
+    TeacherClassLogger.debug('Dados da verificação', {
+      'hasChanges': hasChanges,
+      'totalStudents': _students.length,
+      'markedStudents':
+          _attendanceMap.values.where((status) => status != null).length,
+    });
+
+    if (!hasChanges) {
+      TeacherClassLogger.info(
+        'Nenhuma mudança na frequência, pulando salvamento',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nenhuma mudança na frequência para salvar'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
       return;
     }
 
@@ -1012,16 +1253,71 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         'presences': presences,
       });
 
-      TeacherClassLogger.api(
-        '/attendances/lesson/${_currentLesson!['id']}',
-        'POST',
-        {'presences': presences},
-      );
+      TeacherClassLogger.api('/attendances/bulk', 'POST', {
+        'lessonId': _currentLesson!['id'],
+        'presences': presences,
+      });
 
-      // SOLUÇÃO: Como o endpoint falha, simular salvamento local
-      TeacherClassLogger.info(
-        'Endpoint de salvamento falha, simulando salvamento local',
-      );
+      // Tentar salvar usando a API real
+      try {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await AttendanceService.markAttendanceByLesson(
+          lessonId: _currentLesson!['id'],
+          presences: presences,
+          token: authProvider.user?.token,
+        );
+
+        TeacherClassLogger.success('Frequência salva via API real!');
+
+        // Salvar localmente também para cache
+        await _saveAttendanceLocally(_currentLesson!, presences);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Frequência salva com sucesso!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+
+        // Recarregar frequência da API para confirmar salvamento
+        TeacherClassLogger.info(
+          'Recarregando frequência da API após salvamento',
+        );
+        try {
+          final attendances = await AttendanceService.getAttendanceByLesson(
+            _currentLesson!['id'],
+          );
+
+          if (attendances.isNotEmpty) {
+            TeacherClassLogger.success(
+              'Frequência recarregada da API após salvamento',
+            );
+            _processAttendanceData(attendances);
+          } else {
+            TeacherClassLogger.warning(
+              'API retornou lista vazia após salvamento',
+            );
+          }
+        } catch (e) {
+          TeacherClassLogger.warning(
+            'Erro ao recarregar frequência da API: $e',
+          );
+          // Manter dados locais se API falhar
+        }
+
+        return;
+      } catch (e) {
+        TeacherClassLogger.warning('API falhou, usando salvamento local: $e');
+      }
+
+      // Fallback: simular salvamento local
+      TeacherClassLogger.info('Usando salvamento local como fallback');
+
+      // Salvar localmente a frequência
+      await _saveAttendanceLocally(_currentLesson!, presences);
 
       // Simular sucesso do salvamento
       TeacherClassLogger.success('Frequência simulada salva com sucesso!');
@@ -1036,8 +1332,12 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         );
       }
 
-      // Recarrega a frequência
-      await _loadAttendance();
+      // Recarregar frequência local após salvamento
+      TeacherClassLogger.info('Recarregando frequência local após salvamento');
+      _loadSavedAttendanceForLesson(_currentLesson!);
+
+      // Recarregamento já foi feito acima, não duplicar
+      TeacherClassLogger.info('Recarregamento de frequência já foi executado');
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao salvar frequência', e, stackTrace);
       if (mounted) {
@@ -1071,7 +1371,11 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
     setState(() {
       _selectedSubjectId = subjectId;
-      _currentLesson = null;
+      // Só limpa a aula se a disciplina mudou
+      if (_currentLesson != null && _currentLesson!['subjectId'] != subjectId) {
+        _currentLesson = null;
+        TeacherClassLogger.info('Disciplina mudou, limpando aula anterior');
+      }
       // Não limpa o mapa de presença aqui, deixa a função _loadAttendance fazer isso
     });
 
@@ -1111,7 +1415,15 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
       setState(() {
         _selectedDate = date;
-        _currentLesson = null;
+        // Só limpa a aula se a data mudou significativamente (diferente dia)
+        if (_currentLesson != null &&
+            _currentLesson!['date'] != null &&
+            !_isSameDay(DateTime.parse(_currentLesson!['date']), date)) {
+          _currentLesson = null;
+          TeacherClassLogger.info(
+            'Data mudou significativamente, limpando aula anterior',
+          );
+        }
         // Não limpa o mapa de presença aqui, deixa a função _loadAttendance fazer isso
       });
 
@@ -1119,6 +1431,448 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         TeacherClassLogger.info('Recarregando frequência para nova data...');
         _loadAttendance();
       }
+    }
+  }
+
+  // Método auxiliar para verificar se duas datas são do mesmo dia
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
+
+  // Método para normalizar data para chave do cache
+  String _normalizeDateKey(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      // Usar data local (como o backend faz com toDateString())
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      TeacherClassLogger.warning('Erro ao normalizar data: $e');
+      return dateString;
+    }
+  }
+
+  // Método para debug do cache
+  Future<void> _debugCacheStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheJson = prefs.getString(_attendanceCacheKey) ?? '{}';
+      final Map<String, dynamic> cache = jsonDecode(cacheJson);
+
+      TeacherClassLogger.debug('Status do cache local (SharedPreferences)', {
+        'totalCacheEntries': cache.length,
+        'cacheKeys': cache.keys.toList(),
+        'cacheDetails': cache.map(
+          (key, value) => MapEntry(key, {
+            'savedAt': value['savedAt'],
+            'presencesCount': value['presences'].length,
+            'lessonId': value['lesson']['id'],
+            'lessonDate': value['lesson']['date'],
+            'normalizedKey': _normalizeDateKey(value['lesson']['date']),
+          }),
+        ),
+      });
+    } catch (e) {
+      TeacherClassLogger.error('Erro ao ler cache do SharedPreferences', e);
+    }
+  }
+
+  // Método para salvar frequência localmente
+  Future<void> _saveAttendanceLocally(
+    Map<String, dynamic> lesson,
+    List<Map<String, dynamic>> presences,
+  ) async {
+    final normalizedDate = _normalizeDateKey(lesson['date']);
+    final lessonKey = '${lesson['subjectId']}_$normalizedDate';
+
+    TeacherClassLogger.info(
+      'Salvando frequência localmente no SharedPreferences',
+    );
+    TeacherClassLogger.debug('Dados para salvamento local', {
+      'lessonKey': lessonKey,
+      'normalizedDate': normalizedDate,
+      'originalDate': lesson['date'],
+      'presencesCount': presences.length,
+      'lessonId': lesson['id'],
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Carregar cache existente
+      final existingCacheJson = prefs.getString(_attendanceCacheKey) ?? '{}';
+      final Map<String, dynamic> existingCache = jsonDecode(existingCacheJson);
+
+      // Adicionar nova entrada
+      existingCache[lessonKey] = {
+        'lesson': lesson,
+        'presences': presences,
+        'savedAt': DateTime.now().toIso8601String(),
+      };
+
+      // Salvar de volta
+      final updatedCacheJson = jsonEncode(existingCache);
+      await prefs.setString(_attendanceCacheKey, updatedCacheJson);
+
+      // Atualizar mapas de presença com os dados salvos
+      final newAttendanceMap = <String, String?>{};
+      final newJustificationMap = <String, String>{};
+
+      // Inicializar todos os alunos como não marcados
+      for (var student in _students) {
+        final studentId = student['id'];
+        newAttendanceMap[studentId] = null;
+        newJustificationMap[studentId] = '';
+      }
+
+      // Aplicar dados salvos
+      for (var presence in presences) {
+        final studentId = presence['studentId'];
+        final status = presence['status'];
+        final justification = presence['justification'] ?? '';
+
+        newAttendanceMap[studentId] = status;
+        if (status == 'JUSTIFIED_ABSENT' && justification.isNotEmpty) {
+          newJustificationMap[studentId] = justification;
+        }
+      }
+
+      setState(() {
+        _attendanceMap = newAttendanceMap;
+        _justificationMap = newJustificationMap;
+      });
+
+      TeacherClassLogger.success(
+        'Frequência salva localmente no SharedPreferences',
+      );
+      TeacherClassLogger.debug('Dados salvos', {
+        'lessonKey': lessonKey,
+        'totalSaved': existingCache.length,
+        'attendanceMapKeys': _attendanceMap.keys.length,
+      });
+
+      // Debug do cache após salvar
+      await _debugCacheStatus();
+    } catch (e) {
+      TeacherClassLogger.error('Erro ao salvar no SharedPreferences', e);
+    }
+  }
+
+  // Método para processar dados de frequência do cache local
+  void _processAttendanceDataFromCache(List<Map<String, dynamic>> presences) {
+    TeacherClassLogger.info('Processando dados do cache local');
+
+    final newAttendanceMap = <String, String?>{};
+    final newJustificationMap = <String, String>{};
+
+    // Inicializar todos os alunos como não marcados
+    for (var student in _students) {
+      final studentId = student['id'];
+      newAttendanceMap[studentId] = null;
+      newJustificationMap[studentId] = '';
+    }
+
+    // Aplicar dados do cache
+    for (var presence in presences) {
+      final studentId = presence['studentId'];
+      final status = presence['status'];
+      final justification = presence['justification'] ?? '';
+
+      newAttendanceMap[studentId] = status;
+      if (status == 'JUSTIFIED_ABSENT' && justification.isNotEmpty) {
+        newJustificationMap[studentId] = justification;
+      }
+    }
+
+    setState(() {
+      _attendanceMap = newAttendanceMap;
+      _justificationMap = newJustificationMap;
+    });
+
+    TeacherClassLogger.success('Dados do cache local processados');
+    TeacherClassLogger.debug('Mapas atualizados do cache', {
+      'attendanceMapKeys': _attendanceMap.keys.length,
+      'justificationMapKeys': _justificationMap.keys.length,
+      'markedStudents':
+          _attendanceMap.values.where((status) => status != null).length,
+    });
+  }
+
+  // Método para processar dados de frequência da API
+  void _processAttendanceData(List<Map<String, dynamic>> attendances) {
+    TeacherClassLogger.info('Processando dados de frequência da API');
+
+    final newAttendanceMap = <String, String?>{};
+    final newJustificationMap = <String, String>{};
+
+    // Inicializar todos os alunos como não marcados
+    for (var student in _students) {
+      final studentId = student['id'];
+      newAttendanceMap[studentId] = null;
+      newJustificationMap[studentId] = '';
+    }
+
+    // Aplicar dados da API
+    for (var attendance in attendances) {
+      final studentId = attendance['studentId'];
+      final status = attendance['status'];
+      final justification = attendance['justification'] ?? '';
+
+      newAttendanceMap[studentId] = status;
+      if (status == 'JUSTIFIED_ABSENT' && justification.isNotEmpty) {
+        newJustificationMap[studentId] = justification;
+      }
+    }
+
+    setState(() {
+      _attendanceMap = newAttendanceMap;
+      _justificationMap = newJustificationMap;
+    });
+
+    TeacherClassLogger.success('Dados de frequência da API processados');
+    TeacherClassLogger.debug('Mapas atualizados', {
+      'attendanceMapKeys': _attendanceMap.keys.length,
+      'justificationMapKeys': _justificationMap.keys.length,
+      'markedStudents':
+          _attendanceMap.values.where((status) => status != null).length,
+    });
+  }
+
+  // Método para inicializar frequência vazia
+  void _initializeEmptyAttendance() {
+    TeacherClassLogger.info('Inicializando frequência vazia');
+
+    final newAttendanceMap = <String, String?>{};
+    final newJustificationMap = <String, String>{};
+
+    for (var student in _students) {
+      final studentId = student['id'];
+      newAttendanceMap[studentId] = null;
+      newJustificationMap[studentId] = '';
+    }
+
+    setState(() {
+      _attendanceMap = newAttendanceMap;
+      _justificationMap = newJustificationMap;
+    });
+
+    TeacherClassLogger.success('Frequência vazia inicializada');
+  }
+
+  // Método para carregar frequência salva de uma aula existente
+  Future<void> _loadSavedAttendanceForLesson(
+    Map<String, dynamic> lesson,
+  ) async {
+    TeacherClassLogger.info('Carregando frequência salva para aula existente');
+    TeacherClassLogger.debug('Dados da aula', {
+      'lessonId': lesson['id'],
+      'date': lesson['date'],
+      'subjectId': lesson['subjectId'],
+    });
+
+    // Primeiro, tentar carregar da API
+    try {
+      final attendances = await AttendanceService.getAttendanceByLesson(
+        lesson['id'],
+      );
+      TeacherClassLogger.info('Frequência carregada da API');
+      TeacherClassLogger.debug('Frequências da API', {
+        'count': attendances.length,
+        'lessonId': lesson['id'],
+      });
+
+      _processAttendanceData(attendances);
+      return; // Sucesso com API
+    } catch (e) {
+      TeacherClassLogger.warning(
+        'Erro ao carregar da API, tentando cache local: $e',
+      );
+    }
+
+    // Fallback: verificar se há frequência salva localmente no SharedPreferences
+    final normalizedDate = _normalizeDateKey(lesson['date']);
+    final lessonKey = '${lesson['subjectId']}_$normalizedDate';
+
+    Map<String, dynamic>? savedData;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheJson = prefs.getString(_attendanceCacheKey) ?? '{}';
+      final Map<String, dynamic> cache = jsonDecode(cacheJson);
+
+      // Buscar no cache com fallback para data aproximada
+      savedData = cache[lessonKey];
+
+      // Se não encontrou, tentar buscar por data aproximada (mesmo dia)
+      if (savedData == null) {
+        TeacherClassLogger.info(
+          'Cache não encontrado para chave exata (método dedicado), buscando por data aproximada',
+        );
+
+        final targetDate = DateTime.parse(lesson['date']);
+        final targetDay =
+            '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
+
+        // Procurar por qualquer entrada que tenha a mesma data
+        for (var entry in cache.entries) {
+          final entryKey = entry.key;
+          final entryData = entry.value;
+
+          if (entryKey.contains('_$targetDay')) {
+            TeacherClassLogger.info(
+              'Cache encontrado por data aproximada (método dedicado)',
+            );
+            TeacherClassLogger.debug('Dados do cache aproximado', {
+              'originalKey': entryKey,
+              'targetKey': lessonKey,
+              'targetDay': targetDay,
+              'savedAt': entryData['savedAt'],
+            });
+
+            savedData = entryData;
+            break;
+          }
+        }
+      }
+
+      TeacherClassLogger.debug('Buscando no cache local (método dedicado)', {
+        'lessonKey': lessonKey,
+        'normalizedDate': normalizedDate,
+        'originalDate': lesson['date'],
+        'cacheKeys': cache.keys.toList(),
+        'foundData': savedData != null,
+      });
+    } catch (e) {
+      TeacherClassLogger.error(
+        'Erro ao carregar cache do SharedPreferences',
+        e,
+      );
+    }
+
+    if (savedData != null) {
+      TeacherClassLogger.info('Frequência salva encontrada, carregando...');
+      TeacherClassLogger.debug('Dados salvos encontrados', {
+        'lessonKey': lessonKey,
+        'savedAt': savedData['savedAt'],
+        'presencesCount': savedData['presences'].length,
+      });
+
+      // Carregar dados salvos
+      final presences = savedData['presences'] as List<Map<String, dynamic>>;
+
+      final newAttendanceMap = <String, String?>{};
+      final newJustificationMap = <String, String>{};
+
+      // Inicializar todos os alunos como não marcados
+      for (var student in _students) {
+        final studentId = student['id'];
+        newAttendanceMap[studentId] = null;
+        newJustificationMap[studentId] = '';
+      }
+
+      // Aplicar dados salvos
+      for (var presence in presences) {
+        final studentId = presence['studentId'];
+        final status = presence['status'];
+        final justification = presence['justification'] ?? '';
+
+        newAttendanceMap[studentId] = status;
+        if (status == 'JUSTIFIED_ABSENT' && justification.isNotEmpty) {
+          newJustificationMap[studentId] = justification;
+        }
+      }
+
+      setState(() {
+        _attendanceMap = newAttendanceMap;
+        _justificationMap = newJustificationMap;
+      });
+
+      TeacherClassLogger.success('Frequência salva carregada com sucesso');
+      TeacherClassLogger.debug('Mapas carregados', {
+        'attendanceMapKeys': _attendanceMap.keys.length,
+        'justificationMapKeys': _justificationMap.keys.length,
+        'studentsCount': _students.length,
+        'markedStudents':
+            _attendanceMap.values.where((status) => status != null).length,
+      });
+    } else {
+      TeacherClassLogger.info(
+        'Nenhuma frequência salva encontrada, inicializando mapas vazios',
+      );
+
+      // Inicializar mapas vazios (frequência não salva ainda)
+      final newAttendanceMap = <String, String?>{};
+      final newJustificationMap = <String, String>{};
+
+      for (var student in _students) {
+        final studentId = student['id'];
+        newAttendanceMap[studentId] = null;
+        newJustificationMap[studentId] = '';
+      }
+
+      setState(() {
+        _attendanceMap = newAttendanceMap;
+        _justificationMap = newJustificationMap;
+      });
+
+      TeacherClassLogger.success('Mapas vazios inicializados para nova aula');
+      TeacherClassLogger.debug('Mapas inicializados', {
+        'attendanceMapKeys': _attendanceMap.keys.length,
+        'justificationMapKeys': _justificationMap.keys.length,
+        'studentsCount': _students.length,
+      });
+    }
+  }
+
+  // Método para recarregar mapas de presença sem criar nova aula
+  void _refreshAttendanceMaps() {
+    if (_currentLesson == null || _students.isEmpty) {
+      TeacherClassLogger.warning(
+        'Não é possível recarregar mapas: aula ou alunos não disponíveis',
+      );
+      return;
+    }
+
+    TeacherClassLogger.info(
+      'Recarregando mapas de presença para aula existente',
+    );
+
+    // Verificar se os mapas estão vazios ou incompletos
+    bool needsRefresh =
+        _attendanceMap.isEmpty ||
+        _attendanceMap.length != _students.length ||
+        _justificationMap.isEmpty ||
+        _justificationMap.length != _students.length;
+
+    if (needsRefresh) {
+      TeacherClassLogger.info('Mapas incompletos, inicializando novamente');
+
+      // Inicializar mapas de presença
+      final newAttendanceMap = <String, String?>{};
+      final newJustificationMap = <String, String>{};
+
+      for (var student in _students) {
+        final studentId = student['id'];
+        // Manter valores existentes se disponíveis
+        newAttendanceMap[studentId] = _attendanceMap[studentId];
+        newJustificationMap[studentId] = _justificationMap[studentId] ?? '';
+      }
+
+      setState(() {
+        _attendanceMap = newAttendanceMap;
+        _justificationMap = newJustificationMap;
+      });
+
+      TeacherClassLogger.success('Mapas de presença recarregados');
+      TeacherClassLogger.debug('Mapas atualizados', {
+        'attendanceMapKeys': _attendanceMap.keys.length,
+        'justificationMapKeys': _justificationMap.keys.length,
+        'studentsCount': _students.length,
+      });
+    } else {
+      TeacherClassLogger.info(
+        'Mapas já estão completos, não é necessário recarregar',
+      );
     }
   }
 
@@ -1522,125 +2276,24 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       );
     }
 
-    return Padding(
-      padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Seletor de Data
-          Card(
-            child: Padding(
-              padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
-              child:
-                  isMobile
-                      ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Data da aula:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          InkWell(
-                            onTap: _onDateChanged,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.calendar_today),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    DateFormat(
-                                      'dd/MM/yyyy',
-                                    ).format(_selectedDate),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed:
-                                  _selectedSubjectId != null
-                                      ? _loadAttendance
-                                      : null,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Carregar Chamada'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2953A5),
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                      : Row(
-                        children: [
-                          const Text(
-                            'Data da aula:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          InkWell(
-                            onTap: _onDateChanged,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.calendar_today),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    DateFormat(
-                                      'dd/MM/yyyy',
-                                    ).format(_selectedDate),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          ElevatedButton.icon(
-                            onPressed:
-                                _selectedSubjectId != null
-                                    ? _loadAttendance
-                                    : null,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Carregar Chamada'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2953A5),
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-            ),
-          ),
-          SizedBox(height: isMobile ? 16 : 24),
-
-          // Lista de Alunos
-          Expanded(
-            child: _buildStudentsList(isMobile: isMobile, isTablet: isTablet),
-          ),
-        ],
-      ),
+    // Usar o novo widget de frequência
+    return AttendanceWidget(
+      students: _students,
+      currentLesson: _currentLesson,
+      selectedSubjectId: _selectedSubjectId,
+      selectedDate: _selectedDate,
+      onDateChanged: (newDate) {
+        setState(() {
+          _selectedDate = newDate;
+        });
+        // Recarregar frequência para nova data
+        if (_selectedSubjectId != null) {
+          _loadAttendance();
+        }
+      },
+      onLoadAttendance: _loadAttendance,
+      isMobile: isMobile,
+      isTablet: isTablet,
     );
   }
 
@@ -2167,28 +2820,64 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                           ],
                         ),
                         const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed:
-                                _loadingAttendance ? null : _saveAttendance,
-                            icon:
-                                _loadingAttendance
-                                    ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                    : const Icon(Icons.save),
-                            label: const Text('Salvar Chamada'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2953A5),
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed:
+                                    _loadingAttendance ? null : _saveAttendance,
+                                icon:
+                                    _loadingAttendance
+                                        ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : const Icon(Icons.save),
+                                label: const Text('Salvar Chamada'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2953A5),
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed:
+                                  _loadingAttendance
+                                      ? null
+                                      : () {
+                                        TeacherClassLogger.info(
+                                          'Botão de teste pressionado',
+                                        );
+                                        TeacherClassLogger.debug(
+                                          'Estado atual dos mapas',
+                                          {
+                                            'attendanceMap': _attendanceMap,
+                                            'justificationMap':
+                                                _justificationMap,
+                                            'studentsCount': _students.length,
+                                            'currentLesson': _currentLesson,
+                                          },
+                                        );
+
+                                        // Forçar salvamento para teste
+                                        _saveAttendance();
+                                      },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
+                              ),
+                              child: const Text('Teste'),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                       ],
