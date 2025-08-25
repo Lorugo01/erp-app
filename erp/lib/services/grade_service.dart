@@ -6,7 +6,9 @@ class GradeService {
   // URL base da API - agora centralizada
   static String get baseUrl => ApiConfig.baseUrl;
 
-  static Future<List<Map<String, dynamic>>> getGradesByStudent(String studentId) async {
+  static Future<List<Map<String, dynamic>>> getGradesByStudent(
+    String studentId,
+  ) async {
     final response = await http.get(
       Uri.parse(ApiConfig.getGradesUrl('/student/$studentId')),
     );
@@ -18,7 +20,9 @@ class GradeService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getGradesBySubject(String subjectId) async {
+  static Future<List<Map<String, dynamic>>> getGradesBySubject(
+    String subjectId,
+  ) async {
     final response = await http.get(
       Uri.parse(ApiConfig.getGradesUrl('/subject/$subjectId')),
     );
@@ -30,7 +34,9 @@ class GradeService {
     }
   }
 
-  static Future<Map<String, dynamic>> createGrade(Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> createGrade(
+    Map<String, dynamic> data,
+  ) async {
     final response = await http.post(
       Uri.parse(ApiConfig.getGradesUrl('')),
       headers: {'Content-Type': 'application/json'},
@@ -71,9 +77,26 @@ class GradeService {
       headers: {'Content-Type': 'application/json'},
     );
 
+    // Status 204 significa "No Content" - sucesso sem retorno
+    if (response.statusCode == 204) {
+      return; // Sucesso - nota excluída
+    }
+
+    // Para outros status codes, tentar fazer parse do erro
     if (response.statusCode != 200) {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao deletar nota');
+      String errorMessage = 'Erro ao deletar nota';
+
+      try {
+        if (response.body.isNotEmpty) {
+          final error = jsonDecode(response.body);
+          errorMessage = error['error'] ?? errorMessage;
+        }
+      } catch (e) {
+        // Se não conseguir fazer parse do JSON, usar a mensagem padrão
+        errorMessage = 'Erro ao deletar nota (Status: ${response.statusCode})';
+      }
+
+      throw Exception(errorMessage);
     }
   }
 }

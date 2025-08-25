@@ -66,13 +66,16 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
     // Garantir que a data seja inicializada corretamente
     _selectedDate = DateTime.now();
+    debugPrint('🔄 === INICIALIZANDO TELA DE DETALHES DA TURMA ===');
     debugPrint('🔄 Data inicializada: $_selectedDate');
+    debugPrint(
+      '🔄 Turma: ${widget.classData['name']} (ID: ${widget.classData['id']})',
+    );
 
     _tabController = TabController(length: 3, vsync: this);
-    _fetchSubjects();
-    _fetchStudents();
-    _fetchPeriods();
-    _fetchGradeTypes();
+
+    // Carregar dados na ordem correta
+    _initializeData();
 
     _tabController.addListener(() {
       if (_tabController.index == 0 && _assignments.isEmpty) {
@@ -91,6 +94,26 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     });
   }
 
+  Future<void> _initializeData() async {
+    debugPrint('🔄 === INICIALIZANDO DADOS ===');
+
+    try {
+      // Primeiro carregar disciplinas (necessário para outras operações)
+      await _fetchSubjects();
+
+      // Depois carregar alunos
+      await _fetchStudents();
+
+      // Carregar dados auxiliares em paralelo
+      await Future.wait([_fetchPeriods(), _fetchGradeTypes()]);
+
+      debugPrint('✅ === DADOS INICIALIZADOS COM SUCESSO ===');
+    } catch (e) {
+      debugPrint('❌ === ERRO NA INICIALIZAÇÃO ===');
+      debugPrint('❌ Erro: $e');
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -98,19 +121,34 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   }
 
   Future<void> _fetchSubjects() async {
+    debugPrint('🔄 === CARREGANDO DISCIPLINAS DO PROFESSOR ===');
+    debugPrint('🔄 Turma ID: ${widget.classData['id']}');
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final teacherId = authProvider.user?.teacher?.id;
 
+      debugPrint('🔄 Teacher ID: $teacherId');
+
       if (teacherId == null) {
-        throw Exception('Professor não encontrado');
+        throw Exception(
+          'Professor não encontrado - verifique se está logado como professor',
+        );
       }
 
       // Buscar apenas as disciplinas que o professor leciona nesta turma
+      debugPrint('🔄 Buscando disciplinas do professor na turma...');
       final subjects = await TeacherService.getSubjectsByClassIdAndTeacher(
         widget.classData['id'],
         teacherId,
       );
+
+      debugPrint('🔄 Disciplinas encontradas: ${subjects.length}');
+      if (subjects.isNotEmpty) {
+        debugPrint(
+          '🔄 Primeira disciplina: ${subjects.first['name']} (ID: ${subjects.first['id']})',
+        );
+      }
 
       setState(() {
         _subjects = subjects;
@@ -128,15 +166,40 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
           debugPrint('🔄 Aba de chamada detectada, carregando frequência...');
           _loadAttendance();
         }
+      } else {
+        debugPrint(
+          '⚠️ Nenhuma disciplina encontrada para o professor nesta turma',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Nenhuma disciplina encontrada para você nesta turma',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
       }
+
+      debugPrint('✅ === DISCIPLINAS CARREGADAS COM SUCESSO ===');
     } catch (e) {
-      debugPrint('❌ Erro ao carregar disciplinas: $e');
+      debugPrint('❌ === ERRO AO CARREGAR DISCIPLINAS ===');
+      debugPrint('❌ Erro: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao carregar disciplinas: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Tentar novamente',
+              textColor: Colors.white,
+              onPressed: _fetchSubjects,
+            ),
           ),
         );
       }
@@ -144,10 +207,24 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   }
 
   Future<void> _fetchStudents() async {
+    debugPrint('🔄 === CARREGANDO ALUNOS DA TURMA ===');
+    debugPrint('🔄 Turma ID: ${widget.classData['id']}');
+
     try {
       final students = await TeacherService.getClassStudents(
         widget.classData['id'],
       );
+
+      debugPrint('🔄 Alunos retornados da API: ${students.length}');
+
+      if (students.isEmpty) {
+        debugPrint('⚠️ Nenhum aluno encontrado na turma');
+      } else {
+        debugPrint(
+          '🔄 Primeiro aluno: ${students.first['name']} (ID: ${students.first['id']})',
+        );
+      }
+
       setState(() {
         _students = students;
         // Inicializa o mapa de presença com valores nulos (não marcado)
@@ -159,10 +236,29 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
           students.map((student) => MapEntry(student['id'], '')),
         );
       });
+
       debugPrint('🔄 Alunos carregados: ${students.length}');
       debugPrint('🔄 Mapa de presença inicializado: $_attendanceMap');
+      debugPrint('✅ === ALUNOS CARREGADOS COM SUCESSO ===');
     } catch (e) {
-      debugPrint('❌ Erro ao carregar alunos: $e');
+      debugPrint('❌ === ERRO AO CARREGAR ALUNOS ===');
+      debugPrint('❌ Erro: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar alunos: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Tentar novamente',
+              textColor: Colors.white,
+              onPressed: _fetchStudents,
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -245,8 +341,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   Future<void> _loadAttendance() async {
     if (_selectedSubjectId == null) return;
 
-    debugPrint('🔄 Carregando frequência para disciplina: $_selectedSubjectId');
+    debugPrint('🔄 === INICIANDO CARREGAMENTO DE FREQUÊNCIA ===');
+    debugPrint('🔄 Disciplina ID: $_selectedSubjectId');
     debugPrint('🔄 Data selecionada: $_selectedDate');
+    debugPrint('🔄 Turma ID: ${widget.classData['id']}');
 
     setState(() {
       _loadingAttendance = true;
@@ -257,11 +355,23 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final teacherId = authProvider.user?.teacher?.id;
 
+      debugPrint('🔄 Teacher ID: $teacherId');
+
       if (teacherId == null) {
-        throw Exception('Professor não encontrado');
+        throw Exception(
+          'Professor não encontrado - verifique se está logado como professor',
+        );
       }
 
+      // Verificar se há alunos na turma
+      if (_students.isEmpty) {
+        throw Exception('Nenhum aluno encontrado nesta turma');
+      }
+
+      debugPrint('🔄 Alunos na turma: ${_students.length}');
+
       // Busca ou cria a aula
+      debugPrint('🔄 Buscando/criando aula...');
       final lesson = await AttendanceService.getOrCreateLesson(
         classId: widget.classData['id'],
         subjectId: _selectedSubjectId!,
@@ -269,14 +379,19 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         date: _selectedDate,
       );
 
+      debugPrint('🔄 Aula encontrada/criada: ${lesson['id']}');
+
       setState(() {
         _currentLesson = lesson;
       });
 
       // Busca a frequência existente
+      debugPrint('🔄 Buscando frequência existente...');
       final attendances = await AttendanceService.getAttendanceByLesson(
         lesson['id'],
       );
+
+      debugPrint('🔄 Frequências encontradas: ${attendances.length}');
 
       // Inicializa os mapas de presença e justificativa sem valores marcados
       final newAttendanceMap = <String, String?>{};
@@ -288,17 +403,25 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         newJustificationMap[student['id']] = '';
       }
 
-      // Sobrescreve com os dados existentes da API
-      for (var attendance in attendances) {
-        final studentId = attendance['studentId'];
-        // Determinar status baseado nos novos campos ou compatibilidade
-        String? status = attendance['status'];
-        if (status == null) {
-          final present = attendance['present'];
-          status = present == true ? 'PRESENT' : 'ABSENT';
+      // Sobrescreve com os dados existentes da API (se houver)
+      if (attendances.isNotEmpty) {
+        debugPrint('🔄 Processando frequências existentes...');
+        for (var attendance in attendances) {
+          final studentId = attendance['studentId'];
+          // Determinar status baseado nos novos campos ou compatibilidade
+          String? status = attendance['status'];
+          if (status == null) {
+            final present = attendance['present'];
+            status = present == true ? 'PRESENT' : 'ABSENT';
+          }
+          newAttendanceMap[studentId] = status;
+          newJustificationMap[studentId] = attendance['justification'] ?? '';
+          debugPrint('🔄 Aluno $studentId: $status');
         }
-        newAttendanceMap[studentId] = status;
-        newJustificationMap[studentId] = attendance['justification'] ?? '';
+      } else {
+        debugPrint(
+          '🔄 Nenhuma frequência encontrada - todos os alunos começam sem marcação',
+        );
       }
 
       setState(() {
@@ -307,18 +430,45 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       });
 
       debugPrint('🔄 Mapa de presença inicializado: $_attendanceMap');
+      debugPrint('✅ === FREQUÊNCIA CARREGADA COM SUCESSO ===');
     } catch (e) {
-      debugPrint('❌ Erro ao carregar frequência: $e');
+      debugPrint('❌ === ERRO AO CARREGAR FREQUÊNCIA ===');
+      debugPrint('❌ Erro: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+
+      String errorMessage = 'Erro ao carregar chamada';
+
+      // Mensagens de erro mais específicas
+      if (e.toString().contains('Professor não encontrado')) {
+        errorMessage =
+            'Erro: Professor não encontrado. Faça logout e login novamente.';
+      } else if (e.toString().contains('Nenhum aluno encontrado')) {
+        errorMessage = 'Erro: Esta turma não possui alunos matriculados.';
+      } else if (e.toString().contains('getOrCreateLesson')) {
+        errorMessage =
+            'Erro: Não foi possível criar/buscar a aula. Verifique a conexão com o servidor.';
+      } else if (e.toString().contains('getAttendanceByLesson')) {
+        errorMessage =
+            'Erro: Não foi possível buscar a frequência. Verifique a conexão com o servidor.';
+      } else {
+        errorMessage = 'Erro ao carregar chamada: $e';
+      }
+
       setState(() {
-        _errorAttendance = 'Erro ao carregar chamada: $e';
+        _errorAttendance = errorMessage;
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar chamada: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Tentar novamente',
+              textColor: Colors.white,
+              onPressed: _loadAttendance,
+            ),
           ),
         );
       }
@@ -828,8 +978,80 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
   Widget _buildAttendanceTab({bool isMobile = false, bool isTablet = false}) {
     if (_selectedSubjectId == null) {
-      return const Center(
-        child: Text('Selecione uma disciplina para fazer a chamada'),
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.subject, size: 80, color: Colors.grey[400]),
+              const SizedBox(height: 24),
+              Text(
+                'Disciplina não selecionada',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Selecione uma disciplina para fazer a chamada dos alunos',
+                style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              if (_subjects.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.warning, color: Colors.orange, size: 32),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Nenhuma disciplina encontrada',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Você não está atribuído a nenhuma disciplina nesta turma',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Forçar seleção da primeira disciplina
+                    if (_subjects.isNotEmpty) {
+                      _onSubjectChanged(_subjects.first['id']);
+                    }
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Carregar disciplinas'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2953A5),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -962,22 +1184,98 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
     if (_errorAttendance != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              _errorAttendance!,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadAttendance,
-              child: const Text('Tentar novamente'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 80, color: Colors.red),
+              const SizedBox(height: 24),
+              Text(
+                'Erro ao carregar chamada',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red[700],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorAttendance!,
+                style: const TextStyle(color: Colors.red, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _loadAttendance,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Tentar novamente'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _errorAttendance = null;
+                      });
+                      _initializeData();
+                    },
+                    icon: const Icon(Icons.restart_alt),
+                    label: const Text('Reiniciar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Possíveis soluções:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('• Verifique sua conexão com a internet'),
+                    const Text(
+                      '• Certifique-se de estar logado como professor',
+                    ),
+                    const Text(
+                      '• Verifique se a turma possui alunos matriculados',
+                    ),
+                    const Text('• Tente acessar a aba novamente'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -2233,22 +2531,38 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
     if (confirm == true) {
       try {
+        debugPrint('🔄 Excluindo nota: $gradeId');
+
         await GradeService.deleteGrade(gradeId);
+
+        debugPrint('✅ Nota excluída com sucesso, atualizando lista...');
+
+        // Atualizar a lista de notas
         await _fetchGrades();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Nota excluída com sucesso!'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
             ),
           );
         }
       } catch (e) {
+        debugPrint('❌ Erro ao excluir nota: $e');
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Erro ao excluir nota: $e'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Tentar novamente',
+                textColor: Colors.white,
+                onPressed: () => _deleteGrade(gradeId),
+              ),
             ),
           );
         }

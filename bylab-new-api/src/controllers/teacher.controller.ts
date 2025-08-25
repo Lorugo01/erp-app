@@ -38,6 +38,21 @@ export const getTeacherClasses = async (req: Request, res: Response, next: NextF
   }
 };
 
+export const getTeacherSubjectsByClass = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const teacherId = req.params.id;
+    const classId = req.params.classId;
+    
+    if (!teacherId) return res.status(400).json({ error: 'teacherId é obrigatório' });
+    if (!classId) return res.status(400).json({ error: 'classId é obrigatório' });
+    
+    const subjects = await TeacherService.getTeacherSubjectsByClass(teacherId, classId);
+    res.json(subjects);
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const create = async (req: Request, res: Response) => {
   try {

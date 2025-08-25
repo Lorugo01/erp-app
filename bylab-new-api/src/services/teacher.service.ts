@@ -174,6 +174,20 @@ export const getTeacherClasses = async (teacherId: string, subjectId?: string) =
   return uniqueClasses;
 };
 
+export const getTeacherSubjectsByClass = async (teacherId: string, classId: string) => {
+  return prisma.subject.findMany({
+    where: { 
+      teacherId,
+      classId 
+    },
+    include: {
+      class: true,
+      teacher: true,
+      lessons: true,
+    },
+  });
+};
+
 export const updateTeacher = async (id: string, data: {
   name?: string;
   email?: string;

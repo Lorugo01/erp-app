@@ -78,7 +78,7 @@ class AttendanceService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse(ApiConfig.getAttendanceUrl('/lesson')),
+        Uri.parse(ApiConfig.getLessonsUrl('/get-or-create')),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'classId': classId,
@@ -120,12 +120,12 @@ class AttendanceService {
     required List<Map<String, dynamic>> presences,
   }) async {
     final response = await http.post(
-      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
+      Uri.parse(ApiConfig.getAttendanceUrl('/bulk')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'lessonId': lessonId, 'presences': presences}),
     );
 
-    if (response.statusCode != 200) {
+    if (response.statusCode != 201) {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? 'Erro ao marcar frequência');
     }

@@ -10,7 +10,7 @@ class AssignmentService {
     String classId,
   ) async {
     final response = await http.get(
-      Uri.parse(ApiConfig.getAssignmentsUrl('?classId=$classId')),
+      Uri.parse(ApiConfig.getAssignmentsUrl('/class/$classId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -27,7 +27,7 @@ class AssignmentService {
   ) async {
     final response = await http.get(
       Uri.parse(
-        ApiConfig.getAssignmentsUrl('?classId=$classId&subjectId=$subjectId'),
+        ApiConfig.getAssignmentsUrl('/class/$classId?subjectId=$subjectId'),
       ),
     );
     if (response.statusCode == 200) {
@@ -46,7 +46,7 @@ class AssignmentService {
     String? fileUrl,
   }) async {
     final response = await http.post(
-      Uri.parse(ApiConfig.getAssignmentsUrl('')),
+      Uri.parse(ApiConfig.getAssignmentsUrl('/class/$classId')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'classId': classId,

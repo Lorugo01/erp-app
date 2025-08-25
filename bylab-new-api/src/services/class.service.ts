@@ -113,13 +113,20 @@ export const getClassesByName = (name: string) => {
   });
 };
 
-export const createClass = (data: {
+export const createClass = async (data: {
   grade: number;
   letter: string;
   academicYear: number;
   shift: 'MATUTINO' | 'VESPERTINO' | 'NOTURNO';
-  evaluationModel: string;
+  evaluationModel?: string;
 }) => {
+  // Se evaluationModel não for fornecido, buscar da configuração padrão
+  let finalEvaluationModel = data.evaluationModel;
+  if (!finalEvaluationModel) {
+    const config = await prisma.config.findFirst();
+    finalEvaluationModel = config?.evaluationModel || 'TRADICIONAL';
+  }
+
   const gradeLabel = getGradeLabel(data.grade);
   const turmaLetra = data.letter.toUpperCase();
   const name = `${gradeLabel} ${turmaLetra} ${data.academicYear} - ${data.shift}`;
@@ -127,6 +134,7 @@ export const createClass = (data: {
   return prisma.class.create({
     data: {
       ...data,
+      evaluationModel: finalEvaluationModel,
       letter: turmaLetra,
       name
     }
