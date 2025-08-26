@@ -118,7 +118,7 @@ class TecaAIService {
   static String get baseUrl => TecaAIConfig.baseUrl;
 
   // Timeout para requisições - agora centralizado
-  static int get requestTimeout => TecaAIConfig.requestTimeout;
+  static Duration get requestTimeout => const Duration(seconds: 30);
 
   // Headers padrão - agora centralizado
   static Map<String, String> get defaultHeaders => TecaAIConfig.defaultHeaders;
@@ -154,7 +154,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -192,7 +192,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -230,7 +230,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -268,7 +268,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -305,7 +305,7 @@ class TecaAIService {
 
       final response = await http
           .get(uri, headers: defaultHeaders)
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -328,7 +328,7 @@ class TecaAIService {
     try {
       final response = await http
           .get(Uri.parse(TecaAIConfig.getStatsUrl()), headers: defaultHeaders)
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -348,7 +348,7 @@ class TecaAIService {
     try {
       final response = await http
           .get(Uri.parse(TecaAIConfig.getItemsUrl()), headers: defaultHeaders)
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -384,7 +384,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -427,7 +427,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -464,7 +464,7 @@ class TecaAIService {
               'user_role': user.role.toString().split('.').last,
             }),
           )
-          .timeout(Duration(seconds: requestTimeout));
+          .timeout(requestTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

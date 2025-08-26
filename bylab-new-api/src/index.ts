@@ -8,6 +8,7 @@ import fs from 'fs';
 
 import studentRoutes from './routes/student.routes';
 import teacherRoutes from './routes/teacher.routes';
+import subjectsRoutes from './routes/subjects.routes';
 import subjectRoutes from './routes/subject.routes';
 import enrollmentRoutes from './routes/enrollment.routes';
 import attendanceRoutes from './routes/attendance.routes';
@@ -37,7 +38,8 @@ app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/students', studentRoutes);
 app.use('/teachers', teacherRoutes);
-app.use('/subjects', subjectRoutes);
+app.use('/subjects', subjectsRoutes); // Rotas de disciplinas (types, etc.)
+app.use('/subject', subjectRoutes); // Rotas de matéria específica
 app.use('/attendances', attendanceRoutes);
 app.use('/enrollments', enrollmentRoutes);
 app.use('/lessons', lessonRoutes);

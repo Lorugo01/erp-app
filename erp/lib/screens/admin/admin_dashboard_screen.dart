@@ -1309,7 +1309,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 selectedIndex: _selectedIndex,
                 onSelect: (index) {
                   if (mounted) {
-                    setState(() => _selectedIndex = index);
+                    // Se clicou na aba "Mais" (índice 4), mostrar menu
+                    if (index == 4 && _selectedIndex != 4) {
+                      _showMoreMenu();
+                    } else {
+                      setState(() => _selectedIndex = index);
+                    }
                   }
                 },
                 onLogout: () => _showLogoutConfirmation(),
@@ -1397,6 +1402,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         );
       },
+    );
+  }
+
+  // Método para mostrar o menu "Mais" no mobile
+  void _showMoreMenu() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => AdminMoreMenu(
+              selectedIndex: _selectedIndex,
+              onSelect: (index) {
+                if (mounted) {
+                  setState(() => _selectedIndex = index);
+                }
+              },
+              onLogout: () => _showLogoutConfirmation(),
+            ),
+      ),
     );
   }
 }

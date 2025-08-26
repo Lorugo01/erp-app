@@ -81,9 +81,26 @@ class UserService {
       headers: {'Content-Type': 'application/json'},
     );
 
+    // Status 204 significa "No Content" - sucesso sem retorno
+    if (response.statusCode == 204) {
+      return; // Sucesso - usuário excluído
+    }
+
+    // Para outros status codes, tentar fazer parse do erro
     if (response.statusCode != 200) {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao deletar usuário');
+      String errorMessage = 'Erro ao deletar usuário';
+
+      try {
+        if (response.body.isNotEmpty) {
+          final error = jsonDecode(response.body);
+          errorMessage = error['error'] ?? errorMessage;
+        }
+      } catch (e) {
+        // Se não conseguir fazer parse do JSON, usar a mensagem padrão
+        errorMessage = 'Erro ao deletar usuário (Status: ${response.statusCode})';
+      }
+
+      throw Exception(errorMessage);
     }
   }
 

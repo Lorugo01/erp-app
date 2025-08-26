@@ -18,8 +18,8 @@ class AppConfig {
   static String get uploadsBaseUrl => EnvironmentConfig.uploadsBaseUrl;
 
   // Timeouts
-  static int get apiRequestTimeout => EnvironmentConfig.apiRequestTimeout;
-  static int get tecaaiRequestTimeout => EnvironmentConfig.tecaaiRequestTimeout;
+  static Duration get apiTimeout => const Duration(seconds: 30);
+  static Duration get tecaaiTimeout => const Duration(seconds: 30);
 
   // Configurações de upload
   static int get maxFileSize => EnvironmentConfig.maxFileSize;
@@ -78,8 +78,8 @@ class AppConfig {
     debugPrint('🔗 API Base URL: $apiBaseUrl');
     debugPrint('🤖 TecaAI Base URL: $tecaaiBaseUrl');
     debugPrint('📁 Uploads Base URL: $uploadsBaseUrl');
-    debugPrint('⏱️ API Timeout: ${apiRequestTimeout}s');
-    debugPrint('⏱️ TecaAI Timeout: ${tecaaiRequestTimeout}s');
+    debugPrint('⏱️ API Timeout: ${apiTimeout.inSeconds}s');
+    debugPrint('⏱️ TecaAI Timeout: ${tecaaiTimeout.inSeconds}s');
     debugPrint(
       '📏 Max File Size: ${(maxFileSize / (1024 * 1024)).toStringAsFixed(1)}MB',
     );
@@ -105,10 +105,10 @@ class AppConfig {
     if (uploadsBaseUrl.isEmpty) {
       errors.add('Uploads Base URL não pode estar vazia');
     }
-    if (apiRequestTimeout <= 0) {
+    if (apiTimeout.inSeconds <= 0) {
       errors.add('API Request Timeout deve ser maior que 0');
     }
-    if (tecaaiRequestTimeout <= 0) {
+    if (tecaaiTimeout.inSeconds <= 0) {
       errors.add('TecaAI Request Timeout deve ser maior que 0');
     }
     if (maxFileSize <= 0) {

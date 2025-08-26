@@ -14,7 +14,7 @@ class AuthService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(Duration(seconds: ApiConfig.requestTimeout));
+          .timeout(ApiConfig.apiTimeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

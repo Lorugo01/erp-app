@@ -40,9 +40,26 @@ class ClassService {
       headers: {'Content-Type': 'application/json'},
     );
 
+    // Status 204 significa "No Content" - sucesso sem retorno
+    if (response.statusCode == 204) {
+      return; // Sucesso - turma excluída
+    }
+
+    // Para outros status codes, tentar fazer parse do erro
     if (response.statusCode != 200) {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao deletar turma');
+      String errorMessage = 'Erro ao deletar turma';
+
+      try {
+        if (response.body.isNotEmpty) {
+          final error = jsonDecode(response.body);
+          errorMessage = error['error'] ?? errorMessage;
+        }
+      } catch (e) {
+        // Se não conseguir fazer parse do JSON, usar a mensagem padrão
+        errorMessage = 'Erro ao deletar turma (Status: ${response.statusCode})';
+      }
+
+      throw Exception(errorMessage);
     }
   }
 }

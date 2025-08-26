@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../config/api_config.dart';
 
 class SubjectsManagementTab extends StatefulWidget {
   const SubjectsManagementTab({super.key});
@@ -11,6 +12,7 @@ class SubjectsManagementTab extends StatefulWidget {
 
 class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
   List<Map<String, dynamic>> _subjects = [];
+  List<String> _availableTypes = []; // Lista dinâmica de tipos disponíveis
   bool _loading = false;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
@@ -24,88 +26,22 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
   Future<void> _fetchSubjects() async {
     setState(() => _loading = true);
     try {
-      // Dados mock para teste - remover quando a API estiver funcionando
-      await Future.delayed(
-        const Duration(milliseconds: 500),
-      ); // Simular delay da API
-
-      final mockData = [
-        {
-          'id': '1',
-          'type': 'MATEMATICA',
-          'description': 'Matemática básica e avançada',
-          'isEvaluative': true,
-          'classCount': 5,
-          'teacherCount': 3,
-          'studentCount': 150,
-        },
-        {
-          'id': '2',
-          'type': 'PORTUGUES',
-          'description': 'Língua Portuguesa e Literatura',
-          'isEvaluative': true,
-          'classCount': 5,
-          'teacherCount': 2,
-          'studentCount': 150,
-        },
-        {
-          'id': '3',
-          'type': 'CIENCIAS',
-          'description': 'Ciências Naturais',
-          'isEvaluative': true,
-          'classCount': 4,
-          'teacherCount': 2,
-          'studentCount': 120,
-        },
-        {
-          'id': '4',
-          'type': 'HISTORIA',
-          'description': 'História Geral e do Brasil',
-          'isEvaluative': true,
-          'classCount': 4,
-          'teacherCount': 2,
-          'studentCount': 120,
-        },
-        {
-          'id': '5',
-          'type': 'GEOGRAFIA',
-          'description': 'Geografia Física e Humana',
-          'isEvaluative': true,
-          'classCount': 4,
-          'teacherCount': 2,
-          'studentCount': 120,
-        },
-        {
-          'id': '6',
-          'type': 'EDUCACAO_FISICA',
-          'description': 'Atividades físicas e esportes',
-          'isEvaluative': false,
-          'classCount': 5,
-          'teacherCount': 1,
-          'studentCount': 150,
-        },
-      ];
-
-      setState(() {
-        _subjects = mockData;
-        _error = null;
-      });
-
-      // Comentado temporariamente - descomentar quando a API estiver funcionando
-      /*
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/subjects'),
+        Uri.parse(ApiConfig.getSubjectsUrl('/types')),
       );
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {
           _subjects = data.cast<Map<String, dynamic>>();
+          // Extrair tipos únicos das matérias existentes
+          _availableTypes =
+              data.map<String>((subject) => subject['type'] as String).toList();
           _error = null;
         });
       } else {
         throw Exception('Erro ao carregar matérias');
       }
-      */
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -123,27 +59,12 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
   }
 
   void _showAddSubjectDialog() {
-    final subjectTypes = [
-      'LINGUA_INGLESA',
-      'ARTE',
-      'EDUCACAO_FISICA',
-      'MATEMATICA',
-      'CIENCIAS',
-      'HISTORIA',
-      'GEOGRAFIA',
-      'ENSINO_RELIGIOSO',
-      'BIOLOGIA',
-      'FISICA',
-      'QUIMICA',
-      'FILOSOFIA',
-      'SOCIOLOGIA',
-      'CONTEUDO_INTERDISCIPLINAR',
-    ];
-
     String? selectedType;
     bool isEvaluative = true;
     String description = '';
     bool isLoading = false;
+    bool isCustomType = false;
+    final TextEditingController customTypeController = TextEditingController();
 
     showDialog(
       context: context,
@@ -154,37 +75,71 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  title: Row(
-                    children: [
-                      const Icon(Icons.add, color: Colors.green),
-                      const SizedBox(width: 8),
-                      const Text('Adicionar Nova Matéria'),
-                    ],
-                  ),
+                  title: const Text('Adicionar Nova Matéria'),
                   content: SizedBox(
-                    width: 500,
+                    width: 400,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Seleção de tipo de matéria
-                        DropdownButtonFormField<String>(
-                          value: selectedType,
-                          items:
-                              subjectTypes
-                                  .map<DropdownMenuItem<String>>(
-                                    (type) => DropdownMenuItem(
-                                      value: type,
-                                      child: Text(_formatSubjectType(type)),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged: (v) => setState(() => selectedType = v),
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo de Matéria *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.school),
+                        // Checkbox para tipo personalizado
+                        CheckboxListTile(
+                          value: isCustomType,
+                          onChanged: (v) {
+                            setState(() {
+                              isCustomType = v ?? false;
+                              if (isCustomType) {
+                                selectedType = null;
+                              }
+                            });
+                          },
+                          title: const Text('Criar novo tipo de matéria'),
+                          subtitle: const Text(
+                            'Marque para criar um tipo personalizado',
                           ),
+                          controlAffinity: ListTileControlAffinity.leading,
                         ),
+                        const SizedBox(height: 16),
+
+                        if (!isCustomType) ...[
+                          // Seleção de tipo existente
+                          DropdownButtonFormField<String>(
+                            value: selectedType,
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Selecione um tipo'),
+                              ),
+                              ..._availableTypes.map<DropdownMenuItem<String>>(
+                                (type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(_formatSubjectType(type)),
+                                ),
+                              ),
+                            ],
+                            onChanged: (v) => setState(() => selectedType = v),
+                            decoration: const InputDecoration(
+                              labelText: 'Tipo de Matéria *',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ] else ...[
+                          // Campo para tipo personalizado
+                          TextFormField(
+                            controller: customTypeController,
+                            onChanged:
+                                (v) =>
+                                    selectedType = v.toUpperCase().replaceAll(
+                                      ' ',
+                                      '_',
+                                    ),
+                            decoration: const InputDecoration(
+                              labelText: 'Nome do novo tipo *',
+                              border: OutlineInputBorder(),
+                              hintText: 'Ex: INFORMATICA, LITERATURA, etc.',
+                              helperText: 'Use letras maiúsculas e underscores',
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
 
                         // Descrição da matéria
@@ -195,7 +150,6 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           decoration: const InputDecoration(
                             labelText: 'Descrição (opcional)',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.description),
                             hintText:
                                 'Descreva os objetivos e conteúdo da matéria...',
                           ),
@@ -211,16 +165,12 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           subtitle: const Text(
                             'Esta matéria será avaliada com notas',
                           ),
-                          secondary: Icon(
-                            isEvaluative ? Icons.grade : Icons.block,
-                            color: isEvaluative ? Colors.green : Colors.grey,
-                          ),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
 
                         // Informações adicionais
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: Colors.blue.withAlpha(20),
                             borderRadius: BorderRadius.circular(8),
@@ -231,35 +181,26 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.info,
-                                    color: Colors.blue,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Informações da Matéria',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              const Text(
+                                'Informações da Matéria',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 4),
                               Text(
                                 '• Tipo: ${selectedType != null ? _formatSubjectType(selectedType) : 'Selecione'}',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11),
                               ),
                               Text(
                                 '• Avaliativa: ${isEvaluative ? 'Sim' : 'Não'}',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11),
                               ),
                               if (description.isNotEmpty)
                                 Text(
                                   '• Descrição: ${description.length > 50 ? '${description.substring(0, 50)}...' : description}',
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                             ],
                           ),
@@ -275,7 +216,9 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                     ),
                     ElevatedButton(
                       onPressed:
-                          (selectedType == null || isLoading)
+                          (selectedType == null ||
+                                  selectedType!.isEmpty ||
+                                  isLoading)
                               ? null
                               : () async {
                                 setState(() => isLoading = true);
@@ -283,7 +226,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                                 try {
                                   final response = await http.post(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subjects/types',
+                                      ApiConfig.getSubjectsUrl('/types'),
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -354,23 +297,6 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
   }
 
   void _showEditSubjectDialog(Map<String, dynamic> subject) {
-    final subjectTypes = [
-      'LINGUA_INGLESA',
-      'ARTE',
-      'EDUCACAO_FISICA',
-      'MATEMATICA',
-      'CIENCIAS',
-      'HISTORIA',
-      'GEOGRAFIA',
-      'ENSINO_RELIGIOSO',
-      'BIOLOGIA',
-      'FISICA',
-      'QUIMICA',
-      'FILOSOFIA',
-      'SOCIOLOGIA',
-      'CONTEUDO_INTERDISCIPLINAR',
-    ];
-
     String selectedType = subject['type'] ?? '';
     bool isEvaluative = subject['isEvaluative'] ?? true;
     String description = subject['description'] ?? '';
@@ -385,38 +311,36 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  title: Row(
-                    children: [
-                      const Icon(Icons.edit, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Editar Matéria: ${_formatSubjectType(subject['type'])}',
-                      ),
-                    ],
+                  title: Text(
+                    'Editar Matéria: ${_formatSubjectType(subject['type'])}',
                   ),
                   content: SizedBox(
-                    width: 500,
+                    width: 400,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Seleção de tipo de matéria
+                        // Seleção de tipo de matéria (incluindo o tipo atual)
                         DropdownButtonFormField<String>(
                           value: selectedType,
-                          items:
-                              subjectTypes
-                                  .map<DropdownMenuItem<String>>(
-                                    (type) => DropdownMenuItem(
-                                      value: type,
-                                      child: Text(_formatSubjectType(type)),
-                                    ),
-                                  )
-                                  .toList(),
+                          items: [
+                            ..._availableTypes.map<DropdownMenuItem<String>>(
+                              (type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(_formatSubjectType(type)),
+                              ),
+                            ),
+                            // Incluir o tipo atual caso não esteja na lista
+                            if (!_availableTypes.contains(selectedType))
+                              DropdownMenuItem(
+                                value: selectedType,
+                                child: Text(_formatSubjectType(selectedType)),
+                              ),
+                          ],
                           onChanged:
                               (v) => setState(() => selectedType = v ?? ''),
                           decoration: const InputDecoration(
                             labelText: 'Tipo de Matéria *',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.school),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -429,7 +353,6 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           decoration: const InputDecoration(
                             labelText: 'Descrição (opcional)',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.description),
                             hintText:
                                 'Descreva os objetivos e conteúdo da matéria...',
                           ),
@@ -445,16 +368,12 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           subtitle: const Text(
                             'Esta matéria será avaliada com notas',
                           ),
-                          secondary: Icon(
-                            isEvaluative ? Icons.grade : Icons.block,
-                            color: isEvaluative ? Colors.green : Colors.grey,
-                          ),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
 
                         // Estatísticas da matéria
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: Colors.orange.withAlpha(20),
                             borderRadius: BorderRadius.circular(8),
@@ -465,34 +384,25 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.analytics,
-                                    color: Colors.orange,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Estatísticas da Matéria',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              const Text(
+                                'Estatísticas da Matéria',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 4),
                               Text(
                                 '• Turmas que usam: ${subject['classCount'] ?? 0}',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11),
                               ),
                               Text(
                                 '• Professores: ${subject['teacherCount'] ?? 0}',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11),
                               ),
                               Text(
                                 '• Alunos: ${subject['studentCount'] ?? 0}',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 11),
                               ),
                             ],
                           ),
@@ -516,7 +426,9 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                                 try {
                                   final response = await http.put(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subjects/types/${subject['id']}',
+                                      ApiConfig.getSubjectsUrl(
+                                        '/types/${subject['id']}',
+                                      ),
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -610,13 +522,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Row(
-              children: [
-                const Icon(Icons.warning, color: Colors.red),
-                const SizedBox(width: 8),
-                const Text('Confirmar Exclusão'),
-              ],
-            ),
+            title: const Text('Confirmar Exclusão'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,7 +533,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.red.withAlpha(20),
                     borderRadius: BorderRadius.circular(8),
@@ -639,7 +545,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                       Text(
                         '⚠️ Esta ação não pode ser desfeita!',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: Colors.red,
                           fontWeight: FontWeight.bold,
                         ),
@@ -647,11 +553,11 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                       SizedBox(height: 4),
                       Text(
                         '• A matéria será removida do sistema',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 11),
                       ),
                       Text(
                         '• Não afetará turmas existentes',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 11),
                       ),
                     ],
                   ),
@@ -679,7 +585,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/subjects/types/${subject['id']}'),
+        Uri.parse(ApiConfig.getSubjectsUrl('/types/${subject['id']}')),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
@@ -696,7 +602,8 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
           ),
         );
       } else {
-        throw Exception('Erro ao excluir matéria');
+        final errorBody = jsonDecode(response.body);
+        throw Exception(errorBody['error'] ?? 'Erro ao excluir matéria');
       }
     } catch (e) {
       if (!mounted) return;
@@ -713,6 +620,8 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
 
   String _formatSubjectType(String? type) {
     if (type == null) return '';
+
+    // Mapeamento dos tipos padrão
     switch (type) {
       case 'LINGUA_INGLESA':
         return 'Língua Inglesa';
@@ -743,7 +652,18 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
       case 'CONTEUDO_INTERDISCIPLINAR':
         return 'Conteúdo Interdisciplinar';
       default:
-        return type;
+        // Para tipos personalizados, converter de UPPER_CASE para Title Case
+        return type
+            .toLowerCase()
+            .split('_')
+            .map(
+              (word) =>
+                  word.isNotEmpty
+                      ? '${word[0].toUpperCase()}${word.substring(1)}'
+                      : '',
+            )
+            .join(' ')
+            .trim();
     }
   }
 
@@ -777,10 +697,8 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
+                    child: ElevatedButton(
                       onPressed: _showAddSubjectDialog,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Nova Matéria'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2953A5),
                         foregroundColor: Colors.white,
@@ -792,6 +710,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: const Text('Nova Matéria'),
                     ),
                   ),
                 ] else ...[
@@ -844,7 +763,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
             );
           },
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
 
         // Barra de pesquisa e filtros
         LayoutBuilder(
@@ -876,10 +795,8 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: ElevatedButton(
                           onPressed: _fetchSubjects,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Atualizar'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey[100],
                             foregroundColor: Colors.grey[700],
@@ -888,6 +805,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                               vertical: 12,
                             ),
                           ),
+                          child: const Text('Atualizar'),
                         ),
                       ),
                     ],
@@ -917,14 +835,17 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
+                      ElevatedButton(
                         onPressed: _fetchSubjects,
-                        tooltip: 'Atualizar',
-                        style: IconButton.styleFrom(
+                        style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey[100],
-                          padding: const EdgeInsets.all(12),
+                          foregroundColor: Colors.grey[700],
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
+                        child: const Text('Atualizar'),
                       ),
                     ],
                   ),
@@ -1053,42 +974,6 @@ class _SubjectCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  String _formatSubjectType(String? type) {
-    if (type == null) return '';
-    switch (type) {
-      case 'LINGUA_INGLESA':
-        return 'Língua Inglesa';
-      case 'ARTE':
-        return 'Arte';
-      case 'EDUCACAO_FISICA':
-        return 'Educação Física';
-      case 'MATEMATICA':
-        return 'Matemática';
-      case 'CIENCIAS':
-        return 'Ciências';
-      case 'HISTORIA':
-        return 'História';
-      case 'GEOGRAFIA':
-        return 'Geografia';
-      case 'ENSINO_RELIGIOSO':
-        return 'Ensino Religioso';
-      case 'BIOLOGIA':
-        return 'Biologia';
-      case 'FISICA':
-        return 'Física';
-      case 'QUIMICA':
-        return 'Química';
-      case 'FILOSOFIA':
-        return 'Filosofia';
-      case 'SOCIOLOGIA':
-        return 'Sociologia';
-      case 'CONTEUDO_INTERDISCIPLINAR':
-        return 'Conteúdo Interdisciplinar';
-      default:
-        return type;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final isEvaluative = subject['isEvaluative'] ?? true;
@@ -1097,11 +982,61 @@ class _SubjectCard extends StatelessWidget {
     final teacherCount = subject['teacherCount'] ?? 0;
     final studentCount = subject['studentCount'] ?? 0;
 
+    // Função local para formatação (usa a mesma lógica da classe principal)
+    String formatSubjectType(String? type) {
+      if (type == null) return '';
+
+      // Mapeamento dos tipos padrão
+      switch (type) {
+        case 'LINGUA_INGLESA':
+          return 'Língua Inglesa';
+        case 'ARTE':
+          return 'Arte';
+        case 'EDUCACAO_FISICA':
+          return 'Educação Física';
+        case 'MATEMATICA':
+          return 'Matemática';
+        case 'CIENCIAS':
+          return 'Ciências';
+        case 'HISTORIA':
+          return 'História';
+        case 'GEOGRAFIA':
+          return 'Geografia';
+        case 'ENSINO_RELIGIOSO':
+          return 'Ensino Religioso';
+        case 'BIOLOGIA':
+          return 'Biologia';
+        case 'FISICA':
+          return 'Física';
+        case 'QUIMICA':
+          return 'Química';
+        case 'FILOSOFIA':
+          return 'Filosofia';
+        case 'SOCIOLOGIA':
+          return 'Sociologia';
+        case 'CONTEUDO_INTERDISCIPLINAR':
+          return 'Conteúdo Interdisciplinar';
+        default:
+          // Para tipos personalizados, converter de UPPER_CASE para Title Case
+          return type
+              .toLowerCase()
+              .split('_')
+              .map(
+                (word) =>
+                    word.isNotEmpty
+                        ? '${word[0].toUpperCase()}${word.substring(1)}'
+                        : '',
+              )
+              .join(' ')
+              .trim();
+      }
+    }
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1117,10 +1052,13 @@ class _SubjectCard extends StatelessWidget {
                             : Colors.grey.withAlpha(50),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    isEvaluative ? Icons.grade : Icons.block,
-                    color: isEvaluative ? Colors.green : Colors.grey,
-                    size: 20,
+                  child: Text(
+                    isEvaluative ? 'A' : 'N',
+                    style: TextStyle(
+                      color: isEvaluative ? Colors.green : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1129,7 +1067,7 @@ class _SubjectCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _formatSubjectType(subject['type']),
+                        formatSubjectType(subject['type']),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -1159,7 +1097,6 @@ class _SubjectCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _StatItem(
-                    icon: Icons.class_,
                     label: 'Turmas',
                     value: classCount.toString(),
                     color: Colors.blue,
@@ -1167,7 +1104,6 @@ class _SubjectCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: _StatItem(
-                    icon: Icons.person,
                     label: 'Professores',
                     value: teacherCount.toString(),
                     color: Colors.orange,
@@ -1175,7 +1111,6 @@ class _SubjectCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: _StatItem(
-                    icon: Icons.people,
                     label: 'Alunos',
                     value: studentCount.toString(),
                     color: Colors.green,
@@ -1194,29 +1129,27 @@ class _SubjectCard extends StatelessWidget {
                     children: [
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: onEdit,
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Editar'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.blue,
                             side: const BorderSide(color: Colors.blue),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                          child: const Text('Editar'),
                         ),
                       ),
                       const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: onDelete,
-                          icon: const Icon(Icons.delete, size: 16),
-                          label: const Text('Excluir'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.red,
                             side: const BorderSide(color: Colors.red),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                          child: const Text('Excluir'),
                         ),
                       ),
                     ],
@@ -1225,28 +1158,26 @@ class _SubjectCard extends StatelessWidget {
                   return Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: onEdit,
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Editar'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.blue,
                             side: const BorderSide(color: Colors.blue),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                          child: const Text('Editar'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: OutlinedButton(
                           onPressed: onDelete,
-                          icon: const Icon(Icons.delete, size: 16),
-                          label: const Text('Excluir'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.red,
                             side: const BorderSide(color: Colors.red),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                          child: const Text('Excluir'),
                         ),
                       ),
                     ],
@@ -1262,13 +1193,11 @@ class _SubjectCard extends StatelessWidget {
 }
 
 class _StatItem extends StatelessWidget {
-  final IconData icon;
   final String label;
   final String value;
   final Color color;
 
   const _StatItem({
-    required this.icon,
     required this.label,
     required this.value,
     required this.color,
@@ -1281,8 +1210,6 @@ class _StatItem extends StatelessWidget {
         final isSmall = constraints.maxWidth < 100;
         return Column(
           children: [
-            Icon(icon, color: color, size: isSmall ? 16 : 20),
-            SizedBox(height: isSmall ? 2 : 4),
             Text(
               value,
               style: TextStyle(

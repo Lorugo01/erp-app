@@ -10,7 +10,7 @@ class AttendanceService {
     String lessonId,
   ) async {
     final response = await http.get(
-      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
+      Uri.parse(ApiConfig.getAttendancesUrl('/lesson/$lessonId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -25,7 +25,7 @@ class AttendanceService {
     Map<String, dynamic> data,
   ) async {
     final response = await http.put(
-      Uri.parse(ApiConfig.getAttendanceUrl('/$attendanceId')),
+      Uri.parse(ApiConfig.getAttendancesUrl('/$attendanceId')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
@@ -43,7 +43,7 @@ class AttendanceService {
     Map<String, dynamic> data,
   ) async {
     final response = await http.post(
-      Uri.parse(ApiConfig.getAttendanceUrl('')),
+      Uri.parse(ApiConfig.getAttendancesUrl('')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
@@ -59,7 +59,7 @@ class AttendanceService {
 
   static Future<void> deleteAttendance(String attendanceId) async {
     final response = await http.delete(
-      Uri.parse(ApiConfig.getAttendanceUrl('/$attendanceId')),
+      Uri.parse(ApiConfig.getAttendancesUrl('/$attendanceId')),
       headers: {'Content-Type': 'application/json'},
     );
 
@@ -104,7 +104,7 @@ class AttendanceService {
     String lessonId,
   ) async {
     final response = await http.get(
-      Uri.parse(ApiConfig.getAttendanceUrl('/lesson/$lessonId')),
+      Uri.parse(ApiConfig.getAttendancesUrl('/lesson/$lessonId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -120,7 +120,7 @@ class AttendanceService {
     required List<Map<String, dynamic>> presences,
   }) async {
     final response = await http.post(
-      Uri.parse(ApiConfig.getAttendanceUrl('/bulk')),
+      Uri.parse(ApiConfig.getAttendancesUrl('/bulk')),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'lessonId': lessonId, 'presences': presences}),
     );
@@ -135,7 +135,7 @@ class AttendanceService {
     String studentId,
   ) async {
     final response = await http.get(
-      Uri.parse(ApiConfig.getAttendanceUrl('/student/$studentId')),
+      Uri.parse(ApiConfig.getAttendancesUrl('/student/$studentId')),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);

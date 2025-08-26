@@ -13,7 +13,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   bool _isLoading = false;
   String _currentEnvironment = EnvironmentConfig.environment.name;
   String _apiUrl = ApiConfig.baseUrl;
-  int _timeout = ApiConfig.requestTimeout;
+  int _timeout = ApiConfig.apiTimeout.inSeconds;
 
   @override
   Widget build(BuildContext context) {
