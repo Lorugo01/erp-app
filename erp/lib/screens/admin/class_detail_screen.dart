@@ -141,22 +141,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
   final int duracaoAula = 50;
   final int intervalo = 10;
 
-  final subjectTypes = [
-    'LINGUA_INGLESA',
-    'ARTE',
-    'EDUCACAO_FISICA',
-    'MATEMATICA',
-    'CIENCIAS',
-    'HISTORIA',
-    'GEOGRAFIA',
-    'ENSINO_RELIGIOSO',
-    'BIOLOGIA',
-    'FISICA',
-    'QUIMICA',
-    'FILOSOFIA',
-    'SOCIOLOGIA',
-    'CONTEUDO_INTERDISCIPLINAR',
-  ];
+  List<Map<String, dynamic>> subjectTypes = [];
 
   @override
   void initState() {
@@ -165,6 +150,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     _garantirHorariosMinimos();
     fetchEvents();
     fetchProfessores();
+    fetchSubjectTypes();
 
     // Debug: verifica os horários após inicialização
     debugPrint('Horários após initState: $horarios');
@@ -392,11 +378,13 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                   value: subjectType,
                   items:
                       subjectTypes
-                          .map(
-                            (type) => DropdownMenuItem(
-                              value: type,
+                          .map<DropdownMenuItem<String>>(
+                            (subjectType) => DropdownMenuItem<String>(
+                              value: subjectType['name'] ?? subjectType['type'],
                               child: Text(
-                                type.replaceAll('_', ' ').toUpperCase(),
+                                _formatSubjectType(
+                                  subjectType['name'] ?? subjectType['type'],
+                                ),
                               ),
                             ),
                           )
@@ -659,11 +647,9 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Text(
-                                              evento['title']?.replaceAll(
-                                                    '_',
-                                                    ' ',
-                                                  ) ??
-                                                  '',
+                                              _formatSubjectType(
+                                                evento['title'],
+                                              ),
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 11,
@@ -783,6 +769,58 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     }
   }
 
+  Future<void> fetchSubjectTypes() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.18.15:3000/subjects/types'),
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          subjectTypes = List<Map<String, dynamic>>.from(
+            json.decode(response.body),
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar tipos de disciplinas: $e');
+      // Fallback para tipos fixos se a API falhar
+      setState(() {
+        subjectTypes = [
+          {
+            'id': '1',
+            'name': 'LINGUA_INGLESA',
+            'description': 'Língua Inglesa',
+          },
+          {'id': '2', 'name': 'ARTE', 'description': 'Arte'},
+          {
+            'id': '3',
+            'name': 'EDUCACAO_FISICA',
+            'description': 'Educação Física',
+          },
+          {'id': '4', 'name': 'MATEMATICA', 'description': 'Matemática'},
+          {'id': '5', 'name': 'CIENCIAS', 'description': 'Ciências'},
+          {'id': '6', 'name': 'HISTORIA', 'description': 'História'},
+          {'id': '7', 'name': 'GEOGRAFIA', 'description': 'Geografia'},
+          {
+            'id': '8',
+            'name': 'ENSINO_RELIGIOSO',
+            'description': 'Ensino Religioso',
+          },
+          {'id': '9', 'name': 'BIOLOGIA', 'description': 'Biologia'},
+          {'id': '10', 'name': 'FISICA', 'description': 'Física'},
+          {'id': '11', 'name': 'QUIMICA', 'description': 'Química'},
+          {'id': '12', 'name': 'FILOSOFIA', 'description': 'Filosofia'},
+          {'id': '13', 'name': 'SOCIOLOGIA', 'description': 'Sociologia'},
+          {
+            'id': '14',
+            'name': 'CONTEUDO_INTERDISCIPLINAR',
+            'description': 'Conteúdo Interdisciplinar',
+          },
+        ];
+      });
+    }
+  }
+
   String _getTeacherName(Map<String, dynamic> evento) {
     // Se o evento tem dados do professor diretamente
     if (evento['teacher'] != null && evento['teacher']['name'] != null) {
@@ -801,6 +839,42 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     }
 
     return 'Professor não definido';
+  }
+
+  String _formatSubjectType(String? type) {
+    if (type == null) return '';
+    switch (type) {
+      case 'LINGUA_INGLESA':
+        return 'Língua Inglesa';
+      case 'ARTE':
+        return 'Arte';
+      case 'EDUCACAO_FISICA':
+        return 'Educação Física';
+      case 'MATEMATICA':
+        return 'Matemática';
+      case 'CIENCIAS':
+        return 'Ciências';
+      case 'HISTORIA':
+        return 'História';
+      case 'GEOGRAFIA':
+        return 'Geografia';
+      case 'ENSINO_RELIGIOSO':
+        return 'Ensino Religioso';
+      case 'BIOLOGIA':
+        return 'Biologia';
+      case 'FISICA':
+        return 'Física';
+      case 'QUIMICA':
+        return 'Química';
+      case 'FILOSOFIA':
+        return 'Filosofia';
+      case 'SOCIOLOGIA':
+        return 'Sociologia';
+      case 'CONTEUDO_INTERDISCIPLINAR':
+        return 'Conteúdo Interdisciplinar';
+      default:
+        return type;
+    }
   }
 
   void _showAddEventDialog() async {
@@ -830,7 +904,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     final Map<String, List<Map<String, dynamic>>> professoresPorMateria = {};
 
     for (final subject in subjects) {
-      final type = subject['type'];
+      final type = subject['type'] ?? subject['subjectType']?['name'];
       final teacher = subject['teacher'];
       if (type != null && teacher != null) {
         professoresPorMateria.putIfAbsent(type, () => []).add(teacher);
@@ -876,9 +950,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
                               .map(
                                 (type) => DropdownMenuItem(
                                   value: type,
-                                  child: Text(
-                                    type.replaceAll('_', ' ').toUpperCase(),
-                                  ),
+                                  child: Text(_formatSubjectType(type)),
                                 ),
                               )
                               .toList(),

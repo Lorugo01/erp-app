@@ -16,7 +16,10 @@ export const getAllClasses = () => {
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     },
@@ -37,7 +40,10 @@ export const getClassById = async (id: string) => {
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     },
@@ -56,7 +62,10 @@ export const getClassesByYear = (year: number) => {
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     },
@@ -71,7 +80,10 @@ export const getClassesByGrade = (grade: number) => {
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     },
@@ -86,7 +98,10 @@ export const getClassesByShift = (shift: 'MATUTINO' | 'VESPERTINO' | 'NOTURNO') 
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     },
@@ -106,7 +121,10 @@ export const getClassesByName = (name: string) => {
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     },
@@ -181,7 +199,10 @@ export const updateClass = async (id: string, data: {
         include: { student: true }
       },
       subjects: {
-        include: { teacher: true }
+        include: { 
+          teacher: true,
+          subjectType: true
+        } as any
       },
       lessons: true,
     }

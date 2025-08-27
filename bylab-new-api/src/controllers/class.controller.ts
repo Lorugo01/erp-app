@@ -116,11 +116,26 @@ export const addTeacherToClass = async (req: Request, res: Response, next: NextF
   try {
     const classId = req.params.id;
     const { teacherId } = req.body;
+    // Busca um SubjectType genérico ou cria um se não existir
+    let subjectType = await prisma.subjectType.findFirst({
+      where: { name: 'CONTEUDO_INTERDISCIPLINAR' }
+    });
+    
+    if (!subjectType) {
+      subjectType = await prisma.subjectType.create({
+        data: {
+          name: 'CONTEUDO_INTERDISCIPLINAR',
+          description: 'Conteúdo Interdisciplinar',
+          isEvaluative: true
+        }
+      });
+    }
+
     // Cria um Subject genérico para vincular o professor à turma
     const subject = await prisma.subject.create({
       data: {
         name: 'GENERICA',
-        type: 'CONTEUDO_INTERDISCIPLINAR',
+        subjectTypeId: subjectType.id,
         classId,
         teacherId,
       }

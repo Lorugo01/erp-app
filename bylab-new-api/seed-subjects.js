@@ -86,7 +86,7 @@ async function seedSubjects() {
     
     console.log('📝 Disciplinas criadas:');
     allSubjects.forEach(subject => {
-      console.log(`  - ${subject.type}: ${subject.description}`);
+      console.log(`  - ${subject.name}: ${subject.description}`);
     });
     
   } catch (error) {

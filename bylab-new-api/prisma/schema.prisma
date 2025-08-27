@@ -117,18 +117,19 @@ model Teacher {
 }
 
 model Subject {
-  id          String       @id @default(uuid())
+  id          String          @id @default(uuid())
   name        String
   classId     String
   teacherId   String
-  createdAt   DateTime     @default(now())
-  type        SubjectType
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime        @default(now())
+  subjectTypeId String
+  subjectType   SubjectType   @relation(fields: [subjectTypeId], references: [id])
+  updatedAt   DateTime        @updatedAt
   assignments Assignment[]
   grades      Grade[]
   lessons     Lesson[]
-  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
-  teacher     Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class       Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher     Teacher         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 }
 
 model Lesson {
@@ -250,21 +251,16 @@ enum Shift {
   INTEGRAL
 }
 
-enum SubjectType {
-  LINGUA_INGLESA
-  ARTE
-  EDUCACAO_FISICA
-  MATEMATICA
-  CIENCIAS
-  HISTORIA
-  GEOGRAFIA
-  ENSINO_RELIGIOSO
-  BIOLOGIA
-  FISICA
-  QUIMICA
-  FILOSOFIA
-  SOCIOLOGIA
-  CONTEUDO_INTERDISCIPLINAR
+// Removido enum de tipos fixos; agora tudo referencia SubjectType
+
+model SubjectType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isEvaluative Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  subjects    Subject[]
 }
 
 enum AttendanceStatus {

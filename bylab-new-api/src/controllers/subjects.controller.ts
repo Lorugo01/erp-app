@@ -1,192 +1,183 @@
 import { Request, Response } from 'express';
+import prisma from '../prisma/client';
 
 export class SubjectsController {
-  // Buscar todos os tipos de disciplinas
+  // Buscar todas as disciplinas
   async getAllSubjectTypes(req: Request, res: Response) {
     try {
-      console.log('🔍 Controller: Iniciando busca de disciplinas...');
-      
-      // Como SubjectType é um enum, vamos criar uma lista baseada nos valores do enum
-      const subjectTypes = [
-        'LINGUA_INGLESA', 'ARTE', 'EDUCACAO_FISICA', 'MATEMATICA', 'CIENCIAS',
-        'HISTORIA', 'GEOGRAFIA', 'ENSINO_RELIGIOSO', 'BIOLOGIA', 'FISICA',
-        'QUIMICA', 'FILOSOFIA', 'SOCIOLOGIA', 'CONTEUDO_INTERDISCIPLINAR'
-      ];
-
-      console.log('🔍 Controller: Criando lista de disciplinas...');
-      
-      // Versão simplificada - sem consultas complexas por enquanto
-      const subjectsWithStats = subjectTypes.map((type) => {
-        console.log(`🔍 Controller: Processando disciplina ${type}`);
-        
-        // Descrições hardcoded para evitar problemas com métodos de classe
-        const descriptions: { [key: string]: string } = {
-          'LINGUA_INGLESA': 'Língua Inglesa',
-          'ARTE': 'Arte e Cultura',
-          'EDUCACAO_FISICA': 'Educação Física e Esportes',
-          'MATEMATICA': 'Matemática básica e avançada',
-          'CIENCIAS': 'Ciências Naturais',
-          'HISTORIA': 'História Geral e do Brasil',
-          'GEOGRAFIA': 'Geografia Geral e do Brasil',
-          'ENSINO_RELIGIOSO': 'Ensino Religioso',
-          'BIOLOGIA': 'Biologia',
-          'FISICA': 'Física',
-          'QUIMICA': 'Química',
-          'FILOSOFIA': 'Filosofia',
-          'SOCIOLOGIA': 'Sociologia',
-          'CONTEUDO_INTERDISCIPLINAR': 'Conteúdo Interdisciplinar'
-        };
-        
-        const nonEvaluative = ['EDUCACAO_FISICA', 'ARTE'];
-        const isEvaluative = !nonEvaluative.includes(type);
-        
-        return {
-          id: type, // Usar o tipo como ID
-          type: type,
-          description: descriptions[type] || type,
-          isEvaluative: isEvaluative,
-          classCount: 0, // Temporariamente fixo
-          teacherCount: 0, // Temporariamente fixo
-          studentCount: 0, // Temporariamente fixo
-          createdAt: new Date(), // Data atual como placeholder
-          updatedAt: new Date(), // Data atual como placeholder
-        };
+      const subjects = await (prisma as any).subjectType.findMany({
+        orderBy: { createdAt: 'desc' },
       });
 
-      console.log(`✅ Controller: Processadas ${subjectsWithStats.length} disciplinas`);
+      // Calcular estatísticas reais para cada tipo de disciplina
+      const subjectsWithStats = await Promise.all(
+        subjects.map(async (s: any) => {
+          // Contar turmas que usam este tipo de disciplina
+          const classCount = await (prisma as any).subject.count({
+            where: { subjectTypeId: s.id },
+          });
+
+          // Contar professores únicos que lecionam este tipo de disciplina
+          const teachers = await (prisma as any).subject.findMany({
+            where: { subjectTypeId: s.id },
+            select: { teacherId: true },
+          });
+          const teacherCount = teachers.map((t: any) => t.teacherId).filter((value: any, index: any, self: any) => self.indexOf(value) === index).length;
+
+          // Contar alunos únicos que estudam este tipo de disciplina
+          const enrollments = await (prisma as any).enrollment.findMany({
+            where: {
+              class: {
+                subjects: {
+                  some: {
+                    subjectTypeId: s.id,
+                  },
+                },
+              },
+              current: true,
+            },
+            select: { studentId: true },
+          });
+          const studentCount = enrollments.map((e: any) => e.studentId).filter((value: any, index: any, self: any) => self.indexOf(value) === index).length;
+
+          return {
+            id: s.id,
+            type: s.name,
+            description: s.description ?? '',
+            isEvaluative: s.isEvaluative,
+            classCount,
+            teacherCount,
+            studentCount,
+            createdAt: s.createdAt,
+            updatedAt: s.updatedAt,
+          };
+        })
+      );
+
       res.json(subjectsWithStats);
     } catch (error) {
-      console.error('❌ Controller: Erro ao buscar tipos de disciplinas:', error);
+      console.error('❌ Controller: Erro ao buscar disciplinas:', error);
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
-  // Buscar tipo de disciplina por ID
+  // Buscar disciplina por ID
   async getSubjectTypeById(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      
-      // Como SubjectType é um enum, vamos verificar se o ID é um valor válido
-      const validTypes = [
-        'LINGUA_INGLESA', 'ARTE', 'EDUCACAO_FISICA', 'MATEMATICA', 'CIENCIAS',
-        'HISTORIA', 'GEOGRAFIA', 'ENSINO_RELIGIOSO', 'BIOLOGIA', 'FISICA',
-        'QUIMICA', 'FILOSOFIA', 'SOCIOLOGIA', 'CONTEUDO_INTERDISCIPLINAR'
-      ];
-      
-      if (!validTypes.includes(id)) {
-        return res.status(404).json({ error: 'Tipo de disciplina não encontrado' });
-      }
+      const subject = await (prisma as any).subjectType.findUnique({ where: { id } });
+      if (!subject) return res.status(404).json({ error: 'Disciplina não encontrada' });
 
-      // Descrições hardcoded para evitar problemas com métodos de classe
-      const descriptions: { [key: string]: string } = {
-        'LINGUA_INGLESA': 'Língua Inglesa',
-        'ARTE': 'Arte e Cultura',
-        'EDUCACAO_FISICA': 'Educação Física e Esportes',
-        'MATEMATICA': 'Matemática básica e avançada',
-        'CIENCIAS': 'Ciências Naturais',
-        'HISTORIA': 'História Geral e do Brasil',
-        'GEOGRAFIA': 'Geografia Geral e do Brasil',
-        'ENSINO_RELIGIOSO': 'Ensino Religioso',
-        'BIOLOGIA': 'Biologia',
-        'FISICA': 'Física',
-        'QUIMICA': 'Química',
-        'FILOSOFIA': 'Filosofia',
-        'SOCIOLOGIA': 'Sociologia',
-        'CONTEUDO_INTERDISCIPLINAR': 'Conteúdo Interdisciplinar'
-      };
-      
-      const nonEvaluative = ['EDUCACAO_FISICA', 'ARTE'];
-      const isEvaluative = !nonEvaluative.includes(id);
-      
-      const subject = {
-        id: id,
-        type: id,
-        description: descriptions[id] || id,
-        isEvaluative: isEvaluative,
-        classCount: 0, // Temporariamente fixo
-        teacherCount: 0, // Temporariamente fixo
-        studentCount: 0, // Temporariamente fixo
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      res.json(subject);
+      // Calcular estatísticas reais para este tipo de disciplina
+      const classCount = await (prisma as any).subject.count({
+        where: { subjectTypeId: id },
+      });
+
+      const teachers = await (prisma as any).subject.findMany({
+        where: { subjectTypeId: id },
+        select: { teacherId: true },
+      });
+      const teacherCount = teachers.map((t: any) => t.teacherId).filter((value: any, index: any, self: any) => self.indexOf(value) === index).length;
+
+      const enrollments = await (prisma as any).enrollment.findMany({
+        where: {
+          class: {
+            subjects: {
+              some: {
+                subjectTypeId: id,
+              },
+            },
+          },
+          current: true,
+        },
+        select: { studentId: true },
+      });
+      const studentCount = enrollments.map((e: any) => e.studentId).filter((value: any, index: any, self: any) => self.indexOf(value) === index).length;
+
+      res.json({
+        id: subject.id,
+        type: subject.name,
+        description: subject.description ?? '',
+        isEvaluative: subject.isEvaluative,
+        classCount,
+        teacherCount,
+        studentCount,
+        createdAt: subject.createdAt,
+        updatedAt: subject.updatedAt,
+      });
     } catch (error) {
-      console.error('Erro ao buscar tipo de disciplina:', error);
+      console.error('Erro ao buscar disciplina:', error);
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
-  // Criar novo tipo de disciplina
+  // Criar nova disciplina
   async createSubjectType(req: Request, res: Response) {
     try {
-      const { type, description, isEvaluative } = req.body;
+      const { name, description, isEvaluative } = req.body;
 
-      if (!type) {
-        return res.status(400).json({ error: 'Tipo de disciplina é obrigatório' });
+      if (!name) {
+        return res.status(400).json({ error: 'Nome da disciplina é obrigatório' });
       }
 
-      // Como SubjectType é um enum, não podemos criar novos tipos
-      // Apenas retornar os dados para compatibilidade
-      const newSubject = {
-        id: type,
-        type: type,
-        description: description || '',
-        isEvaluative: isEvaluative !== undefined ? isEvaluative : true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const created = await (prisma as any).subjectType.create({
+        data: {
+          name: name,
+          description: description ?? '',
+          isEvaluative: isEvaluative ?? true,
+        },
+      });
 
-      res.status(201).json(newSubject);
-    } catch (error) {
-      console.error('Erro ao criar tipo de disciplina:', error);
-      
-      if (error instanceof Error && error.message.includes('já existe')) {
-        return res.status(409).json({ error: error.message });
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error('Erro ao criar disciplina:', error);
+      if (error?.code === 'P2002') {
+        return res.status(409).json({ error: 'Já existe uma matéria com esse nome' });
       }
-      
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
-  // Atualizar tipo de disciplina
+  // Atualizar disciplina
   async updateSubjectType(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { type, description, isEvaluative } = req.body;
+      const { name, description, isEvaluative } = req.body;
 
-      if (!type) {
-        return res.status(400).json({ error: 'Tipo de disciplina é obrigatório' });
+      if (!name) {
+        return res.status(400).json({ error: 'Nome da disciplina é obrigatório' });
       }
 
-      // Como SubjectType é um enum, não podemos atualizar tipos
-      // Apenas retornar os dados para compatibilidade
-      const updatedSubject = {
-        id: id,
-        type: type,
-        description: description || '',
-        isEvaluative: isEvaluative !== undefined ? isEvaluative : true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const updated = await (prisma as any).subjectType.update({
+        where: { id },
+        data: {
+          name: name,
+          description: description ?? '',
+          isEvaluative: isEvaluative ?? true,
+        },
+      });
 
-      res.json(updatedSubject);
-    } catch (error) {
-      console.error('Erro ao atualizar tipo de disciplina:', error);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Erro ao atualizar disciplina:', error);
+      if (error?.code === 'P2025') {
+        return res.status(404).json({ error: 'Disciplina não encontrada' });
+      }
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
 
-  // Excluir tipo de disciplina
+  // Excluir disciplina
   async deleteSubjectType(req: Request, res: Response) {
     try {
       const { id } = req.params;
-
-      // Como SubjectType é um enum, não podemos excluir tipos
-      // Apenas retornar true para compatibilidade
-      res.json({ success: true, message: 'Tipo de disciplina removido com sucesso' });
-    } catch (error) {
-      console.error('Erro ao excluir tipo de disciplina:', error);
+      await (prisma as any).subjectType.delete({ where: { id } });
+      res.json({ success: true, message: 'Disciplina removida com sucesso' });
+    } catch (error: any) {
+      console.error('Erro ao excluir disciplina:', error);
+      if (error?.code === 'P2025') {
+        return res.status(404).json({ error: 'Disciplina não encontrada' });
+      }
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
@@ -196,8 +187,27 @@ export class SubjectsController {
     try {
       const { classId } = req.params;
       
-      // Temporariamente retornar array vazio para compatibilidade
-      res.json([]);
+      // Buscar disciplinas da turma usando o service correto
+      const subjects = await (prisma as any).subject.findMany({
+        where: { classId },
+        include: {
+          teacher: true,
+          subjectType: true,
+        },
+      });
+
+      // Formatar dados para compatibilidade com o frontend
+      const formattedSubjects = subjects.map((subject: any) => ({
+        id: subject.id,
+        name: subject.name,
+        teacherId: subject.teacherId,
+        teacher: subject.teacher,
+        subjectType: subject.subjectType,
+        createdAt: subject.createdAt,
+        updatedAt: subject.updatedAt,
+      }));
+
+      res.json(formattedSubjects);
     } catch (error) {
       console.error('Erro ao buscar disciplinas da turma:', error);
       res.status(500).json({ error: 'Erro interno do servidor' });
@@ -210,16 +220,42 @@ export class SubjectsController {
       const { classId } = req.params;
       const { subjectTypeId, teacherId } = req.body;
 
-      // Temporariamente retornar objeto mock para compatibilidade
-      const newSubject = {
-        id: 'mock-id',
-        classId,
-        type: subjectTypeId,
-        teacherId,
-        name: subjectTypeId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      if (!subjectTypeId || !teacherId) {
+        return res.status(400).json({ 
+          error: 'subjectTypeId e teacherId são obrigatórios' 
+        });
+      }
+
+      // Buscar o tipo de disciplina e a turma
+      const subjectType = await (prisma as any).subjectType.findUnique({
+        where: { id: subjectTypeId },
+      });
+
+      const classData = await (prisma as any).class.findUnique({
+        where: { id: classId },
+      });
+
+      if (!subjectType) {
+        return res.status(400).json({ error: 'Tipo de disciplina não encontrado' });
+      }
+
+      if (!classData) {
+        return res.status(400).json({ error: 'Turma não encontrada' });
+      }
+
+      // Criar a disciplina
+      const newSubject = await (prisma as any).subject.create({
+        data: {
+          name: '${subjectType.name} - ${classData.name}',
+          classId,
+          teacherId,
+          subjectTypeId,
+        },
+        include: {
+          teacher: true,
+          subjectType: true,
+        },
+      });
 
       res.status(201).json(newSubject);
     } catch (error) {
@@ -233,7 +269,23 @@ export class SubjectsController {
     try {
       const { classId, subjectId } = req.params;
       
-      // Temporariamente retornar true para compatibilidade
+      // Verificar se a disciplina existe e pertence à turma
+      const subject = await (prisma as any).subject.findFirst({
+        where: { 
+          id: subjectId,
+          classId: classId,
+        },
+      });
+
+      if (!subject) {
+        return res.status(404).json({ error: 'Disciplina não encontrada' });
+      }
+
+      // Remover a disciplina
+      await (prisma as any).subject.delete({
+        where: { id: subjectId },
+      });
+
       res.json({ success: true, message: 'Disciplina removida com sucesso' });
     } catch (error) {
       console.error('Erro ao remover disciplina da turma:', error);
@@ -246,8 +298,27 @@ export class SubjectsController {
     try {
       const { teacherId } = req.params;
       
-      // Temporariamente retornar array vazio para compatibilidade
-      res.json([]);
+      // Buscar disciplinas do professor
+      const subjects = await (prisma as any).subject.findMany({
+        where: { teacherId },
+        include: {
+          class: true,
+          subjectType: true,
+        },
+      });
+
+      // Formatar dados para compatibilidade com o frontend
+      const formattedSubjects = subjects.map((subject: any) => ({
+        id: subject.id,
+        name: subject.name,
+        classId: subject.classId,
+        class: subject.class,
+        subjectType: subject.subjectType,
+        createdAt: subject.createdAt,
+        updatedAt: subject.updatedAt,
+      }));
+
+      res.json(formattedSubjects);
     } catch (error) {
       console.error('Erro ao buscar disciplinas do professor:', error);
       res.status(500).json({ error: 'Erro interno do servidor' });

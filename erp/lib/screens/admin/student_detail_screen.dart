@@ -1905,7 +1905,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     for (var enrollment in enrollments) {
       if (enrollment['class']?['subjects'] != null) {
         for (var s in enrollment['class']['subjects']) {
-          final subjectType = s['type'] ?? s['name'] ?? '';
+          final subjectType =
+              s['subjectType']?['name'] ?? s['type'] ?? s['name'] ?? '';
 
           // Agrupar por tipo de disciplina ao invés de ID
           // Isso evita duplicatas quando há múltiplos professores para a mesma matéria
@@ -1921,7 +1922,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             for (var enrollment2 in enrollments) {
               if (enrollment2['class']?['subjects'] != null) {
                 for (var s2 in enrollment2['class']['subjects']) {
-                  if ((s2['type'] ?? s2['name'] ?? '') == subjectType) {
+                  if ((s2['subjectType']?['name'] ??
+                          s2['type'] ??
+                          s2['name'] ??
+                          '') ==
+                      subjectType) {
                     relatedSubjectIds.add(s2['id']);
                   }
                 }

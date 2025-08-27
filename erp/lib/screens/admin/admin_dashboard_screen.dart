@@ -1325,8 +1325,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _selectedIndex == 2 ||
                   _selectedIndex == 3 ||
                   _selectedIndex == 4 ||
-                  _selectedIndex == 5 ||
-                  _selectedIndex == 8)
+                  _selectedIndex == 5)
               ? Padding(
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).size.width < 600 ? 80 : 24,
@@ -1345,8 +1344,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       _showAddClassDialog();
                     } else if (_selectedIndex == 5) {
                       // Funcionalidade de equipamentos em desenvolvimento
-                    } else if (_selectedIndex == 8) {
-                      // A função de adicionar matéria está dentro da própria aba
                     }
                   },
                   child: const Icon(Icons.add, size: 36, color: Colors.white),

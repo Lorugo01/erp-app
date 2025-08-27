@@ -6,6 +6,7 @@ export const getAllSubjects = () => {
       class: true,
       teacher: true,
       lessons: true,
+      subjectType: true,
     },
   });
 };
@@ -21,6 +22,7 @@ export const getSubjectById = async (id: string) => {
       class: true,
       teacher: true,
       lessons: true,
+      subjectType: true,
     },
   });
 
@@ -32,7 +34,7 @@ export const getSubjectById = async (id: string) => {
 };
 
 export const createSubject = async (data: {
-  type: string;
+  subjectTypeId: string;
   classId: string;
   teacherId: string;
 }) => {
@@ -42,12 +44,19 @@ export const createSubject = async (data: {
 
   if (!turma) throw new Error('Turma não encontrada');
 
-  const subjectLabel = getSubjectLabel(data.type);
-  const name = `${subjectLabel} - ${turma.name}`;
+  const subjectType = await prisma.subjectType.findUnique({
+    where: { id: data.subjectTypeId }
+  });
+
+  if (!subjectType) throw new Error('Tipo de disciplina não encontrado');
+
+  const name = `${subjectType.name} - ${turma.name}`;
 
   return prisma.subject.create({
     data: {
-      ...data,
+      subjectTypeId: data.subjectTypeId,
+      classId: data.classId,
+      teacherId: data.teacherId,
       name
     }
   });
@@ -60,6 +69,7 @@ export const getSubjectsByClassId = async (classId: string) => {
       class: true,
       teacher: true,
       lessons: true,
+      subjectType: true,
     },
   });
 };
@@ -74,35 +84,18 @@ export const getSubjectsByClassIdAndTeacher = async (classId: string, teacherId:
       class: true,
       teacher: true,
       lessons: true,
+      subjectType: true,
     },
   });
 };
 
-function getSubjectLabel(type: string): string {
-  const map = {
-    LINGUA_INGLESA: "Língua Inglesa",
-    ARTE: "Arte",
-    EDUCACAO_FISICA: "Educação Física",
-    MATEMATICA: "Matemática",
-    CIENCIAS: "Ciências",
-    HISTORIA: "História",
-    GEOGRAFIA: "Geografia",
-    ENSINO_RELIGIOSO: "Ensino Religioso",
-    BIOLOGIA: "Biologia",
-    FISICA: "Física",
-    QUIMICA: "Química",
-    FILOSOFIA: "Filosofia",
-    SOCIOLOGIA: "Sociologia",
-    CONTEUDO_INTERDISCIPLINAR: "Conteúdo Interdisciplinar"
-  };
 
-  return map[type as keyof typeof map] || type;
-}
 
 export const updateSubject = (id: string, data: {
   name?: string;
   classId?: string;
   teacherId?: string;
+  subjectTypeId?: string;
 }) => {
   return prisma.subject.update({
     where: { id },

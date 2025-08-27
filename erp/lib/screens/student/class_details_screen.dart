@@ -394,7 +394,37 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
                         return Container(
                           margin: const EdgeInsets.only(right: 8),
                           child: ChoiceChip(
-                            label: Text(subject['name'] ?? 'Disciplina'),
+                            label: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  subject['name'] ?? 'Disciplina',
+                                  style: TextStyle(
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : Colors.black,
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (subject['teacher']?['name'] != null)
+                                  Text(
+                                    'Prof. ${subject['teacher']['name']}',
+                                    style: TextStyle(
+                                      color:
+                                          isSelected
+                                              ? Colors.white70
+                                              : Colors.grey[600],
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.normal,
+                                    ),
+                                  ),
+                              ],
+                            ),
                             selected: isSelected,
                             onSelected: (selected) {
                               if (selected) {
@@ -403,13 +433,6 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
                             },
                             backgroundColor: Colors.grey[200],
                             selectedColor: const Color(0xFF2953A5),
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black,
-                              fontWeight:
-                                  isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                            ),
                           ),
                         );
                       },

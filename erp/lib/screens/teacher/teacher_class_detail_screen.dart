@@ -365,7 +365,12 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
       // Verificar se há alunos na turma
       if (_students.isEmpty) {
-        throw Exception('Nenhum aluno encontrado nesta turma');
+        debugPrint('⚠️ Nenhum aluno encontrado nesta turma');
+        setState(() {
+          _attendanceMap = {};
+          _currentLesson = null;
+        });
+        return; // Retorna sem lançar exceção
       }
 
       debugPrint('🔄 Alunos na turma: ${_students.length}');

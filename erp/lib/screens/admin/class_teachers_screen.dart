@@ -30,6 +30,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
+
         setState(() {
           _subjects = turma['subjects'] ?? [];
         });
@@ -47,22 +48,50 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
             .where((prof) => !idsVinculados.contains(prof['id']))
             .toList();
     String? selectedTeacherId;
-    final subjectTypes = [
-      'LINGUA_INGLESA',
-      'ARTE',
-      'EDUCACAO_FISICA',
-      'MATEMATICA',
-      'CIENCIAS',
-      'HISTORIA',
-      'GEOGRAFIA',
-      'ENSINO_RELIGIOSO',
-      'BIOLOGIA',
-      'FISICA',
-      'QUIMICA',
-      'FILOSOFIA',
-      'SOCIOLOGIA',
-      'CONTEUDO_INTERDISCIPLINAR',
-    ];
+
+    // Buscar tipos de disciplinas do backend
+    List<Map<String, dynamic>> subjectTypes = [];
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.18.15:3000/subjects/types'),
+      );
+      if (response.statusCode == 200) {
+        subjectTypes = List<Map<String, dynamic>>.from(
+          jsonDecode(response.body),
+        );
+      }
+    } catch (e) {
+      // Fallback para tipos fixos se a API falhar
+      subjectTypes = [
+        {'id': '1', 'name': 'LINGUA_INGLESA', 'description': 'Língua Inglesa'},
+        {'id': '2', 'name': 'ARTE', 'description': 'Arte'},
+        {
+          'id': '3',
+          'name': 'EDUCACAO_FISICA',
+          'description': 'Educação Física',
+        },
+        {'id': '4', 'name': 'MATEMATICA', 'description': 'Matemática'},
+        {'id': '5', 'name': 'CIENCIAS', 'description': 'Ciências'},
+        {'id': '6', 'name': 'HISTORIA', 'description': 'História'},
+        {'id': '7', 'name': 'GEOGRAFIA', 'description': 'Geografia'},
+        {
+          'id': '8',
+          'name': 'ENSINO_RELIGIOSO',
+          'description': 'Ensino Religioso',
+        },
+        {'id': '9', 'name': 'BIOLOGIA', 'description': 'Biologia'},
+        {'id': '10', 'name': 'FISICA', 'description': 'Física'},
+        {'id': '11', 'name': 'QUIMICA', 'description': 'Química'},
+        {'id': '12', 'name': 'FILOSOFIA', 'description': 'Filosofia'},
+        {'id': '13', 'name': 'SOCIOLOGIA', 'description': 'Sociologia'},
+        {
+          'id': '14',
+          'name': 'CONTEUDO_INTERDISCIPLINAR',
+          'description': 'Conteúdo Interdisciplinar',
+        },
+      ];
+    }
+
     final selectedSubjects = <String>{};
     showDialog(
       // ignore: use_build_context_synchronously
@@ -104,22 +133,30 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                         Expanded(
                           child: ListView(
                             children:
-                                subjectTypes.map((type) {
+                                subjectTypes.map((subjectType) {
+                                  final typeName =
+                                      subjectType['name'] ??
+                                      subjectType['type'] ??
+                                      '';
                                   return CheckboxListTile(
-                                    value: selectedSubjects.contains(type),
+                                    value: selectedSubjects.contains(typeName),
                                     onChanged:
                                         selectedTeacherId == null
                                             ? null
                                             : (v) {
                                               setState(() {
                                                 if (v == true) {
-                                                  selectedSubjects.add(type);
+                                                  selectedSubjects.add(
+                                                    typeName,
+                                                  );
                                                 } else {
-                                                  selectedSubjects.remove(type);
+                                                  selectedSubjects.remove(
+                                                    typeName,
+                                                  );
                                                 }
                                               });
                                             },
-                                    title: Text(_formatSubjectType(type)),
+                                    title: Text(_formatSubjectType(typeName)),
                                   );
                                 }).toList(),
                           ),
@@ -139,20 +176,30 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                               : () async {
                                 final classId = widget.classData['id'];
                                 int success = 0;
-                                for (final subjectType in selectedSubjects) {
+                                for (final subjectTypeName
+                                    in selectedSubjects) {
+                                  // Buscar o ID do tipo de disciplina
+                                  final subjectType = subjectTypes.firstWhere(
+                                    (st) =>
+                                        (st['name'] ?? st['type']) ==
+                                        subjectTypeName,
+                                    orElse: () => {'id': subjectTypeName},
+                                  );
+
                                   final response = await http.post(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subjects',
+                                      'http://192.168.18.15:3000/subject',
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
                                     },
                                     body: jsonEncode({
-                                      'type': subjectType,
+                                      'subjectTypeId': subjectType['id'],
                                       'classId': classId,
                                       'teacherId': selectedTeacherId,
                                     }),
                                   );
+
                                   if (!context.mounted) return;
                                   if (response.statusCode == 201 ||
                                       response.statusCode == 200) {
@@ -184,33 +231,61 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     required Map<String, dynamic> teacher,
     required List<Map<String, dynamic>> currentSubjects,
   }) async {
-    final subjectTypes = [
-      'LINGUA_INGLESA',
-      'ARTE',
-      'EDUCACAO_FISICA',
-      'MATEMATICA',
-      'CIENCIAS',
-      'HISTORIA',
-      'GEOGRAFIA',
-      'ENSINO_RELIGIOSO',
-      'BIOLOGIA',
-      'FISICA',
-      'QUIMICA',
-      'FILOSOFIA',
-      'SOCIOLOGIA',
-      'CONTEUDO_INTERDISCIPLINAR',
-    ];
+    // Buscar tipos de disciplinas do backend
+    List<Map<String, dynamic>> subjectTypes = [];
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.18.15:3000/subjects/types'),
+      );
+      if (response.statusCode == 200) {
+        subjectTypes = List<Map<String, dynamic>>.from(
+          jsonDecode(response.body),
+        );
+      }
+    } catch (e) {
+      // Fallback para tipos fixos se a API falhar
+      subjectTypes = [
+        {'id': '1', 'name': 'LINGUA_INGLESA', 'description': 'Língua Inglesa'},
+        {'id': '2', 'name': 'ARTE', 'description': 'Arte'},
+        {
+          'id': '3',
+          'name': 'EDUCACAO_FISICA',
+          'description': 'Educação Física',
+        },
+        {'id': '4', 'name': 'MATEMATICA', 'description': 'Matemática'},
+        {'id': '5', 'name': 'CIENCIAS', 'description': 'Ciências'},
+        {'id': '6', 'name': 'HISTORIA', 'description': 'História'},
+        {'id': '7', 'name': 'GEOGRAFIA', 'description': 'Geografia'},
+        {
+          'id': '8',
+          'name': 'ENSINO_RELIGIOSO',
+          'description': 'Ensino Religioso',
+        },
+        {'id': '9', 'name': 'BIOLOGIA', 'description': 'Biologia'},
+        {'id': '10', 'name': 'FISICA', 'description': 'Física'},
+        {'id': '11', 'name': 'QUIMICA', 'description': 'Química'},
+        {'id': '12', 'name': 'FILOSOFIA', 'description': 'Filosofia'},
+        {'id': '13', 'name': 'SOCIOLOGIA', 'description': 'Sociologia'},
+        {
+          'id': '14',
+          'name': 'CONTEUDO_INTERDISCIPLINAR',
+          'description': 'Conteúdo Interdisciplinar',
+        },
+      ];
+    }
 
     // Mapear matérias atuais por tipo para facilitar a busca
     final currentSubjectsMap = <String, Map<String, dynamic>>{};
     for (final subject in currentSubjects) {
-      currentSubjectsMap[subject['type']] = subject;
+      final typeName = subject['type'] ?? subject['subjectType']?['name'] ?? '';
+      currentSubjectsMap[typeName] = subject;
     }
 
     // Inicializar com as matérias atuais
     final selectedSubjects = <String>{};
     for (final subject in currentSubjects) {
-      selectedSubjects.add(subject['type']);
+      final typeName = subject['type'] ?? subject['subjectType']?['name'] ?? '';
+      selectedSubjects.add(typeName);
     }
 
     bool isLoading = false;
@@ -303,30 +378,38 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                         Expanded(
                           child: ListView(
                             children:
-                                subjectTypes.map((type) {
+                                subjectTypes.map((subjectType) {
+                                  final typeName =
+                                      subjectType['name'] ??
+                                      subjectType['type'] ??
+                                      '';
                                   final isCurrentlyAssigned = currentSubjectsMap
-                                      .containsKey(type);
+                                      .containsKey(typeName);
 
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 8),
                                     child: CheckboxListTile(
-                                      value: selectedSubjects.contains(type),
+                                      value: selectedSubjects.contains(
+                                        typeName,
+                                      ),
                                       onChanged:
                                           isLoading
                                               ? null
                                               : (v) {
                                                 setState(() {
                                                   if (v == true) {
-                                                    selectedSubjects.add(type);
+                                                    selectedSubjects.add(
+                                                      typeName,
+                                                    );
                                                   } else {
                                                     selectedSubjects.remove(
-                                                      type,
+                                                      typeName,
                                                     );
                                                   }
                                                 });
                                               },
                                       title: Text(
-                                        _formatSubjectType(type),
+                                        _formatSubjectType(typeName),
                                         style: TextStyle(
                                           fontWeight:
                                               isCurrentlyAssigned
@@ -489,16 +572,24 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   }
 
                                   // Adicionar novas matérias
-                                  for (final subjectType in subjectsToAdd) {
+                                  for (final subjectTypeName in subjectsToAdd) {
+                                    // Buscar o ID do tipo de disciplina
+                                    final subjectType = subjectTypes.firstWhere(
+                                      (st) =>
+                                          (st['name'] ?? st['type']) ==
+                                          subjectTypeName,
+                                      orElse: () => {'id': subjectTypeName},
+                                    );
+
                                     final response = await http.post(
                                       Uri.parse(
-                                        'http://192.168.18.15:3000/subjects',
+                                        'http://192.168.18.15:3000/subject',
                                       ),
                                       headers: {
                                         'Content-Type': 'application/json',
                                       },
                                       body: jsonEncode({
-                                        'type': subjectType,
+                                        'subjectTypeId': subjectType['id'],
                                         'classId': classId,
                                         'teacherId': teacherId,
                                       }),
@@ -719,7 +810,11 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     const SizedBox(width: 32),
                                     Expanded(
                                       child: Text(
-                                        _formatSubjectType(subject['type']),
+                                        _formatSubjectType(
+                                          subject['type'] ??
+                                              subject['subjectType']?['name'] ??
+                                              '',
+                                        ),
                                         style: const TextStyle(fontSize: 15),
                                       ),
                                     ),

@@ -685,38 +685,21 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
   }
 
   String _getSubjectTypeDisplay(String type) {
-    switch (type) {
-      case 'LINGUA_INGLESA':
-        return 'Língua Inglesa';
-      case 'ARTE':
-        return 'Arte';
-      case 'EDUCACAO_FISICA':
-        return 'Educação Física';
-      case 'MATEMATICA':
-        return 'Matemática';
-      case 'CIENCIAS':
-        return 'Ciências';
-      case 'HISTORIA':
-        return 'História';
-      case 'GEOGRAFIA':
-        return 'Geografia';
-      case 'ENSINO_RELIGIOSO':
-        return 'Ensino Religioso';
-      case 'BIOLOGIA':
-        return 'Biologia';
-      case 'FISICA':
-        return 'Física';
-      case 'QUIMICA':
-        return 'Química';
-      case 'FILOSOFIA':
-        return 'Filosofia';
-      case 'SOCIOLOGIA':
-        return 'Sociologia';
-      case 'CONTEUDO_INTERDISCIPLINAR':
-        return 'Conteúdo Interdisciplinar';
-      default:
-        return type;
+    // Para tipos personalizados, converter de UPPER_CASE para Title Case
+    if (type.contains('_')) {
+      return type
+          .toLowerCase()
+          .split('_')
+          .map(
+            (word) =>
+                word.isNotEmpty
+                    ? '${word[0].toUpperCase()}${word.substring(1)}'
+                    : '',
+          )
+          .join(' ')
+          .trim();
     }
+    return type;
   }
 
   String _formatDate(String dateString) {

@@ -35,7 +35,7 @@ export const getStudentById = async (id: string) => {
     include: {
       enrollments: {
         orderBy: { year: 'desc' },
-        include: { class: { include: { subjects: true } } }
+        include: { class: { include: { subjects: { include: { subjectType: true } } } } }
       },
       attendances: true,
       user: {
@@ -318,7 +318,7 @@ export const getStudentSubjects = async (studentId: string) => {
     .map(subject => ({
       id: subject.id,
       name: subject.name,
-      type: subject.type,
+      type: subject.subjectType?.name || 'N/A',
       teacher: subject.teacher ? {
         id: subject.teacher.id,
         name: subject.teacher.name,
