@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../config/api_config.dart';
 import '../../services/student_service.dart' as student_service;
 import 'student_detail_screen.dart';
 
@@ -27,7 +28,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
     final classId = widget.classData['id'];
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/classes/$classId'),
+        Uri.parse('${ApiConfig.baseUrl}/classes/$classId'),
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
@@ -47,7 +48,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
       final messenger = ScaffoldMessenger.of(context);
 
       await http.delete(
-        Uri.parse('http://192.168.18.15:3000/enrollments/$enrollmentId'),
+        Uri.parse('${ApiConfig.baseUrl}/enrollments/$enrollmentId'),
       );
       await _fetchEnrollments();
 
@@ -227,7 +228,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
 
                                 final response = await http.post(
                                   Uri.parse(
-                                    'http://192.168.18.15:3000/enrollments',
+                                    '${ApiConfig.baseUrl}/enrollments',
                                   ),
                                   headers: {'Content-Type': 'application/json'},
                                   body: jsonEncode({

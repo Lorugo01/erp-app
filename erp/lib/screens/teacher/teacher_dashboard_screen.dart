@@ -824,7 +824,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     }
 
     debugPrint(
-      'Fazendo requisição para: http://192.168.18.15:3000/teachers/$teacherId/classes',
+              'Fazendo requisição para: ${ApiConfig.baseUrl}/teachers/$teacherId/classes',
     );
     try {
       final classes = await TeacherService.getTeacherClasses(teacherId);

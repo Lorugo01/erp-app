@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
+import '../../../config/api_config.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/data_provider.dart';
 import '../../../widgets/data_refresh_widget.dart';
@@ -40,7 +41,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/teachers/${widget.teacher['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/teachers/${widget.teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -362,7 +363,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             backgroundColor: Colors.white,
             backgroundImage:
                 photoUrl != null
-                    ? NetworkImage('http://192.168.18.15:3000$photoUrl')
+                    ? NetworkImage('${ApiConfig.baseUrl}$photoUrl')
                     : null,
             child:
                 photoUrl == null
@@ -785,7 +786,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/teachers/${widget.teacher['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/teachers/${widget.teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -853,7 +854,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://192.168.18.15:3000$currentPhotoUrl',
+                                              '${ApiConfig.baseUrl}$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -1070,7 +1071,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.18.15:3000/teachers/$teacherId/photo'),
+        Uri.parse('${ApiConfig.baseUrl}/teachers/$teacherId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto

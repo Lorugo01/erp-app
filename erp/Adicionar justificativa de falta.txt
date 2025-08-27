@@ -1,8 +1,0 @@
-Adicionar justificativa de falta
-Duplicar aula / conteúdos para outras turmas
-Colocar avaliação possível ser editável por disciplina 
-Relatórios:
-Conteúdo programático
-Frequência de alunos 
-Notas
-Sistema interligado entre escolas 

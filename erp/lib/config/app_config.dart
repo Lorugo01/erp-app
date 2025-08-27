@@ -18,8 +18,10 @@ class AppConfig {
   static String get uploadsBaseUrl => EnvironmentConfig.uploadsBaseUrl;
 
   // Timeouts
-  static Duration get apiTimeout => const Duration(seconds: 30);
-  static Duration get tecaaiTimeout => const Duration(seconds: 30);
+  static Duration get apiTimeout =>
+      Duration(seconds: EnvironmentConfig.apiRequestTimeout);
+  static Duration get tecaaiTimeout =>
+      Duration(seconds: EnvironmentConfig.tecaaiRequestTimeout);
 
   // Configurações de upload
   static int get maxFileSize => EnvironmentConfig.maxFileSize;

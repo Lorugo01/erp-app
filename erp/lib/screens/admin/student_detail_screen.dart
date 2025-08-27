@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 // ignore: depend_on_referenced_packages
 import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
+import '../../config/api_config.dart';
 import '../../services/student_service.dart' as student_service;
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
@@ -50,7 +51,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
+        Uri.parse('${ApiConfig.baseUrl}/students/${widget.student.id}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -96,7 +97,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     for (final lessonId in lessonIds) {
       if (lessonId == null) continue;
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/lessons/$lessonId'),
+        Uri.parse('${ApiConfig.baseUrl}/lessons/$lessonId'),
         headers: {'Content-Type': 'application/json'},
       );
       if (response.statusCode == 200) {
@@ -111,7 +112,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   Future<void> _fetchPeriods() async {
     final response = await http.get(
-      Uri.parse('http://192.168.18.15:3000/grade-periods'),
+      Uri.parse('${ApiConfig.baseUrl}/grade-periods'),
     );
     if (response.statusCode == 200) {
       setState(() {
@@ -616,10 +617,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildHeader() {
-    final photoUrl =
+            final photoUrl =
         widget.student.profilePicture != null &&
                 widget.student.profilePicture!.isNotEmpty
-            ? 'http://192.168.18.15:3000${widget.student.profilePicture}'
+            ? '${ApiConfig.baseUrl}${widget.student.profilePicture}'
             : null;
     return Container(
       padding: const EdgeInsets.all(24.0),
@@ -1106,7 +1107,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://192.168.18.15:3000$currentPhotoUrl',
+                                              '${ApiConfig.baseUrl}$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -1321,7 +1322,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       try {
                         final response = await http.put(
                           Uri.parse(
-                            'http://192.168.18.15:3000/students/${widget.student.id}',
+                            '${ApiConfig.baseUrl}/students/${widget.student.id}',
                           ),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode(updatedData),
@@ -1431,7 +1432,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.18.15:3000/students/$studentId/photo'),
+        Uri.parse('${ApiConfig.baseUrl}/students/$studentId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto
@@ -1466,7 +1467,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
+        Uri.parse('${ApiConfig.baseUrl}/students/${widget.student.id}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -2603,7 +2604,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   ) async {
     try {
       final response = await http.put(
-        Uri.parse('http://192.168.18.15:3000/attendances/$attendanceId'),
+        Uri.parse('${ApiConfig.baseUrl}/attendances/$attendanceId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'status': status,
@@ -2639,7 +2640,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   Future<void> _deleteAttendance(String attendanceId) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/attendances/$attendanceId'),
+        Uri.parse('${ApiConfig.baseUrl}/attendances/$attendanceId'),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {

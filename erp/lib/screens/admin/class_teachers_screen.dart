@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../config/api_config.dart';
 import '../../services/teacher_service.dart';
 
 class ClassTeachersScreen extends StatefulWidget {
@@ -26,7 +27,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     final classId = widget.classData['id'];
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/classes/$classId'),
+        Uri.parse('${ApiConfig.baseUrl}/classes/$classId'),
       );
       if (response.statusCode == 200) {
         final turma = jsonDecode(response.body);
@@ -53,7 +54,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     List<Map<String, dynamic>> subjectTypes = [];
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/subjects/types'),
+        Uri.parse('${ApiConfig.baseUrl}/subjects/types'),
       );
       if (response.statusCode == 200) {
         subjectTypes = List<Map<String, dynamic>>.from(
@@ -188,7 +189,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
 
                                   final response = await http.post(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subject',
+                                      '${ApiConfig.baseUrl}/subject',
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -235,7 +236,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     List<Map<String, dynamic>> subjectTypes = [];
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/subjects/types'),
+        Uri.parse('${ApiConfig.baseUrl}/subjects/types'),
       );
       if (response.statusCode == 200) {
         subjectTypes = List<Map<String, dynamic>>.from(
@@ -335,7 +336,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                 backgroundImage:
                                     teacher['photoUrl'] != null
                                         ? NetworkImage(
-                                          'http://192.168.18.15:3000${teacher['photoUrl']}',
+                                          '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                                         )
                                         : null,
                                 child:
@@ -562,7 +563,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   for (final subjectId in subjectsToRemove) {
                                     final response = await http.delete(
                                       Uri.parse(
-                                        'http://192.168.18.15:3000/subjects/$subjectId',
+                                        '${ApiConfig.baseUrl}/subjects/$subjectId',
                                       ),
                                     );
                                     if (response.statusCode == 200 ||
@@ -583,7 +584,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
 
                                     final response = await http.post(
                                       Uri.parse(
-                                        'http://192.168.18.15:3000/subject',
+                                        '${ApiConfig.baseUrl}/subject',
                                       ),
                                       headers: {
                                         'Content-Type': 'application/json',
@@ -743,7 +744,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     backgroundImage:
                                         teacher['photoUrl'] != null
                                             ? NetworkImage(
-                                              'http://192.168.18.15:3000${teacher['photoUrl']}',
+                                              '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                                             )
                                             : null,
                                     child:

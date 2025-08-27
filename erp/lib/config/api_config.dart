@@ -1,9 +1,7 @@
-class ApiConfig {
-  // URLs base
-  static const String baseUrl = 'http://192.168.18.15:3000';
-  static const String tecaAiBaseUrl = 'http://192.168.18.15:5001';
+import 'environment.dart';
 
-  // Endpoints específicos
+class ApiConfig {
+  // Endpoints específicos (sem URLs hardcoded)
   static const String authEndpoint = '/auth';
   static const String usersEndpoint = '/users';
   static const String studentsEndpoint = '/students';
@@ -19,43 +17,54 @@ class ApiConfig {
   static const String assignmentsEndpoint = '/assignments';
   static const String chatsEndpoint = '/chats';
 
-  // Timeouts
-  static const Duration apiTimeout = Duration(seconds: 30);
-  static const Duration tecaAiTimeout = Duration(seconds: 30);
-
-  // Configurações de arquivo
-  static const double maxFileSizeMB = 10.0;
-  static const bool enableHttps = false;
-  static const bool enableCors = true;
-
-  // Métodos para construir URLs completas
-  static String getAuthUrl(String path) => '$baseUrl$authEndpoint$path';
-  static String getUsersUrl(String path) => '$baseUrl$usersEndpoint$path';
-  static String getStudentsUrl(String path) => '$baseUrl$studentsEndpoint$path';
-  static String getTeachersUrl(String path) => '$baseUrl$teachersEndpoint$path';
-  static String getClassesUrl(String path) => '$baseUrl$classesEndpoint$path';
-  static String getSubjectsUrl(String path) => '$baseUrl$subjectsEndpoint$path';
+  // Métodos para construir URLs completas usando EnvironmentConfig
+  static String getAuthUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(authEndpoint)}$path';
+  static String getUsersUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(usersEndpoint)}$path';
+  static String getStudentsUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(studentsEndpoint)}$path';
+  static String getTeachersUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(teachersEndpoint)}$path';
+  static String getClassesUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(classesEndpoint)}$path';
+  static String getSubjectsUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(subjectsEndpoint)}$path';
   static String getAttendancesUrl(String path) =>
-      '$baseUrl$attendancesEndpoint$path';
+      '${EnvironmentConfig.getApiUrl(attendancesEndpoint)}$path';
   static String getEnrollmentsUrl(String path) =>
-      '$baseUrl$enrollmentsEndpoint$path';
-  static String getLessonsUrl(String path) => '$baseUrl$lessonsEndpoint$path';
-  static String getGradesUrl(String path) => '$baseUrl$gradesEndpoint$path';
+      '${EnvironmentConfig.getApiUrl(enrollmentsEndpoint)}$path';
+  static String getLessonsUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(lessonsEndpoint)}$path';
+  static String getGradesUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(gradesEndpoint)}$path';
   static String getGradeTypesUrl(String path) =>
-      '$baseUrl$gradeTypesEndpoint$path';
+      '${EnvironmentConfig.getApiUrl(gradeTypesEndpoint)}$path';
   static String getGradePeriodsUrl(String path) =>
-      '$baseUrl$gradePeriodsEndpoint$path';
+      '${EnvironmentConfig.getApiUrl(gradePeriodsEndpoint)}$path';
   static String getAssignmentsUrl(String path) =>
-      '$baseUrl$assignmentsEndpoint$path';
-  static String getChatsUrl(String path) => '$baseUrl$chatsEndpoint$path';
+      '${EnvironmentConfig.getApiUrl(assignmentsEndpoint)}$path';
+  static String getChatsUrl(String path) =>
+      '${EnvironmentConfig.getApiUrl(chatsEndpoint)}$path';
 
   // Headers padrão
   static const Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
   };
 
-  // Configurações de ambiente
-  static const bool isDevelopment = true;
-  static const bool enableDebug = true;
-  static const String logLevel = 'debug';
+  // Getters para configurações do ambiente (delegando para EnvironmentConfig)
+  static String get baseUrl => EnvironmentConfig.apiBaseUrl;
+  static String get tecaAiBaseUrl => EnvironmentConfig.tecaaiBaseUrl;
+  static Duration get apiTimeout =>
+      Duration(seconds: EnvironmentConfig.apiRequestTimeout);
+  static Duration get tecaAiTimeout =>
+      Duration(seconds: EnvironmentConfig.tecaaiRequestTimeout);
+  static double get maxFileSizeMB =>
+      EnvironmentConfig.maxFileSize / (1024 * 1024);
+  static bool get enableHttps => EnvironmentConfig.enableHttps;
+  static bool get enableCors => EnvironmentConfig.enableCors;
+  static bool get isDevelopment => EnvironmentConfig.isDevelopment;
+  static bool get enableDebug => EnvironmentConfig.isDevelopment;
+  static String get logLevel =>
+      EnvironmentConfig.isDevelopment ? 'debug' : 'error';
 }

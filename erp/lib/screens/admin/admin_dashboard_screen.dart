@@ -8,6 +8,7 @@ import '../../services/user_service.dart';
 import '../../models/user.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../config/api_config.dart';
 import 'class_detail_screen.dart';
 import 'student_detail_screen.dart';
 import 'teacher_detail_screen.dart';
@@ -87,7 +88,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _deleteTeacher(Map<String, dynamic> teacher) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/teachers/${teacher['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/teachers/${teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -164,7 +165,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _deleteStudent(Map<String, dynamic> student) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/students/${student['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/students/${student['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -367,7 +368,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               }
               try {
                 final response = await http.post(
-                  Uri.parse('http://192.168.18.15:3000/teachers'),
+                  Uri.parse('${ApiConfig.baseUrl}/teachers'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'name': name,
@@ -443,7 +444,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               }
               try {
                 final response = await http.post(
-                  Uri.parse('http://192.168.18.15:3000/students'),
+                  Uri.parse('${ApiConfig.baseUrl}/students'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'name': name,
@@ -515,7 +516,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               }
               try {
                 final response = await http.post(
-                  Uri.parse('http://192.168.18.15:3000/classes'),
+                  Uri.parse('${ApiConfig.baseUrl}/classes'),
                   headers: {'Content-Type': 'application/json'},
                   body: jsonEncode({
                     'grade': grade,
@@ -1727,7 +1728,7 @@ class _TeacherCardGrid extends StatelessWidget {
                   backgroundImage:
                       teacher['photoUrl'] != null
                           ? NetworkImage(
-                            'http://192.168.18.15:3000${teacher['photoUrl']}',
+                            '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                           )
                           : null,
                   child:
@@ -1919,7 +1920,7 @@ class _StudentCardGrid extends StatelessWidget {
                   backgroundImage:
                       student['profilePicture'] != null
                           ? NetworkImage(
-                            'http://192.168.18.15:3000${student['profilePicture']}',
+                            '${ApiConfig.baseUrl}${student['profilePicture']}',
                           )
                           : null,
                   child:
@@ -2142,7 +2143,7 @@ class _UserCardGrid extends StatelessWidget {
                           ? NetworkImage(
                             user.photoUrl!.startsWith('http')
                                 ? user.photoUrl!
-                                : 'http://192.168.18.15:3000${user.photoUrl}',
+                                : '${ApiConfig.baseUrl}${user.photoUrl}',
                           )
                           : null,
                   child:

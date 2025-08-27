@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 // ignore: depend_on_referenced_packages
 import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
+import '../../config/api_config.dart';
 import '../../models/user.dart';
 import '../../services/user_service.dart';
 
@@ -70,7 +71,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         backgroundImage:
                             widget.user.photoUrl != null
                                 ? NetworkImage(
-                                  'http://192.168.18.15:3000${widget.user.photoUrl}',
+                                  '${ApiConfig.baseUrl}${widget.user.photoUrl}',
                                 )
                                 : null,
                         child:
@@ -344,11 +345,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                                 selectedImage != null
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
-                                        ? NetworkImage(
-                                              'http://192.168.18.15:3000$currentPhotoUrl',
-                                            )
-                                            as ImageProvider
-                                        : null),
+                                                                            ? NetworkImage(
+                                          '${ApiConfig.baseUrl}$currentPhotoUrl',
+                                        )
+                                        as ImageProvider
+                                    : null),
                             child:
                                 selectedImage == null && currentPhotoUrl == null
                                     ? const Icon(
@@ -502,7 +503,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       try {
                         final response = await http.put(
                           Uri.parse(
-                            'http://192.168.18.15:3000/users/${widget.user.id}',
+                            '${ApiConfig.baseUrl}/users/${widget.user.id}',
                           ),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode(updatedData),
@@ -593,7 +594,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.18.15:3000/users/$userId/photo'),
+        Uri.parse('${ApiConfig.baseUrl}/users/$userId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto
