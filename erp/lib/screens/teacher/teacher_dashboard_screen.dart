@@ -49,6 +49,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   // Variáveis para filtragem de armários
   String? _selectedArmarioFilter;
+  
+  // Variáveis para controle direto dos armários
+  List<TecaAIConnectedClient> _connectedClients = [];
+  String? _selectedDirectArmario;
+  final TextEditingController _directCommandController = TextEditingController();
 
   @override
   void initState() {
@@ -124,6 +129,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   Future<void> _loadArmarioData() async {
     await _checkArmarioConnection();
     await _loadArmarioItems();
+    await _loadConnectedClients();
   }
 
   Future<void> _checkArmarioConnection() async {
@@ -141,6 +147,37 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         });
       }
     }
+  }
+
+  Future<void> _loadConnectedClients() async {
+    try {
+      final clients = await TecaAIService.getConnectedClients();
+      if (mounted) {
+        setState(() {
+          _connectedClients = clients;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar clientes conectados: $e');
+    }
+  }
+
+  List<String> get _availableArmarios {
+    final armarios = _connectedClients.map((client) => client.id).toSet().toList();
+    armarios.sort();
+    return armarios;
+  }
+
+  String _getArmarioDisplayName(String armarioId) {
+    final client = _connectedClients.firstWhere(
+      (client) => client.id == armarioId,
+      orElse: () => TecaAIConnectedClient(id: armarioId, name: 'Armário $armarioId', ip: '', port: 0, connectedAt: '', lastSeen: ''),
+    );
+    String displayName = client.name;
+    if (displayName.isEmpty || displayName == 'Armário $armarioId') {
+      displayName = 'Armário ${armarioId.toUpperCase()}';
+    }
+    return displayName;
   }
 
   Future<void> _loadArmarioItems() async {

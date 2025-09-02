@@ -20,6 +20,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
   List<TecaAIItem> _filteredItems = [];
   TecaAIItem? _selectedItem;
   String? _selectedArmario;
+  List<TecaAIConnectedClient> _connectedClients = [];
 
   // Controllers para adicionar/editar itens
   final TextEditingController _itemNameController = TextEditingController();
@@ -28,6 +29,8 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _itemFileiraController = TextEditingController();
   final TextEditingController _itemSegmentoController = TextEditingController();
+  final TextEditingController _customCommandController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -36,6 +39,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
     _loadHistory();
     _loadStats();
     _loadItems();
+    _loadConnectedClients();
   }
 
   @override
@@ -46,6 +50,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
     _searchController.dispose();
     _itemFileiraController.dispose();
     _itemSegmentoController.dispose();
+    _customCommandController.dispose();
     super.dispose();
   }
 
@@ -73,6 +78,19 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
       setState(() {
         _stats = stats;
       });
+    }
+  }
+
+  Future<void> _loadConnectedClients() async {
+    try {
+      final clients = await TecaAIService.getConnectedClients();
+      if (mounted) {
+        setState(() {
+          _connectedClients = clients;
+        });
+      }
+    } catch (e) {
+      // Ignorar erro silenciosamente
     }
   }
 
@@ -136,7 +154,9 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
   }
 
   List<String> get _availableArmarios {
-    final armarios = _items.map((item) => item.espIpOriginal).toSet().toList();
+    // Usa apenas os clientes conectados e garante que não há duplicatas
+    final armarios =
+        _connectedClients.map((client) => client.id).toSet().toList();
     armarios.sort();
     return armarios;
   }
@@ -218,6 +238,142 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
       }
       _showSnackBar('Erro: $e');
     }
+  }
+
+  Future<void> _executeEsp32Command(String commandKey) async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final response = await TecaAIService.executeEsp32PredefinedCommand(
+        commandKey: commandKey,
+        user: user,
+      );
+
+      if (mounted) {
+        setState(() {
+          _lastResponse = response;
+          _isLoading = false;
+        });
+      }
+
+      if (response.success) {
+        _showSnackBar('Comando ESP32 executado!');
+        _loadHistory();
+      } else {
+        _showSnackBar('Erro: ${response.error}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      _showSnackBar('Erro: $e');
+    }
+  }
+
+  Future<void> _executeDirectArmarioCommand(String command) async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final response = await TecaAIService.executeEsp32CommandDirect(
+        command: command,
+        user: user,
+      );
+
+      if (mounted) {
+        setState(() {
+          _lastResponse = response;
+          _isLoading = false;
+        });
+      }
+
+      if (response.success) {
+        _showSnackBar('Comando executado!');
+        _loadHistory();
+      } else {
+        _showSnackBar('Erro: ${response.error}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      _showSnackBar('Erro: $e');
+    }
+  }
+
+  Future<void> _executeBroadcastCommand(String command) async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final response = await TecaAIService.executeBroadcastCommand(
+        command: command,
+        user: user,
+      );
+
+      if (mounted) {
+        setState(() {
+          _lastResponse = response;
+          _isLoading = false;
+        });
+      }
+
+      if (response.success) {
+        _showSnackBar('Comando Broadcast executado!');
+        _loadHistory();
+      } else {
+        _showSnackBar('Erro: ${response.error}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      _showSnackBar('Erro: $e');
+    }
+  }
+
+  String _getArmarioDisplayName(String armarioId) {
+    // Procura o cliente conectado correspondente
+    final client = _connectedClients.firstWhere(
+      (client) => client.id == armarioId,
+      orElse:
+          () => TecaAIConnectedClient(
+            id: armarioId,
+            name: 'Armário $armarioId',
+            ip: '',
+            port: 0,
+            connectedAt: '',
+            lastSeen: '',
+          ),
+    );
+
+    // Garante que o nome seja único adicionando o ID se necessário
+    String displayName = client.name;
+    if (displayName.isEmpty || displayName == 'Armário $armarioId') {
+      // Se não tem nome específico, usa um nome baseado no ID
+      displayName = 'Armário ${armarioId.toUpperCase()}';
+    }
+
+    return displayName;
   }
 
   Future<void> _addItem() async {
@@ -721,7 +877,10 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
 
                   // Filtro por armário
                   DropdownButtonFormField<String>(
-                    value: _selectedArmario,
+                    value:
+                        _availableArmarios.contains(_selectedArmario)
+                            ? _selectedArmario
+                            : null,
                     decoration: InputDecoration(
                       labelText: 'Filtrar por Armário',
                       border: const OutlineInputBorder(),
@@ -735,22 +894,13 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
                         value: null,
                         child: Text('Todos os Armários'),
                       ),
-                      ..._availableArmarios.map((armario) {
-                        // Traduzir o IP para letra para exibição
-                        String displayText = armario;
-                        if (armario == '192.168.100.184') {
-                          displayText = 'A';
-                        } else if (armario == '192.168.100.185') {
-                          displayText = 'B';
-                        } else if (armario == '192.168.100.186') {
-                          displayText = 'C';
-                        }
-
+                      ..._availableArmarios.map((armarioId) {
+                        final displayName = _getArmarioDisplayName(armarioId);
                         return DropdownMenuItem(
-                          value: armario,
-                          child: Text('Armário $displayText'),
+                          value: armarioId,
+                          child: Text(displayName),
                         );
-                      }),
+                      }).toSet(), // Remove duplicatas
                     ],
                     onChanged: _filterItemsByArmario,
                   ),
@@ -1017,94 +1167,928 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
 
           SizedBox(height: isMobile ? 12 : 16),
 
-          // Comandos Pré-definidos
+          // Controle Direto dos Armários
           Card(
             child: Padding(
               padding: EdgeInsets.all(isMobile ? 12 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Comandos Pré-definidos',
-                    style: TextStyle(
-                      fontSize: isMobile ? 16 : 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: isMobile ? 12 : 16),
-                  Wrap(
-                    spacing: isMobile ? 6 : 8,
-                    runSpacing: isMobile ? 6 : 8,
+                  // Adicionar botão para atualizar clientes conectados
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () => _executePredefinedCommand('ligar_luz'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 12 : 16,
-                            vertical: isMobile ? 8 : 12,
-                          ),
-                        ),
-                        child: Text(
-                          'Ligar Luz',
-                          style: TextStyle(fontSize: isMobile ? 12 : 14),
+                      Text(
+                        'Controle Direto dos Armários',
+                        style: TextStyle(
+                          fontSize: isMobile ? 16 : 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('desligar_luz'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 12 : 16,
-                            vertical: isMobile ? 8 : 12,
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed:
+                                _isLoading ? null : _loadConnectedClients,
+                            icon: Icon(Icons.refresh, size: isMobile ? 20 : 24),
+                            tooltip: 'Atualizar Armários Conectados',
+                            padding: EdgeInsets.all(isMobile ? 4 : 8),
+                            constraints: BoxConstraints(
+                              minWidth: isMobile ? 36 : 48,
+                              minHeight: isMobile ? 36 : 48,
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          'Desligar Luz',
-                          style: TextStyle(fontSize: isMobile ? 12 : 14),
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('modo_festa_on'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 12 : 16,
-                            vertical: isMobile ? 8 : 12,
-                          ),
-                        ),
-                        child: Text(
-                          'Modo Festa ON',
-                          style: TextStyle(fontSize: isMobile ? 12 : 14),
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('modo_festa_off'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 12 : 16,
-                            vertical: isMobile ? 8 : 12,
-                          ),
-                        ),
-                        child: Text(
-                          'Modo Festa OFF',
-                          style: TextStyle(fontSize: isMobile ? 12 : 14),
-                        ),
+                        ],
                       ),
                     ],
                   ),
+                  SizedBox(height: isMobile ? 12 : 16),
+
+                  // Mostrar status dos armários conectados
+                  if (_connectedClients.isNotEmpty) ...[
+                    Container(
+                      padding: EdgeInsets.all(isMobile ? 8 : 12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.wifi,
+                                color: Colors.green,
+                                size: isMobile ? 16 : 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Armários Conectados (${_connectedClients.length})',
+                                style: TextStyle(
+                                  fontSize: isMobile ? 12 : 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8,
+                            children:
+                                _connectedClients.map((client) {
+                                  return Chip(
+                                    label: Text(
+                                      client.name,
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 10 : 12,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                    backgroundColor: Colors.green.shade100,
+                                    side: BorderSide(
+                                      color: Colors.green.shade300,
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 12 : 16),
+                  ] else ...[
+                    Container(
+                      padding: EdgeInsets.all(isMobile ? 8 : 12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.wifi_off,
+                            color: Colors.orange,
+                            size: isMobile ? 16 : 20,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Nenhum armário conectado. Verifique se os clientes Python estão rodando.',
+                              style: TextStyle(
+                                fontSize: isMobile ? 12 : 14,
+                                color: Colors.orange.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 12 : 16),
+                  ],
+
+                  // Seletor de armário para controle direto
+                  DropdownButtonFormField<String>(
+                    value:
+                        _availableArmarios.contains(_selectedArmario)
+                            ? _selectedArmario
+                            : null,
+                    decoration: InputDecoration(
+                      labelText: 'Selecionar Armário para Controle',
+                      border: const OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 8 : 12,
+                        vertical: isMobile ? 8 : 12,
+                      ),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Selecione um armário'),
+                      ),
+                      ..._availableArmarios.map((armarioId) {
+                        final displayName = _getArmarioDisplayName(armarioId);
+                        return DropdownMenuItem(
+                          value: armarioId,
+                          child: Text(displayName),
+                        );
+                      }).toSet(), // Remove duplicatas
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedArmario = value;
+                      });
+                    },
+                  ),
+                  SizedBox(height: isMobile ? 12 : 16),
+
+                  // Controles básicos por armário
+                  if (_selectedArmario != null) ...[
+                    Text(
+                      'Controles Básicos - Armário ${_getArmarioDisplayName(_selectedArmario!)}',
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 8 : 12),
+                    Wrap(
+                      spacing: isMobile ? 6 : 8,
+                      runSpacing: isMobile ? 6 : 8,
+                      children: [
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand('demo'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                          child: Text(
+                            'Demo ON',
+                            style: TextStyle(fontSize: isMobile ? 12 : 14),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeDirectArmarioCommand('demo off'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                          child: Text(
+                            'Demo OFF',
+                            style: TextStyle(fontSize: isMobile ? 12 : 14),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeDirectArmarioCommand('tecaon'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.blue,
+                          ),
+                          child: Text(
+                            'TECA ON',
+                            style: TextStyle(fontSize: isMobile ? 12 : 14),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeDirectArmarioCommand('tecaoff'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.blue,
+                          ),
+                          child: Text(
+                            'TECA OFF',
+                            style: TextStyle(fontSize: isMobile ? 12 : 14),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: isMobile ? 12 : 16),
+
+                    // Controles de cor por armário
+                    Text(
+                      'Controles de Cor - Armário ${_getArmarioDisplayName(_selectedArmario!)}',
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 8 : 12),
+                    Wrap(
+                      spacing: isMobile ? 6 : 8,
+                      runSpacing: isMobile ? 6 : 8,
+                      children: [
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    'allled vermelho',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                          child: Text(
+                            'Vermelho',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    'allled verde',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                          child: Text(
+                            'Verde',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    'allled azul',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.blue,
+                          ),
+                          child: Text(
+                            'Azul',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    'allled amarelo',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.yellow,
+                          ),
+                          child: Text(
+                            'Amarelo',
+                            style: TextStyle(fontSize: isMobile ? 12 : 14),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    'allled branco',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.white,
+                          ),
+                          child: Text(
+                            'Branco',
+                            style: TextStyle(fontSize: isMobile ? 12 : 14),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    'allled preto',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.grey,
+                          ),
+                          child: Text(
+                            'Desligar',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: isMobile ? 12 : 16),
+
+                    // Controle de sessões específicas
+                    Text(
+                      'Controle de Sessões - Armário ${_getArmarioDisplayName(_selectedArmario!)}',
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 8 : 12),
+
+                    // Fita 1: 3 sessões
+                    Text(
+                      'Fita 1 (3 sessões)',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Wrap(
+                      spacing: isMobile ? 4 : 6,
+                      runSpacing: isMobile ? 4 : 6,
+                      children: [
+                        ...List.generate(
+                          3,
+                          (index) => ElevatedButton(
+                            onPressed:
+                                _isLoading
+                                    ? null
+                                    : () => _executeDirectArmarioCommand(
+                                      'fx1s${index + 1} vermelho',
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 8 : 12,
+                                vertical: isMobile ? 6 : 8,
+                              ),
+                              backgroundColor: Colors.red.shade300,
+                            ),
+                            child: Text(
+                              'S${index + 1}',
+                              style: TextStyle(
+                                fontSize: isMobile ? 10 : 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 8),
+
+                    // Fita 2: 2 sessões
+                    Text(
+                      'Fita 2 (2 sessões)',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Wrap(
+                      spacing: isMobile ? 4 : 6,
+                      runSpacing: isMobile ? 4 : 6,
+                      children: [
+                        ...List.generate(
+                          2,
+                          (index) => ElevatedButton(
+                            onPressed:
+                                _isLoading
+                                    ? null
+                                    : () => _executeDirectArmarioCommand(
+                                      'fx2s${index + 1} azul',
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 8 : 12,
+                                vertical: isMobile ? 6 : 8,
+                              ),
+                              backgroundColor: Colors.blue.shade300,
+                            ),
+                            child: Text(
+                              'S${index + 1}',
+                              style: TextStyle(
+                                fontSize: isMobile ? 10 : 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 8),
+
+                    // Fitas 3, 4, 5: 8 sessões cada
+                    Text(
+                      'Fitas 3, 4, 5 (8 sessões cada)',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Wrap(
+                      spacing: isMobile ? 4 : 6,
+                      runSpacing: isMobile ? 4 : 6,
+                      children: [
+                        ...List.generate(
+                          8,
+                          (index) => ElevatedButton(
+                            onPressed:
+                                _isLoading
+                                    ? null
+                                    : () => _executeDirectArmarioCommand(
+                                      'fx3s${index + 1} verde',
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 6 : 8,
+                                vertical: isMobile ? 4 : 6,
+                              ),
+                              backgroundColor: Colors.green.shade300,
+                            ),
+                            child: Text(
+                              '3S${index + 1}',
+                              style: TextStyle(
+                                fontSize: isMobile ? 9 : 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        ...List.generate(
+                          8,
+                          (index) => ElevatedButton(
+                            onPressed:
+                                _isLoading
+                                    ? null
+                                    : () => _executeDirectArmarioCommand(
+                                      'fx4s${index + 1} amarelo',
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 6 : 8,
+                                vertical: isMobile ? 4 : 6,
+                              ),
+                              backgroundColor: Colors.yellow.shade300,
+                            ),
+                            child: Text(
+                              '4S${index + 1}',
+                              style: TextStyle(
+                                fontSize: isMobile ? 9 : 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        ...List.generate(
+                          8,
+                          (index) => ElevatedButton(
+                            onPressed:
+                                _isLoading
+                                    ? null
+                                    : () => _executeDirectArmarioCommand(
+                                      'fx5s${index + 1} roxo',
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 6 : 8,
+                                vertical: isMobile ? 4 : 6,
+                              ),
+                              backgroundColor: Colors.purple.shade300,
+                            ),
+                            child: Text(
+                              '5S${index + 1}',
+                              style: TextStyle(
+                                fontSize: isMobile ? 9 : 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: isMobile ? 12 : 16),
+
+                    // Comando personalizado
+                    Text(
+                      'Comando Personalizado',
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _customCommandController,
+                            decoration: InputDecoration(
+                              labelText: 'Comando ESP32',
+                              hintText: 'Ex: fx1s2 azul, allled verde',
+                              border: const OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 8 : 12,
+                                vertical: isMobile ? 8 : 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading ||
+                                      _customCommandController.text.isEmpty
+                                  ? null
+                                  : () => _executeDirectArmarioCommand(
+                                    _customCommandController.text,
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.deepPurple,
+                          ),
+                          child: Text(
+                            'Executar',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: isMobile ? 12 : 16),
+
+                    // Broadcast de Comandos para Todos os Armários
+                    Text(
+                      'Broadcast de Comandos para Todos os Armários',
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Envia comandos para TODOS os clientes Python conectados (ignora IP específico)',
+                      style: TextStyle(
+                        fontSize: isMobile ? 11 : 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Wrap(
+                      spacing: isMobile ? 6 : 8,
+                      runSpacing: isMobile ? 6 : 8,
+                      children: [
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeBroadcastCommand('demo'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.deepOrange,
+                          ),
+                          child: Text(
+                            'Demo ON (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 11 : 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeBroadcastCommand('demo off'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.deepOrange,
+                          ),
+                          child: Text(
+                            'Demo OFF (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 11 : 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeBroadcastCommand('tecaon'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.deepOrange,
+                          ),
+                          child: Text(
+                            'TECA ON (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 11 : 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeBroadcastCommand('tecaoff'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.deepOrange,
+                          ),
+                          child: Text(
+                            'TECA OFF (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 11 : 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Wrap(
+                      spacing: isMobile ? 6 : 8,
+                      runSpacing: isMobile ? 6 : 8,
+                      children: [
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () => _executeBroadcastCommand(
+                                    'allled vermelho',
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 14,
+                              vertical: isMobile ? 6 : 10,
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                          child: Text(
+                            'Vermelho (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 10 : 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeBroadcastCommand('allled verde'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 14,
+                              vertical: isMobile ? 6 : 10,
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                          child: Text(
+                            'Verde (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 10 : 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeBroadcastCommand('allled azul'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 14,
+                              vertical: isMobile ? 6 : 10,
+                            ),
+                            backgroundColor: Colors.blue,
+                          ),
+                          child: Text(
+                            'Azul (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 10 : 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeBroadcastCommand('allled branco'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 14,
+                              vertical: isMobile ? 6 : 10,
+                            ),
+                            backgroundColor: Colors.white,
+                          ),
+                          child: Text(
+                            'Branco (Todos)',
+                            style: TextStyle(fontSize: isMobile ? 10 : 11),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading
+                                  ? null
+                                  : () =>
+                                      _executeBroadcastCommand('allled preto'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 14,
+                              vertical: isMobile ? 6 : 10,
+                            ),
+                            backgroundColor: Colors.grey,
+                          ),
+                          child: Text(
+                            'Desligar (Todos)',
+                            style: TextStyle(
+                              fontSize: isMobile ? 10 : 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _customCommandController,
+                            decoration: InputDecoration(
+                              labelText: 'Comando Broadcast Personalizado',
+                              hintText: 'Ex: allled roxo, fx1s2 amarelo',
+                              border: const OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 8 : 12,
+                                vertical: isMobile ? 8 : 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed:
+                              _isLoading ||
+                                      _customCommandController.text.isEmpty
+                                  ? null
+                                  : () => _executeBroadcastCommand(
+                                    _customCommandController.text,
+                                  ),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 12,
+                            ),
+                            backgroundColor: Colors.deepOrange,
+                          ),
+                          child: Text(
+                            'Broadcast',
+                            style: TextStyle(
+                              fontSize: isMobile ? 12 : 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    // Mensagem quando nenhum armário está selecionado
+                    Container(
+                      padding: EdgeInsets.all(isMobile ? 12 : 16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: Colors.blue.shade600,
+                            size: isMobile ? 20 : 24,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Selecione um armário acima para controlar seus LEDs e animações diretamente.',
+                              style: TextStyle(
+                                fontSize: isMobile ? 12 : 14,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

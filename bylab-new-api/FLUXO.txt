@@ -136,7 +136,7 @@ Então, o fluxo é:
    - Se for STUDENT ou TEACHER, cria também um registro na tabela específica
    - Tudo isso é feito diretamente pelo Prisma, sem fazer novas requisições HTTP
 
-Não há chamadas para outros endpoints HTTP como `/students` ou `/teachers`. Tudo é feito internamente através do Prisma ORM, que faz as operações diretamente no banco de dados.
+Não há Frequências para outros endpoints HTTP como `/students` ou `/teachers`. Tudo é feito internamente através do Prisma ORM, que faz as operações diretamente no banco de dados.
 
 O mesmo acontece com o login:
 1. Requisição chega em `/auth/login`

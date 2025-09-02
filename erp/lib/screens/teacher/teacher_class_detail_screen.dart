@@ -39,7 +39,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   bool _loadingAssignments = false;
   String? _errorAssignments;
 
-  // Chamadas
+  // Frequências
   List<Map<String, dynamic>> _students = [];
   DateTime _selectedDate = DateTime.now();
   Map<String, dynamic>? _currentLesson;
@@ -81,10 +81,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       if (_tabController.index == 0 && _assignments.isEmpty) {
         _fetchAssignments();
       } else if (_tabController.index == 1 && _currentLesson == null) {
-        // Aba de chamada - carregar frequência se houver disciplina selecionada
+        // Aba de Frequência - carregar frequência se houver disciplina selecionada
         if (_selectedSubjectId != null) {
           debugPrint(
-            '🔄 Listener detectou aba de chamada, carregando frequência...',
+            '🔄 Listener detectou aba de Frequência, carregando frequência...',
           );
           _loadAttendance();
         }
@@ -161,9 +161,11 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         debugPrint('🔄 Disciplina selecionada: $_selectedSubjectId');
         _fetchAssignments();
 
-        // Se estiver na aba de chamada, carregar frequência automaticamente
+        // Se estiver na aba de Frequência, carregar frequência automaticamente
         if (_tabController.index == 1) {
-          debugPrint('🔄 Aba de chamada detectada, carregando frequência...');
+          debugPrint(
+            '🔄 Aba de Frequência detectada, carregando frequência...',
+          );
           _loadAttendance();
         }
       } else {
@@ -441,7 +443,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       debugPrint('❌ Erro: $e');
       debugPrint('❌ Stack trace: ${StackTrace.current}');
 
-      String errorMessage = 'Erro ao carregar chamada';
+      String errorMessage = 'Erro ao carregar Frequência';
 
       // Mensagens de erro mais específicas
       if (e.toString().contains('Professor não encontrado')) {
@@ -456,7 +458,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         errorMessage =
             'Erro: Não foi possível buscar a frequência. Verifique a conexão com o servidor.';
       } else {
-        errorMessage = 'Erro ao carregar chamada: $e';
+        errorMessage = 'Erro ao carregar Frequência: $e';
       }
 
       setState(() {
@@ -721,7 +723,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
               icon: const Icon(Icons.assignment),
             ),
             Tab(
-              text: isMobile ? 'Cham.' : 'Chamadas',
+              text: isMobile ? 'Cham.' : 'Frequências',
               icon: const Icon(Icons.how_to_reg),
             ),
             Tab(
@@ -1002,7 +1004,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'Selecione uma disciplina para fazer a chamada dos alunos',
+                'Selecione uma disciplina para fazer a Frequência dos alunos',
                 style: TextStyle(color: Colors.grey[600], fontSize: 16),
                 textAlign: TextAlign.center,
               ),
@@ -1113,7 +1115,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                       ? _loadAttendance
                                       : null,
                               icon: const Icon(Icons.refresh),
-                              label: const Text('Carregar Chamada'),
+                              label: const Text('Carregar Frequência'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2953A5),
                                 foregroundColor: Colors.white,
@@ -1161,7 +1163,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                     ? _loadAttendance
                                     : null,
                             icon: const Icon(Icons.refresh),
-                            label: const Text('Carregar Chamada'),
+                            label: const Text('Carregar Frequência'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2953A5),
                               foregroundColor: Colors.white,
@@ -1197,7 +1199,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
               const Icon(Icons.error_outline, size: 80, color: Colors.red),
               const SizedBox(height: 24),
               Text(
-                'Erro ao carregar chamada',
+                'Erro ao carregar Frequência',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -1743,7 +1745,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                       ),
                                     )
                                     : const Icon(Icons.save),
-                            label: const Text('Salvar Chamada'),
+                            label: const Text('Salvar Frequência'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2953A5),
                               foregroundColor: Colors.white,
@@ -1802,7 +1804,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                     ),
                                   )
                                   : const Icon(Icons.save),
-                          label: const Text('Salvar Chamada'),
+                          label: const Text('Salvar Frequência'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2953A5),
                             foregroundColor: Colors.white,
@@ -2380,16 +2382,13 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
   double? _calculateAverage(Map<String, Map<String, dynamic>> studentGrades) {
     if (studentGrades.isEmpty) return null;
 
-    // Separar notas por tipo
+    // Separar notas por tipo usando o campo isRecovery
     final regularGrades = <Map<String, dynamic>>[];
-    Map<String, dynamic>? recGrade;
-    Map<String, dynamic>? recFinalGrade;
+    final recoveryGrades = <Map<String, dynamic>>[];
 
     studentGrades.forEach((typeId, grade) {
-      if (typeId == 'RECUPERACAO') {
-        recGrade = grade;
-      } else if (typeId == 'RECUPERACAO_FINAL') {
-        recFinalGrade = grade;
+      if (grade['type']?['isRecovery'] == true) {
+        recoveryGrades.add(grade);
       } else {
         regularGrades.add(grade);
       }
@@ -2413,42 +2412,31 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     final minGradeIndex = finalGrades.indexOf(minGrade);
     final minGradeValue = _safeToDouble(minGrade['value']) ?? 0.0;
 
-    // Se houver recuperação final e for maior que a menor nota, substitui
-    if (recFinalGrade != null) {
-      final value = recFinalGrade?['value'];
-      if (value != null) {
-        final recFinalValue = _safeToDouble(value) ?? 0.0;
-        if (recFinalValue > minGradeValue) {
-          finalGrades[minGradeIndex] = {
-            ...?recFinalGrade,
-            'value': recFinalValue,
-          };
-        }
-      }
-    }
-    // Se não houver recuperação final mas houver recuperação normal, pode substituir
-    else if (recGrade != null) {
-      final value = recGrade?['value'];
-      if (value != null) {
-        final recValue = _safeToDouble(value) ?? 0.0;
-        if (recValue > minGradeValue) {
-          finalGrades[minGradeIndex] = {...?recGrade, 'value': recValue};
-        }
+    // Se houver notas de recuperação, encontrar a melhor para substituir a menor nota
+    if (recoveryGrades.isNotEmpty) {
+      // Ordenar notas de recuperação por valor (maior primeiro)
+      recoveryGrades.sort((a, b) {
+        final aValue = _safeToDouble(a['value']) ?? 0.0;
+        final bValue = _safeToDouble(b['value']) ?? 0.0;
+        return bValue.compareTo(aValue);
+      });
+
+      final bestRecoveryGrade = recoveryGrades.first;
+      final recoveryValue = _safeToDouble(bestRecoveryGrade['value']) ?? 0.0;
+
+      // Se a melhor recuperação for maior que a menor nota regular, substituir
+      if (recoveryValue > minGradeValue) {
+        finalGrades[minGradeIndex] = bestRecoveryGrade;
       }
     }
 
-    // Calcular média final
-    double sum = 0;
-    int count = 0;
-    for (var grade in finalGrades) {
-      final value = _safeToDouble(grade['value']);
-      if (value != null) {
-        sum += value;
-        count++;
-      }
-    }
+    // Calcular a média final
+    final sum = finalGrades.fold<double>(
+      0.0,
+      (sum, grade) => sum + (_safeToDouble(grade['value']) ?? 0.0),
+    );
 
-    return count > 0 ? sum / count : null;
+    return sum / finalGrades.length;
   }
 
   Color _getGradeColor(Map<String, dynamic> grade) {

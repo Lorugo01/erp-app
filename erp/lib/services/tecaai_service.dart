@@ -3,6 +3,35 @@ import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../config/environment.dart';
 
+class TecaAIConnectedClient {
+  final String id;
+  final String name;
+  final String ip;
+  final int port;
+  final String connectedAt;
+  final String lastSeen;
+
+  TecaAIConnectedClient({
+    required this.id,
+    required this.name,
+    required this.ip,
+    required this.port,
+    required this.connectedAt,
+    required this.lastSeen,
+  });
+
+  factory TecaAIConnectedClient.fromJson(Map<String, dynamic> json) {
+    return TecaAIConnectedClient(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      ip: json['ip'] ?? '',
+      port: json['port'] ?? 0,
+      connectedAt: json['connected_at'] ?? '',
+      lastSeen: json['last_seen'] ?? '',
+    );
+  }
+}
+
 class TecaAIResponse {
   final bool success;
   final String? response;
@@ -131,10 +160,13 @@ class TecaAIService {
   static const String askEndpoint = '/ask';
   static const String locateEndpoint = '/locate';
   static const String controlEndpoint = '/control';
+  static const String esp32Endpoint = '/esp32';
+  static const String esp32BroadcastEndpoint = '/esp32/broadcast';
   static const String itemInfoEndpoint = '/item-info';
   static const String historyEndpoint = '/history';
   static const String statsEndpoint = '/stats';
   static const String itemsEndpoint = '/items';
+  static const String connectedClientsEndpoint = '/connected-clients';
 
   // Métodos utilitários para construir URLs completas
   static String getHealthUrl() =>
@@ -144,6 +176,7 @@ class TecaAIService {
       EnvironmentConfig.getTecaAIUrl(locateEndpoint);
   static String getControlUrl() =>
       EnvironmentConfig.getTecaAIUrl(controlEndpoint);
+  static String getEsp32Url() => EnvironmentConfig.getTecaAIUrl(esp32Endpoint);
   static String getItemInfoUrl() =>
       EnvironmentConfig.getTecaAIUrl(itemInfoEndpoint);
   static String getHistoryUrl() =>
@@ -152,6 +185,10 @@ class TecaAIService {
   static String getItemsUrl() => EnvironmentConfig.getTecaAIUrl(itemsEndpoint);
   static String getItemUrl(int itemId) =>
       EnvironmentConfig.getTecaAIUrl('$itemsEndpoint/$itemId');
+  static String getEsp32BroadcastUrl() =>
+      EnvironmentConfig.getTecaAIUrl(esp32BroadcastEndpoint);
+  static String getConnectedClientsUrl() =>
+      EnvironmentConfig.getTecaAIUrl(connectedClientsEndpoint);
 
   // Comandos pré-definidos para facilitar o uso
   static const Map<String, String> predefinedCommands = {
@@ -161,6 +198,63 @@ class TecaAIService {
     'modo_festa_off': 'desligue modo festa',
     'alarme_fumaca': 'os alarmes de fumaça foram acionados',
   };
+
+  // Comandos ESP32 específicos
+  static const Map<String, String> esp32Commands = {
+    'demo': 'demo',
+    'demo off': 'demo off',
+    'tecaon': 'tecaon',
+    'tecaoff': 'tecaoff',
+    'allled vermelho': 'allled vermelho',
+    'allled verde': 'allled verde',
+    'allled azul': 'allled azul',
+    'allled amarelo': 'allled amarelo',
+    'allled branco': 'allled branco',
+    'allled preto': 'allled preto',
+    'allled roxo': 'allled roxo',
+    'allled ciano': 'allled ciano',
+    'allled laranja': 'allled laranja',
+    'allled rosa': 'allled rosa',
+    'allled off': 'allled off',
+  };
+
+  // Função para executar comandos ESP32 via cliente Python
+  static Future<TecaAIResponse> executeEsp32CommandDirect({
+    required String command,
+    required User user,
+  }) async {
+    try {
+      final url = getEsp32Url();
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'command': command,
+              'user_id': user.id,
+              'user_role': user.role.toString().split('.').last,
+            }),
+          )
+          .timeout(requestTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return TecaAIResponse.fromJson(data);
+      } else {
+        return TecaAIResponse(
+          success: false,
+          error: 'Erro ${response.statusCode}: ${response.body}',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+      }
+    } catch (e) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Erro de conexão: $e',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
+  }
 
   /// Verifica se a API TecaAI está online
   static Future<bool> checkConnection() async {
@@ -540,5 +634,124 @@ class TecaAIService {
     }
 
     return controlDevice(command: command, user: user);
+  }
+
+  /// Executa um comando ESP32 diretamente
+  static Future<TecaAIResponse> executeEsp32Command({
+    required String command,
+    required User user,
+    String? espIp,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(getEsp32Url()),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'command': command,
+              'user_id': user.id,
+              'user_role': user.role.toString().split('.').last,
+              if (espIp != null) 'esp_ip': espIp,
+            }),
+          )
+          .timeout(requestTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return TecaAIResponse.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        return TecaAIResponse(
+          success: false,
+          error: error['error'] ?? 'Erro ao executar comando ESP32',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+      }
+    } catch (e) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Erro de conexão: $e',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
+  }
+
+  /// Executa um comando ESP32 pré-definido
+  static Future<TecaAIResponse> executeEsp32PredefinedCommand({
+    required String commandKey,
+    required User user,
+    String? espIp,
+  }) async {
+    final command = esp32Commands[commandKey];
+    if (command == null) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Comando ESP32 pré-definido não encontrado',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
+
+    return executeEsp32Command(command: command, user: user, espIp: espIp);
+  }
+
+  /// Obtém lista de clientes Python conectados
+  static Future<List<TecaAIConnectedClient>> getConnectedClients() async {
+    try {
+      final response = await http
+          .get(Uri.parse(getConnectedClientsUrl()), headers: defaultHeaders)
+          .timeout(requestTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final List<dynamic> clientsList = data['clients'];
+          return clientsList
+              .map((client) => TecaAIConnectedClient.fromJson(client))
+              .toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Executa um comando de broadcast para todos os clientes Python conectados
+  static Future<TecaAIResponse> executeBroadcastCommand({
+    required String command,
+    required User user,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(getEsp32BroadcastUrl()),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'command': command,
+              'user_id': user.id,
+              'user_role': user.role.toString().split('.').last,
+            }),
+          )
+          .timeout(requestTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return TecaAIResponse.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        return TecaAIResponse(
+          success: false,
+          error: error['error'] ?? 'Erro ao executar comando de broadcast',
+          timestamp: DateTime.now().toIso8601String(),
+        );
+      }
+    } catch (e) {
+      return TecaAIResponse(
+        success: false,
+        error: 'Erro de conexão: $e',
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
   }
 }

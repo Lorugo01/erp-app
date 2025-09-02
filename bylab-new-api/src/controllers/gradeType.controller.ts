@@ -17,7 +17,18 @@ export const getById = async (req: Request, res: Response, next: NextFunction) =
 
 export const create = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const type = await GradeTypeService.createGradeType(req.body);
+    const { name, description, isConcept, isRecovery } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Nome do tipo de nota é obrigatório' });
+    }
+
+    const type = await GradeTypeService.createGradeType({
+      name,
+      description,
+      isConcept: isConcept ?? false,
+      isRecovery: isRecovery ?? false,
+    });
     res.status(201).json(type);
   } catch (error) {
     next(error);
@@ -26,7 +37,18 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 
 export const update = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const type = await GradeTypeService.updateGradeType(req.params.id, req.body);
+    const { name, description, isConcept, isRecovery } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ error: 'Nome do tipo de nota é obrigatório' });
+    }
+
+    const type = await GradeTypeService.updateGradeType(req.params.id, {
+      name,
+      description,
+      isConcept,
+      isRecovery,
+    });
     res.json(type);
   } catch (error) {
     next(error);

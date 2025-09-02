@@ -349,39 +349,25 @@ class _TeacherStudentDetailScreenState
             orElse: () => {'name': 'Período não encontrado'},
           );
 
-          // Ordenar notas: regulares primeiro, depois recuperação, por último recuperação final
+          // Ordenar notas: regulares primeiro, depois recuperação
           final sortedGrades = List<Map<String, dynamic>>.from(entry.value)
             ..sort((a, b) {
-              final aType = a['typeId'];
-              final bType = b['typeId'];
-              if (aType == 'RECUPERACAO_FINAL') return 1;
-              if (bType == 'RECUPERACAO_FINAL') return -1;
-              if (aType == 'RECUPERACAO') return 1;
-              if (bType == 'RECUPERACAO') return -1;
+              final aIsRecovery = a['type']?['isRecovery'] ?? false;
+              final bIsRecovery = b['type']?['isRecovery'] ?? false;
+              if (aIsRecovery && !bIsRecovery) return 1;
+              if (!aIsRecovery && bIsRecovery) return -1;
               return 0;
             });
 
           // Separar notas por tipo
           final regularGrades =
               sortedGrades
-                  .where(
-                    (g) =>
-                        ![
-                          'RECUPERACAO',
-                          'RECUPERACAO_FINAL',
-                        ].contains(g['typeId']),
-                  )
+                  .where((g) => !(g['type']?['isRecovery'] ?? false))
                   .toList();
 
-          final recoveryGrade = sortedGrades.firstWhere(
-            (g) => g['typeId'] == 'RECUPERACAO',
-            orElse: () => <String, dynamic>{},
-          );
-
-          final finalRecoveryGrade = sortedGrades.firstWhere(
-            (g) => g['typeId'] == 'RECUPERACAO_FINAL',
-            orElse: () => <String, dynamic>{},
-          );
+          final recoveryGrades = sortedGrades
+              .where((g) => g['type']?['isRecovery'] ?? false)
+              .toList();
 
           // Encontrar a menor nota regular
           final minRegularGrade =
@@ -404,28 +390,14 @@ class _TeacherStudentDetailScreenState
               final minRegularValue = minRegularGrade['value'] ?? 0.0;
 
               // Verificar recuperação final primeiro
-              if (finalRecoveryGrade.isNotEmpty) {
-                final finalRecoveryValue = finalRecoveryGrade['value'] ?? 0.0;
-                if (finalRecoveryValue > minRegularValue) {
-                  // Substituir a menor nota pela recuperação final
-                  final index = gradesToAverage.indexOf(minRegularGrade);
-                  if (index != -1) {
-                    gradesToAverage[index] = {
-                      ...finalRecoveryGrade,
-                      'replacedGrade': true,
-                    };
-                  }
-                }
-              }
-              // Se não substituiu com recuperação final, tentar com recuperação normal
-              else if (recoveryGrade.isNotEmpty) {
-                final recoveryValue = recoveryGrade['value'] ?? 0.0;
+              if (recoveryGrades.isNotEmpty) {
+                final recoveryValue = recoveryGrades.first['value'] ?? 0.0;
                 if (recoveryValue > minRegularValue) {
                   // Substituir a menor nota pela recuperação
                   final index = gradesToAverage.indexOf(minRegularGrade);
                   if (index != -1) {
                     gradesToAverage[index] = {
-                      ...recoveryGrade,
+                      ...recoveryGrades.first,
                       'replacedGrade': true,
                     };
                   }
@@ -486,8 +458,7 @@ class _TeacherStudentDetailScreenState
                   );
 
                   final isRecovery =
-                      grade['typeId'] == 'RECUPERACAO' ||
-                      grade['typeId'] == 'RECUPERACAO_FINAL';
+                      grade['type']?['isRecovery'] ?? false;
 
                   final isReplacingGrade =
                       isRecovery && grade['replacedGrade'] == true;
@@ -496,8 +467,7 @@ class _TeacherStudentDetailScreenState
                       grade == minRegularGrade &&
                       sortedGrades.any(
                         (g) =>
-                            (g['typeId'] == 'RECUPERACAO' ||
-                                g['typeId'] == 'RECUPERACAO_FINAL') &&
+                            (g['type']?['isRecovery'] ?? false) &&
                             g['replacedGrade'] == true,
                       );
 

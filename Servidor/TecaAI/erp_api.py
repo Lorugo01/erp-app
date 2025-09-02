@@ -20,9 +20,153 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Permite CORS para o frontend
 
-# Configurações do TecaAI
+# Configurações do TecaAI (modificado para teste)
 TECAAI_HOST = "localhost"
 TECAAI_PORT = 5000
+
+# MODO TESTE - Simula respostas sem precisar do Ollama
+TEST_MODE = True
+
+# Configurações para servidor TCP (porta 5000)
+TCP_HOST = '0.0.0.0'
+TCP_PORT = 5000
+
+# Cliente TCP para comunicação interna
+class TCPClientHandler:
+    """Manipulador de conexões TCP para o cliente Python."""
+    
+    def __init__(self):
+        self.active_clients = [] # Lista para manter sockets de clientes ativos
+        self.lock = threading.Lock()
+
+    def add_client(self, client_socket):
+        with self.lock:
+            self.active_clients.append(client_socket)
+            logger.info(f"Cliente TCP adicionado. Total: {len(self.active_clients)}")
+
+    def remove_client(self, client_socket):
+        with self.lock:
+            if client_socket in self.active_clients:
+                self.active_clients.remove(client_socket)
+                logger.info(f"Cliente TCP removido. Total: {len(self.active_clients)}")
+            client_socket.close()
+    
+    def broadcast_command(self, funcao, parametro, voice="Teca") -> list:
+        """Envia um comando para todos os clientes TCP conectados e retorna as respostas."""
+        responses = []
+        clients_to_remove = []
+        
+        with self.lock:
+            for client_socket in self.active_clients:
+                try:
+                    # Prepara dados JSON
+                    dados = {
+                        "ID": "server_broadcast", # ID especial para comandos broadcast
+                        "funcao": funcao,
+                        "parametro": parametro,
+                        "voice": voice
+                    }
+                    data_to_send = json.dumps(dados).encode('utf-8')
+                    
+                    # Envia dados
+                    client_socket.sendall(f"{len(data_to_send):010d}".encode('utf-8') + data_to_send)
+                    
+                    # Tenta receber uma resposta (com timeout)
+                    client_socket.settimeout(2.0) # Curto timeout para não bloquear o broadcast
+                    size_data = client_socket.recv(10)
+                    if not size_data:
+                        raise Exception("Conexão fechada pelo cliente")
+                    size = int(size_data.decode('utf-8'))
+                    response_data = b""
+                    while len(response_data) < size:
+                        chunk = client_socket.recv(size - len(response_data))
+                        if not chunk:
+                            raise Exception("Conexão fechada durante recebimento")
+                        response_data += chunk
+                    
+                    responses.append({"success": True, "response": response_data.decode('utf-8')})
+                    
+                except (socket.timeout, Exception) as e:
+                    logger.warning(f"Erro ao enviar/receber broadcast para cliente TCP: {e}")
+                    responses.append({"success": False, "error": str(e)})
+                    clients_to_remove.append(client_socket)
+            
+            # Remove clientes que falharam
+            for client_socket in clients_to_remove:
+                self.remove_client(client_socket)
+
+        return responses
+    
+    def handle_tcp_connection(self, client_socket, address):
+        """Manipula conexão TCP do cliente Python"""
+        self.add_client(client_socket) # Adiciona o cliente à lista de ativos
+        try:
+            logger.info(f"Conexão TCP recebida de {address}")
+            
+            # Recebe dados JSON do cliente
+            data = client_socket.recv(8192).decode('utf-8').strip()
+            if not data:
+                return
+                
+            dados_json = json.loads(data)
+            id = dados_json.get('ID', 'unknown')
+            funcao = dados_json.get('funcao', '')
+            parametro = dados_json.get('parametro', '')
+            voice = dados_json.get('voice', 'Teca')
+            
+            logger.info(f"Comando TCP: {funcao} - {parametro}")
+            
+            # Processa o comando usando o cliente TecaAI (que já está em modo de teste)
+            result = teca_client.send_command(funcao, parametro, voice)
+            
+            # Envia resposta seguindo o protocolo do API_Rpi.py
+            response_text = result.get('response', 'Erro: Sem resposta')
+            response_data = response_text.encode('utf-8')
+            
+            # Envia tamanho (10 dígitos) + dados
+            size_header = f"{len(response_data):010d}".encode('utf-8')
+            client_socket.sendall(size_header + response_data)
+            
+            logger.info(f"Resposta TCP enviada para {address}")
+            
+        except Exception as e:
+            logger.error(f"Erro na conexão TCP {address}: {e}")
+        finally:
+            self.remove_client(client_socket) # Remove o cliente ao encerrar a conexão
+            logger.info(f"Conexão TCP {address} encerrada")
+
+# Instância do manipulador TCP
+tcp_handler = TCPClientHandler()
+
+def start_tcp_server():
+    """Inicia servidor TCP na porta 5000"""
+    import socket
+    import threading
+    
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind((TCP_HOST, TCP_PORT))
+            server.listen(10)
+            
+            logger.info(f" Servidor TCP iniciado na porta {TCP_PORT}")
+            print(f" Servidor TCP iniciado na porta {TCP_PORT}")
+            
+            while True:
+                try:
+                    client_sock, address = server.accept()
+                    logger.info(f"Conexão TCP aceita de {address}")
+                    client_thread = threading.Thread(
+                        target=tcp_handler.handle_tcp_connection, 
+                        args=(client_sock, address),
+                        daemon=True
+                    )
+                    client_thread.start()
+                except Exception as e:
+                    logger.error(f"Erro ao aceitar conexão TCP: {e}")
+    except Exception as e:
+        logger.critical(f"Erro fatal no servidor TCP: {e}")
+        print(f"Erro fatal no servidor TCP: {e}")
 
 class TecaAIClient:
     """Cliente para comunicação com o TecaAI via TCP"""
@@ -33,6 +177,33 @@ class TecaAIClient:
     
     def send_command(self, funcao, parametro, voice="Teca"):
         """Envia comando para o TecaAI e retorna resposta"""
+        
+        # MODO TESTE - Simula respostas
+        if TEST_MODE:
+            logger.info(f"[TESTE] Simulando comando: {funcao} - {parametro}")
+            
+            # Simula diferentes tipos de resposta baseado na função
+            if funcao == "responda":
+                response = f"[TESTE] Resposta simulada para: '{parametro}' (Voz: {voice})"
+            elif funcao == "localizar":
+                response = f"[TESTE] Item '{parametro}' localizado na posição f1s2 - Armário A"
+            elif funcao == "comando":
+                response = f"[TESTE] Comando '{parametro}' executado com sucesso"
+            elif funcao == "IA_item":
+                response = f"[TESTE] Informações sobre '{parametro}': É um equipamento de laboratório"
+            else:
+                response = f"[TESTE] Função '{funcao}' executada com parâmetro '{parametro}'"
+            
+            # Simula delay de processamento
+            time.sleep(0.5)
+            
+            return {
+                "success": True,
+                "response": response,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # MODO REAL - Comunicação com TecaAI (desabilitado em teste)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
                 client.settimeout(10)  # Timeout de 10 segundos
@@ -126,7 +297,8 @@ def health_check():
     """Verifica se a API está funcionando"""
     return jsonify({
         "status": "online",
-        "service": "ERP-TecaAI Bridge",
+        "service": "ERP-TecaAI Bridge (MODO TESTE)" if TEST_MODE else "ERP-TecaAI Bridge",
+        "test_mode": TEST_MODE,
         "timestamp": datetime.now().isoformat()
     })
 
@@ -248,6 +420,162 @@ def get_item_info():
         
     except Exception as e:
         logger.error(f"Erro na rota /item-info: {e}")
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+# NOVA ROTA PARA TESTE DE COMANDOS ESP32
+@app.route('/esp32', methods=['POST'])
+def esp32_command():
+    """Comandos diretos para o ESP32 (MODO TESTE)"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'command' not in data:
+            return jsonify({"error": "Campo 'command' é obrigatório"}), 400
+        
+        command = data['command']
+        esp_ip = data.get('esp_ip', '192.168.100.184')
+        user_id = data.get('user_id', 'unknown')
+        user_role = data.get('user_role', 'unknown')
+        
+        # Validações
+        if len(command) > 100:
+            return jsonify({"error": "Comando muito longo"}), 400
+        
+        # Comandos válidos do ESP32
+        valid_commands = [
+            "demo", "demo off", "tecaon", "tecaoff",
+            "allled vermelho", "allled verde", "allled azul", "allled amarelo",
+            "allled roxo", "allled ciano", "allled branco", "allled laranja",
+            "allled rosa", "allled preto", "allled off"
+        ]
+        
+        # Verifica se é um comando válido ou um comando fx
+        import re
+        is_valid = (command.lower() in valid_commands or 
+                   re.match(r'^fx\d+s\d+\s+\w+$', command.lower()))
+        
+        if not is_valid:
+            return jsonify({
+                "error": "Comando inválido",
+                "valid_commands": valid_commands + ["fx<fita><sessao> <cor>"]
+            }), 400
+        
+        # MODO TESTE - Simula resposta do ESP32
+        if TEST_MODE:
+            logger.info(f"[TESTE] Simulando comando ESP32: {command} para {esp_ip}")
+            
+            # Simula diferentes respostas baseado no comando
+            if "demo" in command.lower():
+                response = f"[TESTE] Modo demonstração {'ativado' if 'off' not in command else 'desativado'} no ESP32 {esp_ip}"
+            elif "teca" in command.lower():
+                response = f"[TESTE] Animação TECA {'ativada' if 'off' not in command else 'desativada'} no ESP32 {esp_ip}"
+            elif "allled" in command.lower():
+                cor = command.split()[-1] if len(command.split()) > 1 else "desconhecida"
+                response = f"[TESTE] Todos os LEDs definidos como {cor} no ESP32 {esp_ip}"
+            elif "fx" in command.lower():
+                response = f"[TESTE] Comando de sessão {command} executado no ESP32 {esp_ip}"
+            else:
+                response = f"[TESTE] Comando '{command}' executado no ESP32 {esp_ip}"
+            
+            # Simula delay de processamento
+            time.sleep(0.3)
+            
+            result = {
+                "success": True,
+                "command": command,
+                "esp_ip": esp_ip,
+                "response": response,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Registra no histórico
+            log_command(user_id, user_role, "esp32_direct", command, response, True)
+            
+            return jsonify(result)
+        
+        # MODO REAL - Aqui você implementaria a comunicação real com ESP32
+        else:
+            # Implementação real seria aqui
+            pass
+            
+    except Exception as e:
+        logger.error(f"Erro na rota /esp32: {e}")
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+@app.route('/esp32/broadcast', methods=['POST'])
+def esp32_broadcast_command():
+    """Envia um comando ESP32 para todos os clientes TCP conectados."""
+    try:
+        data = request.get_json()
+        
+        if not data or 'command' not in data:
+            return jsonify({"error": "Campo 'command' é obrigatório"}), 400
+        
+        command = data['command']
+        user_id = data.get('user_id', 'unknown')
+        user_role = data.get('user_role', 'unknown')
+        
+        # Validações (mesmas do /esp32 normal)
+        if len(command) > 100:
+            return jsonify({"error": "Comando muito longo"}), 400
+        
+        valid_commands = [
+            "demo", "demo off", "tecaon", "tecaoff",
+            "allled vermelho", "allled verde", "allled azul", "allled amarelo",
+            "allled roxo", "allled ciano", "allled branco", "allled laranja",
+            "allled rosa", "allled preto", "allled off"
+        ]
+        import re
+        is_valid = (command.lower() in valid_commands or 
+                   re.match(r'^fx\d+s\d+\s+\w+$', command.lower()))
+        
+        if not is_valid:
+            return jsonify({
+                "error": "Comando inválido",
+                "valid_commands": valid_commands + ["fx<fita><sessao> <cor>"]
+            }), 400
+        
+        # MODO TESTE - Simula broadcast
+        if TEST_MODE:
+            logger.info(f"[TESTE] Simulando broadcast ESP32: {command}")
+            
+            # Simula respostas para alguns clientes
+            simulated_responses = []
+            for i in range(tcp_handler.active_clients.__len__() if tcp_handler.active_clients.__len__() > 0 else 1):
+                client_response = f"[TESTE] Broadcast de '{command}' recebido por cliente simulado {i+1}"
+                simulated_responses.append({"success": True, "response": client_response})
+                
+            result = {
+                "success": True,
+                "command": command,
+                "broadcast_responses": simulated_responses,
+                "timestamp": datetime.now().isoformat()
+            }
+            log_command(user_id, user_role, "esp32_broadcast", command, json.dumps(simulated_responses), True)
+            return jsonify(result)
+
+        # MODO REAL - Envia para todos os clientes conectados
+        broadcast_results = tcp_handler.broadcast_command("comando", command, "Teca")
+        
+        # Agrega as respostas
+        success_count = sum(1 for res in broadcast_results if res["success"])
+        total_clients = len(broadcast_results)
+        summary_message = f"Comando '{command}' enviado para {total_clients} clientes, {success_count} sucesso." 
+
+        result = {
+            "success": True,
+            "command": command,
+            "summary": summary_message,
+            "individual_responses": broadcast_results,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        log_command(user_id, user_role, "esp32_broadcast", command, json.dumps(broadcast_results), True)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Erro na rota /esp32/broadcast: {e}")
         return jsonify({"error": "Erro interno do servidor"}), 500
 
 @app.route('/items', methods=['GET'])
@@ -626,6 +954,33 @@ if __name__ == '__main__':
     # Inicializa banco de dados
     init_erp_db()
     
-    # Inicia servidor
-    logger.info("Iniciando API ERP-TecaAI Bridge...")
-    app.run(host='0.0.0.0', port=5001, debug=True) 
+    # Inicia servidor TCP em uma thread separada
+    tcp_thread = threading.Thread(target=start_tcp_server, daemon=True)
+    tcp_thread.start()
+    
+    # Aguarda um pouco para o servidor TCP inicializar
+    time.sleep(1)
+    
+    if TEST_MODE:
+        logger.info("🚀 Iniciando API ERP-TecaAI Bridge em MODO TESTE...")
+        logger.info("📝 Este servidor simula respostas sem precisar do Ollama")
+        logger.info("🔧 Para ativar modo real, altere TEST_MODE = False")
+        logger.info("   - POST /esp32/broadcast - Comandos ESP32 para TODOS os clientes (TESTE)") # Adiciona nova rota ao log
+    else:
+        logger.info("🚀 Iniciando API ERP-TecaAI Bridge em MODO REAL...")
+        logger.info("   - POST /esp32/broadcast - Comandos ESP32 para TODOS os clientes") # Adiciona nova rota ao log
+    
+    logger.info("🌐 Servidor rodando em: http://localhost:5001")
+    logger.info("📊 Endpoints disponíveis:")
+    logger.info("   - GET  /health     - Status do servidor")
+    logger.info("   - POST /ask        - Perguntas para IA")
+    logger.info("   - POST /locate     - Localizar itens")
+    logger.info("   - POST /control    - Controlar dispositivos")
+    logger.info("   - POST /esp32      - Comandos ESP32 (TESTE)")
+    logger.info("   - GET  /items      - Listar itens")
+    logger.info("   - POST /items      - Adicionar item")
+    logger.info("   - GET  /history    - Histórico de comandos")
+    logger.info("   - GET  /stats      - Estatísticas")
+    logger.info("   - POST /esp32/broadcast - Comandos ESP32 para TODOS os clientes") # Adiciona nova rota ao log
+    
+    app.run(host='0.0.0.0', port=5001, debug=True, threaded=True) # Habilita threaded para Flask 

@@ -126,12 +126,9 @@ function calcularMedia(valores: number[]): number {
 
 // Função auxiliar para calcular a média considerando recuperações
 const calculateFinalGrade = (grades: any[]) => {
-  // Separar as notas por tipo
-  const regularGrades = grades.filter(g => 
-    !['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(g.typeId)
-  );
-  const recGrade = grades.find(g => g.typeId === 'RECUPERACAO');
-  const recFinalGrade = grades.find(g => g.typeId === 'RECUPERACAO_FINAL');
+  // Separar as notas por tipo usando o campo isRecovery
+  const regularGrades = grades.filter(g => !g.type?.isRecovery);
+  const recoveryGrades = grades.filter(g => g.type?.isRecovery);
 
   // Se não houver notas regulares, retorna 0
   if (regularGrades.length === 0) return 0;
@@ -147,13 +144,16 @@ const calculateFinalGrade = (grades: any[]) => {
     }
   }
 
-  // Se houver recuperação final, ela substitui a menor nota
-  if (recFinalGrade && recFinalGrade.value > finalGrades[minGradeIndex].value) {
-    finalGrades[minGradeIndex] = recFinalGrade;
-  }
-  // Se não houver recuperação final mas houver recuperação normal, ela pode substituir a menor nota
-  else if (recGrade && recGrade.value > finalGrades[minGradeIndex].value) {
-    finalGrades[minGradeIndex] = recGrade;
+  // Se houver notas de recuperação, encontrar a melhor para substituir a menor nota regular
+  if (recoveryGrades.length > 0) {
+    // Ordenar notas de recuperação por valor (maior primeiro)
+    const sortedRecoveryGrades = recoveryGrades.sort((a, b) => (b.value || 0) - (a.value || 0));
+    const bestRecoveryGrade = sortedRecoveryGrades[0];
+    
+    // Se a melhor recuperação for maior que a menor nota regular, substituir
+    if (bestRecoveryGrade.value > finalGrades[minGradeIndex].value) {
+      finalGrades[minGradeIndex] = bestRecoveryGrade;
+    }
   }
 
   // Calcular a média final
@@ -173,7 +173,7 @@ export const getGradesByStudent = async (studentId: string) => {
       period: true
     },
     orderBy: [
-      { period: { startDate: 'asc' } },
+      { period: { order: 'asc' } },
       { type: { name: 'asc' } }
     ]
   });
@@ -197,12 +197,12 @@ export const getGradesByStudent = async (studentId: string) => {
     gradesGroup.forEach(grade => {
       grade.calculatedAverage = average;
       // Adicionar flag para indicar se a nota foi substituída
-      if (grade.typeId === 'RECUPERACAO' || grade.typeId === 'RECUPERACAO_FINAL') {
-        const regularGrades = gradesGroup.filter(g => 
-          !['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(g.typeId)
-        );
-        const minRegularGrade = Math.min(...regularGrades.map(g => g.value));
-        grade.replacedGrade = grade.value > minRegularGrade;
+      if (grade.type?.isRecovery) {
+        const regularGrades = gradesGroup.filter(g => !g.type?.isRecovery);
+        if (regularGrades.length > 0) {
+          const minRegularGrade = Math.min(...regularGrades.map(g => g.value || 0));
+          grade.replacedGrade = grade.value > minRegularGrade;
+        }
       }
     });
   }

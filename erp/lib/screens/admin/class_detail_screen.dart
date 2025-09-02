@@ -355,7 +355,7 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
     );
   }
 
-  void _showEditEventDialog(Map<String, dynamic> evento) {
+  void _showEditEventDialog(Map<String, dynamic> evento) async {
     // Garante que há horários disponíveis antes de abrir o diálogo
     _garantirHorariosMinimos();
 
@@ -366,126 +366,197 @@ class _WeeklyScheduleTabState extends State<_WeeklyScheduleTab> {
         evento['startTime'] ?? (horarios.isNotEmpty ? horarios.first : '07:00');
     String endTime =
         evento['endTime'] ?? (horarios.length > 1 ? horarios[1] : '07:50');
+    String? teacherId = evento['teacherId'];
+
+    // Buscar matérias da turma para mapear professores por disciplina
+    final parent = context.findAncestorWidgetOfExactType<ClassDetailScreen>();
+    final turmaId = parent?.classData['id'] ?? '';
+    final Map<String, List<Map<String, dynamic>>> professoresPorMateria = {};
+    try {
+      // Ignora erros silenciosamente, usaremos lista vazia se falhar
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/classes/$turmaId'),
+      );
+      if (response.statusCode == 200) {
+        final turma = json.decode(response.body);
+        final List subjects = turma['subjects'] ?? [];
+        for (final subject in subjects) {
+          final type = subject['type'] ?? subject['subjectType']?['name'];
+          final teacher = subject['teacher'];
+          if (type != null && teacher != null) {
+            professoresPorMateria.putIfAbsent(type, () => []).add(teacher);
+          }
+        }
+      }
+    } catch (_) {}
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Editar Aula'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: subjectType,
-                  items:
-                      subjectTypes
-                          .map<DropdownMenuItem<String>>(
-                            (subjectType) => DropdownMenuItem<String>(
-                              value: subjectType['name'] ?? subjectType['type'],
-                              child: Text(
-                                _formatSubjectType(
-                                  subjectType['name'] ?? subjectType['type'],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Filtra professores baseado na disciplina selecionada
+            final professoresDisponiveis =
+                subjectType != null
+                    ? (professoresPorMateria[subjectType] ?? [])
+                    : <Map<String, dynamic>>[];
+
+            return AlertDialog(
+              title: const Text('Editar Aula'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: subjectType,
+                      items:
+                          subjectTypes
+                              .map<DropdownMenuItem<String>>(
+                                (subjectType) => DropdownMenuItem<String>(
+                                  value:
+                                      subjectType['name'] ??
+                                      subjectType['type'],
+                                  child: Text(
+                                    _formatSubjectType(
+                                      subjectType['name'] ??
+                                          subjectType['type'],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (v) => subjectType = v,
-                  decoration: const InputDecoration(labelText: 'Disciplina'),
-                  validator: (v) => v == null ? 'Selecione a disciplina' : null,
-                ),
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'Professor/Descrição',
-                  ),
-                  controller: TextEditingController(text: description),
-                  onChanged: (v) => description = v,
-                ),
-                DropdownButtonFormField<int>(
-                  value: dayOfWeek,
-                  items: List.generate(
-                    7,
-                    (i) => DropdownMenuItem(
-                      value: i + 1,
-                      child: Text(weekDays[i]),
+                              )
+                              .toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          subjectType = v;
+                          // Resetar professor ao mudar disciplina
+                          teacherId = null;
+                        });
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Disciplina',
+                      ),
+                      validator:
+                          (v) => v == null ? 'Selecione a disciplina' : null,
                     ),
-                  ),
-                  onChanged: (v) => dayOfWeek = v ?? 1,
-                  decoration: const InputDecoration(labelText: 'Dia da Semana'),
+                    // Dropdown de professores para a disciplina selecionada
+                    DropdownButtonFormField<String>(
+                      value: teacherId,
+                      items:
+                          professoresDisponiveis
+                              .map<DropdownMenuItem<String>>(
+                                (t) => DropdownMenuItem(
+                                  value: t['id'],
+                                  child: Text(t['name'] ?? 'Professor'),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (v) => setState(() => teacherId = v),
+                      decoration: const InputDecoration(labelText: 'Professor'),
+                      validator:
+                          (v) => v == null ? 'Selecione o professor' : null,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição (opcional)',
+                      ),
+                      controller: TextEditingController(text: description),
+                      onChanged: (v) => description = v,
+                    ),
+                    DropdownButtonFormField<int>(
+                      value: dayOfWeek,
+                      items: List.generate(
+                        7,
+                        (i) => DropdownMenuItem(
+                          value: i + 1,
+                          child: Text(weekDays[i]),
+                        ),
+                      ),
+                      onChanged: (v) => setState(() => dayOfWeek = v ?? 1),
+                      decoration: const InputDecoration(
+                        labelText: 'Dia da Semana',
+                      ),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value:
+                          horarios.contains(startTime)
+                              ? startTime
+                              : (horarios.isNotEmpty ? horarios.first : null),
+                      items:
+                          horarios
+                              .map(
+                                (h) =>
+                                    DropdownMenuItem(value: h, child: Text(h)),
+                              )
+                              .toList(),
+                      onChanged:
+                          (v) =>
+                              startTime =
+                                  v ??
+                                  (horarios.isNotEmpty
+                                      ? horarios.first
+                                      : '07:00'),
+                      decoration: const InputDecoration(labelText: 'Início'),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value:
+                          horarios.contains(endTime)
+                              ? endTime
+                              : (horarios.length > 1 ? horarios[1] : null),
+                      items:
+                          horarios
+                              .map(
+                                (h) =>
+                                    DropdownMenuItem(value: h, child: Text(h)),
+                              )
+                              .toList(),
+                      onChanged:
+                          (v) =>
+                              endTime =
+                                  v ??
+                                  (horarios.length > 1 ? horarios[1] : '07:50'),
+                      decoration: const InputDecoration(labelText: 'Fim'),
+                    ),
+                  ],
                 ),
-                DropdownButtonFormField<String>(
-                  value:
-                      horarios.contains(startTime)
-                          ? startTime
-                          : (horarios.isNotEmpty ? horarios.first : null),
-                  items:
-                      horarios
-                          .map(
-                            (h) => DropdownMenuItem(value: h, child: Text(h)),
-                          )
-                          .toList(),
-                  onChanged:
-                      (v) =>
-                          startTime =
-                              v ??
-                              (horarios.isNotEmpty ? horarios.first : '07:00'),
-                  decoration: const InputDecoration(labelText: 'Início'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
                 ),
-                DropdownButtonFormField<String>(
-                  value:
-                      horarios.contains(endTime)
-                          ? endTime
-                          : (horarios.length > 1 ? horarios[1] : null),
-                  items:
-                      horarios
-                          .map(
-                            (h) => DropdownMenuItem(value: h, child: Text(h)),
-                          )
-                          .toList(),
-                  onChanged:
-                      (v) =>
-                          endTime =
-                              v ??
-                              (horarios.length > 1 ? horarios[1] : '07:50'),
-                  decoration: const InputDecoration(labelText: 'Fim'),
+                ElevatedButton(
+                  onPressed: () {
+                    if (subjectType != null && subjectType!.isNotEmpty) {
+                      updateEvent(evento['id'], {
+                        'title': subjectType,
+                        'teacherId': teacherId,
+                        'description': description,
+                        'dayOfWeek': dayOfWeek,
+                        'startTime': startTime,
+                        'endTime': endTime,
+                        'date': null,
+                      });
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    }
+                  },
+                  child: const Text('Salvar'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () async {
+                    await deleteEvent(evento['id']);
+                    if (context.mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: const Text('Excluir'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (subjectType != null && subjectType!.isNotEmpty) {
-                  updateEvent(evento['id'], {
-                    'title': subjectType,
-                    'description': description,
-                    'dayOfWeek': dayOfWeek,
-                    'startTime': startTime,
-                    'endTime': endTime,
-                    'date': null,
-                  });
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                  }
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () async {
-                await deleteEvent(evento['id']);
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Excluir'),
-            ),
-          ],
+            );
+          },
         );
       },
     );

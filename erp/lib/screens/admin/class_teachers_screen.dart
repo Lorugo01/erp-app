@@ -188,9 +188,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   );
 
                                   final response = await http.post(
-                                    Uri.parse(
-                                      '${ApiConfig.baseUrl}/subject',
-                                    ),
+                                    Uri.parse('${ApiConfig.baseUrl}/subject'),
                                     headers: {
                                       'Content-Type': 'application/json',
                                     },
@@ -226,6 +224,82 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                 ),
           ),
     );
+  }
+
+  // Função para remover professor da turma (remove todas as suas matérias)
+  Future<void> _removeTeacherFromClass(
+    String teacherId,
+    String teacherName,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirmar Remoção'),
+            content: Text(
+              'Tem certeza que deseja remover o professor "$teacherName" da turma?\n\n'
+              'Todas as matérias atribuídas a ele serão removidas.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Remover Professor'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirm == true) {
+      setState(() => _loading = true);
+      try {
+        // Buscar todas as matérias do professor nesta turma
+        final teacherSubjects =
+            _subjects.where((s) => s['teacherId'] == teacherId).toList();
+        int removedCount = 0;
+
+        // Remover cada matéria do professor
+        for (final subject in teacherSubjects) {
+          final response = await http.delete(
+            Uri.parse('${ApiConfig.baseUrl}/subject/${subject['id']}'),
+          );
+          if (response.statusCode == 200 || response.statusCode == 204) {
+            removedCount++;
+          }
+        }
+
+        // Atualizar a lista
+        await _fetchSubjects();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Professor removido com sucesso! $removedCount matéria(s) removida(s).',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao remover professor: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _loading = false);
+        }
+      }
+    }
   }
 
   void _showManageTeacherSubjectsDialog({
@@ -278,15 +352,20 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     // Mapear matérias atuais por tipo para facilitar a busca
     final currentSubjectsMap = <String, Map<String, dynamic>>{};
     for (final subject in currentSubjects) {
+      // Usar o tipo correto da matéria
       final typeName = subject['type'] ?? subject['subjectType']?['name'] ?? '';
-      currentSubjectsMap[typeName] = subject;
+      if (typeName.isNotEmpty) {
+        currentSubjectsMap[typeName] = subject;
+      }
     }
 
     // Inicializar com as matérias atuais
     final selectedSubjects = <String>{};
     for (final subject in currentSubjects) {
       final typeName = subject['type'] ?? subject['subjectType']?['name'] ?? '';
-      selectedSubjects.add(typeName);
+      if (typeName.isNotEmpty) {
+        selectedSubjects.add(typeName);
+      }
     }
 
     bool isLoading = false;
@@ -525,7 +604,14 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                       onPressed:
                           (selectedSubjects.length == currentSubjects.length &&
                                       selectedSubjects.containsAll(
-                                        currentSubjects.map((s) => s['type']),
+                                        currentSubjects
+                                            .map(
+                                              (s) =>
+                                                  s['type'] ??
+                                                  s['subjectType']?['name'] ??
+                                                  '',
+                                            )
+                                            .where((t) => t.isNotEmpty),
                                       )) ||
                                   isLoading
                               ? null
@@ -539,9 +625,14 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   // Remover matérias que não estão mais selecionadas
                                   final subjectsToRemove = <String>[];
                                   for (final subject in currentSubjects) {
-                                    if (!selectedSubjects.contains(
-                                      subject['type'],
-                                    )) {
+                                    final subjectType =
+                                        subject['type'] ??
+                                        subject['subjectType']?['name'] ??
+                                        '';
+                                    if (subjectType.isNotEmpty &&
+                                        !selectedSubjects.contains(
+                                          subjectType,
+                                        )) {
                                       subjectsToRemove.add(subject['id']);
                                     }
                                   }
@@ -563,7 +654,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   for (final subjectId in subjectsToRemove) {
                                     final response = await http.delete(
                                       Uri.parse(
-                                        '${ApiConfig.baseUrl}/subjects/$subjectId',
+                                        '${ApiConfig.baseUrl}/subject/$subjectId',
                                       ),
                                     );
                                     if (response.statusCode == 200 ||
@@ -583,9 +674,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     );
 
                                     final response = await http.post(
-                                      Uri.parse(
-                                        '${ApiConfig.baseUrl}/subject',
-                                      ),
+                                      Uri.parse('${ApiConfig.baseUrl}/subject'),
                                       headers: {
                                         'Content-Type': 'application/json',
                                       },
@@ -788,6 +877,22 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                                         currentSubjects:
                                                             subjects,
                                                       ),
+                                            ),
+                                            // Botão de remover professor da turma
+                                            IconButton(
+                                              icon: const Icon(
+                                                Icons.remove_circle_outline,
+                                                color: Colors.red,
+                                                size: 20,
+                                              ),
+                                              tooltip:
+                                                  'Remover professor da turma',
+                                              onPressed:
+                                                  () => _removeTeacherFromClass(
+                                                    teacher['id'],
+                                                    teacher['name'] ??
+                                                        'Professor',
+                                                  ),
                                             ),
                                           ],
                                         ),

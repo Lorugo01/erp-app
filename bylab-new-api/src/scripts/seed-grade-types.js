@@ -6,9 +6,11 @@ async function main() {
   console.log('Iniciando seed dos tipos de nota...');
   
   const gradeTypes = [
-    { id: 'PROVA_1', name: 'Prova 1', description: 'Primeira prova', isConcept: false },
-    { id: 'PROVA_2', name: 'Prova 2', description: 'Segunda prova', isConcept: false },
-    { id: 'TRABALHO', name: 'Trabalho', description: 'Trabalho/atividade avaliativa', isConcept: false },
+    { id: 'PROVA_1', name: 'Prova 1', description: 'Primeira prova', isConcept: false, isRecovery: false },
+    { id: 'PROVA_2', name: 'Prova 2', description: 'Segunda prova', isConcept: false, isRecovery: false },
+    { id: 'TRABALHO', name: 'Trabalho', description: 'Trabalho/atividade avaliativa', isConcept: false, isRecovery: false },
+    { id: 'RECUPERACAO', name: 'Recuperação', description: 'Nota de recuperação', isConcept: false, isRecovery: true },
+    { id: 'RECUPERACAO_FINAL', name: 'Recuperação Final', description: 'Nota de recuperação final', isConcept: false, isRecovery: true },
   ];
 
   for (const type of gradeTypes) {

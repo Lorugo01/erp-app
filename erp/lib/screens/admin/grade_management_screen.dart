@@ -715,6 +715,7 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _isConcept = false;
+  bool _isRecovery = false;
   bool _loading = false;
   String? _error;
 
@@ -743,6 +744,7 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
                 ? _descriptionController.text
                 : null,
         isConcept: _isConcept,
+        isRecovery: _isRecovery,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -795,6 +797,21 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
                 }
               },
             ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('É nota de recuperação?'),
+              subtitle: const Text(
+                'Se marcado, esta nota poderá substituir a menor nota regular',
+              ),
+              value: _isRecovery,
+              onChanged: (value) {
+                if (mounted) {
+                  setState(() {
+                    _isRecovery = value ?? false;
+                  });
+                }
+              },
+            ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
@@ -839,6 +856,7 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
   late bool _isConcept;
+  late bool _isRecovery;
   bool _loading = false;
   String? _error;
 
@@ -850,6 +868,7 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
       text: widget.gradeType['description'] ?? '',
     );
     _isConcept = widget.gradeType['isConcept'] ?? false;
+    _isRecovery = widget.gradeType['isRecovery'] ?? false;
   }
 
   @override
@@ -878,6 +897,7 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
                 ? _descriptionController.text
                 : null,
         isConcept: _isConcept,
+        isRecovery: _isRecovery,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
@@ -926,6 +946,21 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
                 if (mounted) {
                   setState(() {
                     _isConcept = value ?? false;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('É nota de recuperação?'),
+              subtitle: const Text(
+                'Se marcado, esta nota poderá substituir a menor nota regular',
+              ),
+              value: _isRecovery,
+              onChanged: (value) {
+                if (mounted) {
+                  setState(() {
+                    _isRecovery = value ?? false;
                   });
                 }
               },

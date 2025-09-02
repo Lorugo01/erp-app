@@ -21,6 +21,7 @@ import gradeRoutes from './routes/grade.routes';
 import gradeTypeRoutes from './routes/gradeType.routes';
 import gradePeriodRoutes from './routes/gradePeriod.routes';
 import assignmentRoutes from './routes/assignment.routes';
+import configRoutes from './routes/config.routes';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use('/grades', gradeRoutes);
 app.use('/grade-types', gradeTypeRoutes);
 app.use('/grade-periods', gradePeriodRoutes);
 app.use('/assignments', assignmentRoutes);
+app.use('/config', configRoutes);
 
 // Rota de teste
 app.get('/', (req, res) => {

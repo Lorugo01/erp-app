@@ -171,6 +171,7 @@ model GradeType {
   name        String
   description String?
   isConcept   Boolean @default(false)
+  isRecovery  Boolean @default(false) // Novo campo para marcar se é nota de recuperação
   grades      Grade[]
 }
 
@@ -192,10 +193,42 @@ model Grade {
 }
 
 model Config {
-  id              Int    @id @default(1)
-  evaluationModel String
-  minGrade        Float  @default(5.0)
-  minAttendance   Float  @default(75.0)
+  id                    Int      @id @default(1)
+  evaluationModel       String   @default("TRADICIONAL")
+  minGrade              Float    @default(5.0)
+  minAttendance         Float    @default(75.0)
+  
+  // Configurações Gerais
+  currentAcademicYear   String   @default("2024")
+  enrollmentPeriodStart String   @default("01/12/2024")
+  enrollmentPeriodEnd   String   @default("31/01/2025")
+  operatingHoursStart   String   @default("07:00")
+  operatingHoursEnd     String   @default("18:00")
+  
+  // Sistema de Notas
+  evaluationType        String   @default("NUMERICO")
+  passingGrade          Float    @default(7.0)
+  evaluationPeriods     String   @default("4 Bimestres")
+  
+  // Configurações de Turmas
+  maxClassCapacity      Int      @default(35)
+  weeklyWorkload        Int      @default(25)
+  
+  // Configurações de Usuários
+  maxLoginAttempts      Int      @default(3)
+  sessionTimeout        Int      @default(30)
+  requirePasswordChange Boolean  @default(false)
+  
+  // Configurações de Segurança
+  enableDebugLogs       Boolean  @default(false)
+  validateSSLCert       Boolean  @default(true)
+  
+  // Configurações de Backup
+  autoBackupEnabled     Boolean  @default(true)
+  backupFrequency       String   @default("DIARIO")
+  retentionDays         Int      @default(30)
+  
+  updatedAt             DateTime @updatedAt
 }
 
 model Event {

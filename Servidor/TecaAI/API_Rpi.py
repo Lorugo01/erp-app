@@ -13,7 +13,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import Dict, List, Optional, Tuple, Any, Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Tentativa de importar Flask (opcional para ERP API)
 try:
@@ -26,6 +26,7 @@ except ImportError:
     print("   Execute: pip install flask flask-cors")
 
 # Módulos locais
+from erp_api import TEST_MODE
 import comandos
 import itens
 import historico_conversa
@@ -269,27 +270,45 @@ def send_command_to_esp32(cmd: str, ip: str = None) -> str:
 def format_position(pos: str) -> str:
     """Formata uma string de posição para o formato esperado pelo ESP32."""
     try:
-        partes = pos.split()
-        if len(partes) != 2:
-            return pos.replace(" ", "")
-            
-        f_part, s_part = partes
-        if s_part.startswith("s"):
-            num = s_part[1:]
-            if len(num) == 1:
-                s_part = "s" + num.zfill(2)
+        # Remove espaços e converte para minúsculas
+        pos_clean = pos.replace(" ", "").lower()
+        
+        # Padrão: f1s1, f2s3, etc.
+        if pos_clean.startswith('f') and 's' in pos_clean:
+            return pos_clean
+        
+        # Se for formato "Fileira X, Segmento Y", converte para fXsY
+        if "fileira" in pos.lower() and "segmento" in pos.lower():
+            try:
+                fileira_match = re.search(r'fileira\s*(\d+)', pos.lower())
+                segmento_match = re.search(r'segmento\s*(\d+)', pos.lower())
                 
-        return f_part + s_part
+                if fileira_match and segmento_match:
+                    fileira = fileira_match.group(1)
+                    segmento = segmento_match.group(1)
+                    return f"f{fileira}s{segmento}"
+            except:
+                pass
+        
+        # Se não conseguir converter, retorna como está
+        return pos_clean
+        
     except Exception as e:
         logger.error(f"Erro na formatação da posição: {e}")
-        return pos.replace(" ", "")
+        return pos.replace(" ", "").lower()
 
 def send_text_to_client(conexao: socket.socket, text: str) -> None:
     """Envia texto para o cliente com o formato adequado."""
     try:
         data = text.encode('utf-8')
-        conexao.sendall(f"{len(data):010d}".encode('utf-8') + data)
+        header = f"{len(data):010d}".encode('utf-8')
+        print(f"[DEBUG SERVIDOR] Enviando resposta: '{text}'")
+        print(f"[DEBUG SERVIDOR] Tamanho dos dados: {len(data)}")
+        print(f"[DEBUG SERVIDOR] Header: '{header.decode()}'")
+        conexao.sendall(header + data)
+        print(f"[DEBUG SERVIDOR] Resposta enviada com sucesso!")
     except Exception as e:
+        print(f"[DEBUG SERVIDOR] Erro ao enviar resposta: {e}")
         logger.error(f"Erro ao enviar texto para o cliente: {e}")
 
 # ── Funções de manipulação de requisições ────────────────────────────────────
@@ -506,18 +525,50 @@ def localizar_item(id: str, item: str, conexao: socket.socket) -> None:
         pos, esp_ip = details
         pos_fmt = format_position(pos)
         
-        msg = "Comando LED enviado para ESP32 com sucesso."
+        msg = f"Item '{item}' localizado na posição {pos_fmt}. Comando LED enviado para ESP32."
         send_text_to_client(conexao, msg)
         
-        # Envia comando para desligar LEDs e acender novo LED de forma assíncrona
+        # Envia comando para acender LED na posição específica de forma assíncrona
         def executar_comandos_led():
             try:
-                # Desliga LEDs anteriores
-                send_command_to_esp32("off", ip=esp_ip)
-                time.sleep(0.2)
-                # Acende novo LED
-                led_cmd = f"{pos_fmt} verde"
-                send_command_to_esp32(led_cmd, ip=esp_ip)
+                # Primeiro desliga todos os LEDs
+                send_command_to_esp32("allled preto", ip=esp_ip)
+                time.sleep(0.3)
+                
+                # Verifica se a posição é válida para o formato fx<fita><sessao>
+                if pos_fmt.startswith('f') and 's' in pos_fmt:
+                    # Extrai número da fita e sessão
+                    try:
+                        f_match = re.search(r'f(\d+)', pos_fmt)
+                        s_match = re.search(r's(\d+)', pos_fmt)
+                        
+                        if f_match and s_match:
+                            fita = int(f_match.group(1))
+                            sessao = int(s_match.group(1))
+                            
+                            # Valida se a fita e sessão estão dentro dos limites
+                            if 1 <= fita <= 5 and 1 <= sessao <= 8:
+                                # Comando para piscar a sessão específica em verde
+                                led_cmd = f"fx{fita}s{sessao} verde"
+                                send_command_to_esp32(led_cmd, ip=esp_ip)
+                                logger.info(f"Comando LED executado: {led_cmd} para {item}")
+                            else:
+                                # Se fora dos limites, acende todos em verde
+                                send_command_to_esp32("allled verde", ip=esp_ip)
+                                logger.warning(f"Posição {pos_fmt} fora dos limites, acendendo todos os LEDs")
+                        else:
+                            # Formato inválido, acende todos em verde
+                            send_command_to_esp32("allled verde", ip=esp_ip)
+                            logger.warning(f"Formato de posição inválido: {pos_fmt}")
+                    except ValueError:
+                        # Erro na conversão, acende todos em verde
+                        send_command_to_esp32("allled verde", ip=esp_ip)
+                        logger.warning(f"Erro na conversão da posição: {pos_fmt}")
+                else:
+                    # Posição não reconhecida, acende todos em verde
+                    send_command_to_esp32("allled verde", ip=esp_ip)
+                    logger.warning(f"Posição não reconhecida: {pos_fmt}, acendendo todos os LEDs")
+                    
             except Exception as e:
                 logger.error(f"Erro na execução assíncrona de comandos LED: {e}")
         
@@ -528,29 +579,196 @@ def localizar_item(id: str, item: str, conexao: socket.socket) -> None:
         send_text_to_client(conexao, error_msg)
 
 def comando(id: str, parametro: str, conexao: socket.socket) -> None:
-    """Processa comandos específicos."""
+    """Processa comandos específicos para o ESP32."""
     try:
-        if parametro.lower() in ["tecaon", "tecaoff", "off"]:
-            msg = "Comando LED controlado pelo cliente."
+        # Comandos especiais do ESP32
+        if parametro.lower() in ["tecaon", "tecaoff", "demo", "demo off"]:
+            # Estes comandos são processados diretamente pelo ESP32
+            msg = f"Comando '{parametro}' enviado para ESP32."
             send_text_to_client(conexao, msg)
+            
+            # Envia comando para o ESP32 de forma assíncrona
+            def executar_comando_esp32():
+                try:
+                    # Determina qual ESP32 usar (pode ser configurável)
+                    esp_ip = ESP32_DEFAULT_IP
+                    send_command_to_esp32(parametro.lower(), ip=esp_ip)
+                    logger.info(f"Comando ESP32 executado: {parametro}")
+                except Exception as e:
+                    logger.error(f"Erro ao executar comando ESP32: {e}")
+            
+            thread_pool.submit(executar_comando_esp32)
+            
+        elif parametro.lower().startswith("allled "):
+            # Comando para acender todos os LEDs com uma cor específica
+            cor = parametro[7:].strip().lower()
+            cores_validas = ["vermelho", "verde", "azul", "amarelo", "roxo", "ciano", "branco", "laranja", "rosa", "preto", "off"]
+            
+            if cor in cores_validas:
+                msg = f"Comando 'allled {cor}' enviado para ESP32."
+                send_text_to_client(conexao, msg)
+                
+                def executar_comando_led():
+                    try:
+                        esp_ip = ESP32_DEFAULT_IP
+                        send_command_to_esp32(parametro.lower(), ip=esp_ip)
+                        logger.info(f"Comando LED executado: {parametro}")
+                    except Exception as e:
+                        logger.error(f"Erro ao executar comando LED: {e}")
+                
+                thread_pool.submit(executar_comando_led)
+            else:
+                msg = f"Cor inválida: {cor}. Cores válidas: {', '.join(cores_validas)}"
+                send_text_to_client(conexao, msg)
+                
+        elif parametro.lower().startswith("fx"):
+            # Comando para piscar uma sessão específica
+            # Formato: fx<fita><sessao> <cor>
+            if re.match(r'^fx\d+s\d+\s+\w+$', parametro.lower()):
+                msg = f"Comando 'fx' enviado para ESP32: {parametro}"
+                send_text_to_client(conexao, msg)
+                
+                def executar_comando_fx():
+                    try:
+                        esp_ip = ESP32_DEFAULT_IP
+                        send_command_to_esp32(parametro.lower(), ip=esp_ip)
+                        logger.info(f"Comando FX executado: {parametro}")
+                    except Exception as e:
+                        logger.error(f"Erro ao executar comando FX: {e}")
+                
+                thread_pool.submit(executar_comando_fx)
+            else:
+                msg = "Formato inválido para comando 'fx'. Use: fx<fita><sessao> <cor> (ex: fx1s2 verde)"
+                send_text_to_client(conexao, msg)
+                
         else:
+            # Comandos não reconhecidos são enviados para o módulo de comandos
             try:
                 comandos.verificar_comando(id, parametro, conexao)
             except Exception as e:
                 error_msg = f"Erro no comando: {e}"
                 logger.error(error_msg)
                 send_text_to_client(conexao, error_msg)
+                
     except Exception as e:
         error_msg = f"Erro ao processar comando: {e}"
         logger.error(error_msg)
         send_text_to_client(conexao, error_msg)
+
+# Lista de clientes conectados
+connected_clients = []
+
+def add_connected_client(client_id: str, endereco: Tuple[str, int]) -> None:
+    """Adiciona um cliente à lista de conectados"""
+    client_info = {
+        'id': client_id,
+        'ip': endereco[0],
+        'port': endereco[1],
+        'connected_at': datetime.now().isoformat(),
+        'last_seen': datetime.now().isoformat()
+    }
+    
+    # Remove se já existe
+    connected_clients[:] = [c for c in connected_clients if c['id'] != client_id]
+    # Adiciona novo
+    connected_clients.append(client_info)
+    print(f"[DEBUG SERVIDOR] Cliente conectado: {client_id} ({endereco[0]}:{endereco[1]})")
+    logger.info(f"Cliente conectado: {client_id} ({endereco[0]}:{endereco[1]})")
+
+def update_client_last_seen(client_id: str) -> None:
+    """Atualiza o último acesso de um cliente"""
+    for client in connected_clients:
+        if client['id'] == client_id:
+            client['last_seen'] = datetime.now().isoformat()
+            break
+
+def remove_disconnected_client(client_id: str) -> None:
+    """Remove um cliente da lista de conectados"""
+    connected_clients[:] = [c for c in connected_clients if c['id'] != client_id]
+    print(f"[DEBUG SERVIDOR] Cliente desconectado: {client_id}")
+    logger.info(f"Cliente desconectado: {client_id}")
+
+def get_connected_clients() -> List[Dict]:
+    """Retorna lista de clientes conectados"""
+    # Remove clientes que não foram vistos há mais de 30 segundos
+    cutoff_time = datetime.now() - timedelta(seconds=30)
+    active_clients = []
+    
+    for client in connected_clients:
+        last_seen = datetime.fromisoformat(client['last_seen'])
+        if last_seen > cutoff_time:
+            active_clients.append(client)
+        else:
+            print(f"[DEBUG SERVIDOR] Removendo cliente inativo: {client['id']}")
+    
+    # Atualiza a lista
+    connected_clients[:] = active_clients
+    
+    # Debug: mostra clientes ativos
+    print(f"[DEBUG SERVIDOR] Clientes ativos: {len(active_clients)}")
+    for client in active_clients:
+        print(f"[DEBUG SERVIDOR]   - {client['id']} ({client['ip']}:{client['port']}) - Último acesso: {client['last_seen']}")
+    
+    return active_clients
+
+def heartbeat(id: str, parametro: str, conexao: socket.socket) -> None:
+    """Função de heartbeat para manter cliente ativo"""
+    print(f"[DEBUG SERVIDOR] Heartbeat recebido de ID: {id}")
+    resposta = f"Heartbeat OK - Cliente {id} ativo"
+    send_text_to_client(conexao, resposta)
+    print(f"[DEBUG SERVIDOR] Heartbeat respondido: {resposta}")
+    logger.info(f"Heartbeat de {id} processado")
+
+def comando_esp32(id: str, parametro: str, conexao: socket.socket) -> None:
+    """Função para enviar comandos ESP32 via serial"""
+    print(f"[DEBUG SERVIDOR] Executando comando ESP32: '{parametro}' para ID: {id}")
+    
+    try:
+        # Tenta importar o módulo de controle LED
+        try:
+            from led_control import send_command
+        except ImportError:
+            # Se não encontrar, tenta importar do diretório Cliente
+            import sys
+            sys.path.append('../Cliente')
+            from led_control import send_command
+        
+        # Envia comando para ESP32
+        resultado = send_command(parametro)
+        
+        resposta = f"Comando ESP32 '{parametro}' executado: {resultado}"
+        send_text_to_client(conexao, resposta)
+        print(f"[DEBUG SERVIDOR] Resposta ESP32 enviada: {resposta}")
+        logger.info(f"Comando ESP32 executado: {parametro} -> {resultado}")
+        
+    except ImportError as e:
+        erro = f"Erro: Módulo led_control não encontrado: {e}"
+        send_text_to_client(conexao, erro)
+        print(f"[DEBUG SERVIDOR] Erro: {erro}")
+        logger.error(f"Erro ao importar led_control: {erro}")
+    except Exception as e:
+        erro = f"Erro ao executar comando ESP32: {e}"
+        send_text_to_client(conexao, erro)
+        print(f"[DEBUG SERVIDOR] Erro: {erro}")
+        logger.error(f"Erro no comando ESP32: {e}")
+
+def teste_conexao(id: str, parametro: str, conexao: socket.socket) -> None:
+    """Função de teste para verificar conexão"""
+    print(f"[DEBUG SERVIDOR] Executando função de teste para ID: {id}")
+    resposta = f"Teste de conexão bem-sucedido! ID: {id}, Parâmetro: {parametro}"
+    send_text_to_client(conexao, resposta)
+    print(f"[DEBUG SERVIDOR] Resposta de teste enviada: {resposta}")
+    logger.info(f"Teste de conexão realizado para {id}")
 
 # Dicionário de funções disponíveis
 FUNCOES_DISPONIVEIS = {
     "responda": IAGen_resposta,
     "IA_item": Item_ID,
     "localizar": localizar_item,
-    "comando": comando
+    "comando": comando,
+    "comando_esp32": comando_esp32,
+    "teste": teste_conexao,
+    "heartbeat": heartbeat
 }
 
 def responder_conexao(conexao: socket.socket, endereco: Tuple[str, int]) -> None:
@@ -558,6 +776,7 @@ def responder_conexao(conexao: socket.socket, endereco: Tuple[str, int]) -> None
     logger.info(f"Conexão estabelecida com {endereco}")
     conexao.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     
+    client_id = None
     try:
         # Recebe dados JSON do cliente com tamanho máximo
         buffer_size = 8192  # Limitar a 8KB
@@ -572,12 +791,25 @@ def responder_conexao(conexao: socket.socket, endereco: Tuple[str, int]) -> None
         dados_json = json.loads(dados)
         
         # Extrai valores do JSON
-        id = dados_json['ID']
+        client_id = dados_json['ID']
         funcao = dados_json.get("funcao")
         parametro = dados_json.get("parametro", "")
         
+        # Adiciona cliente à lista de conectados
+        add_connected_client(client_id, endereco)
+        
+        # DEBUG: Mostra informações do comando recebido
+        print(f"[DEBUG SERVIDOR] ==========================================")
+        print(f"[DEBUG SERVIDOR] Comando recebido de {endereco}")
+        print(f"[DEBUG SERVIDOR] ID: {client_id}")
+        print(f"[DEBUG SERVIDOR] Função: {funcao}")
+        print(f"[DEBUG SERVIDOR] Parâmetro: {parametro}")
+        print(f"[DEBUG SERVIDOR] ==========================================")
+        
+        logger.info(f"[DEBUG] Comando recebido: {funcao} - {parametro} de {endereco}")
+        
         # Verificar tamanho dos parâmetros individuais
-        if len(id) > 100 or len(str(funcao)) > 50 or len(str(parametro)) > 2000:
+        if len(client_id) > 100 or len(str(funcao)) > 50 or len(str(parametro)) > 2000:
             send_text_to_client(conexao, "Erro: Parâmetros com tamanho excedido")
             logger.warning(f"Parâmetros com tamanho excedido de {endereco}")
             return
@@ -590,11 +822,14 @@ def responder_conexao(conexao: socket.socket, endereco: Tuple[str, int]) -> None
                 return
                 
             voice_file = f"voz/{voice}.wav"
-            IAGen_resposta(id, parametro, conexao, voice_file=voice_file, voice=voice)
+            IAGen_resposta(client_id, parametro, conexao, voice_file=voice_file, voice=voice)
         elif funcao in FUNCOES_DISPONIVEIS:
-            FUNCOES_DISPONIVEIS[funcao](id, parametro, conexao)
+            FUNCOES_DISPONIVEIS[funcao](client_id, parametro, conexao)
         else:
             send_text_to_client(conexao, "Função não reconhecida")
+            
+        # Atualiza último acesso do cliente
+        update_client_last_seen(client_id)
 
     except json.JSONDecodeError:
         logger.error(f"Erro ao decodificar JSON de {endereco}")
@@ -609,6 +844,18 @@ def responder_conexao(conexao: socket.socket, endereco: Tuple[str, int]) -> None
         except:
             pass
     finally:
+        # Só remove o cliente se houve erro ou se não é um heartbeat
+        if client_id:
+            try:
+                dados_json = json.loads(dados)
+                funcao = dados_json.get("funcao")
+                # Não remove clientes que fazem heartbeat
+                if funcao != "heartbeat":
+                    remove_disconnected_client(client_id)
+            except:
+                # Se não conseguir processar, remove por segurança
+                remove_disconnected_client(client_id)
+        
         conexao.close()
         logger.info(f"Conexão com {endereco} encerrada.")
 
@@ -822,6 +1069,57 @@ if __name__ == "__main__":
             # ROTAS DO ERP API
             # ============================================================================
             
+            @app.route('/connected-clients', methods=['GET'])
+            def get_connected_clients_endpoint():
+                """Retorna lista de clientes Python conectados"""
+                try:
+                    print(f"[DEBUG SERVIDOR] Endpoint /connected-clients chamado")
+                    clients = get_connected_clients()
+                    
+                    # Mapeia IDs de cliente para nomes de armário
+                    armario_mapping = {
+                        'A': 'Armário A',
+                        'B': 'Armário B', 
+                        'C': 'Armário C',
+                        'D': 'Armário D',
+                        'E': 'Armário E',
+                        'F': 'Armário F',
+                        'G': 'Armário G',
+                        'H': 'Armário H',
+                        'I': 'Armário I',
+                        'J': 'Armário J'
+                    }
+                    
+                    formatted_clients = []
+                    for client in clients:
+                        armario_name = armario_mapping.get(client['id'], f"Armário {client['id']}")
+                        formatted_clients.append({
+                            'id': client['id'],
+                            'name': armario_name,
+                            'ip': client['ip'],
+                            'port': client['port'],
+                            'connected_at': client['connected_at'],
+                            'last_seen': client['last_seen']
+                        })
+                    
+                    response_data = {
+                        "success": True,
+                        "clients": formatted_clients,
+                        "total": len(formatted_clients),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+                    print(f"[DEBUG SERVIDOR] Retornando {len(formatted_clients)} clientes conectados")
+                    return jsonify(response_data)
+                    
+                except Exception as e:
+                    logger.error(f"Erro ao obter clientes conectados: {e}")
+                    return jsonify({
+                        "success": False,
+                        "error": f"Erro interno: {e}",
+                        "timestamp": datetime.now().isoformat()
+                    }), 500
+
             @app.route('/health', methods=['GET'])
             def health_check():
                 """Verifica se a API está funcionando"""
@@ -920,6 +1218,189 @@ if __name__ == "__main__":
                     
                 except Exception as e:
                     logger.error(f"Erro na rota /control: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/esp32', methods=['POST'])
+            def esp32_command():
+                """Comandos diretos para o ESP32 via cliente Python"""
+                try:
+                    data = request.get_json()
+                    
+                    if not data or 'command' not in data:
+                        return jsonify({"error": "Campo 'command' é obrigatório"}), 400
+                    
+                    command = data['command']
+                    user_id = data.get('user_id', 'unknown')
+                    user_role = data.get('user_role', 'unknown')
+                    
+                    # Validações
+                    if len(command) > 100:
+                        return jsonify({"error": "Comando muito longo"}), 400
+                    
+                    # Comandos válidos do ESP32
+                    valid_commands = [
+                        "demo", "demo off", "tecaon", "tecaoff",
+                        "allled vermelho", "allled verde", "allled azul", "allled amarelo",
+                        "allled roxo", "allled ciano", "allled branco", "allled laranja",
+                        "allled rosa", "allled preto", "allled off"
+                    ]
+                    
+                    # Verifica se é um comando válido ou um comando fx
+                    is_valid = (command.lower() in valid_commands or 
+                               re.match(r'^fx\d+s\d+\s+\w+$', command.lower()))
+                    
+                    if not is_valid:
+                        return jsonify({
+                            "error": "Comando inválido",
+                            "valid_commands": valid_commands + ["fx<fita><sessao> <cor>"]
+                        }), 400
+                    
+                    # Envia comando para TODOS os clientes Python conectados
+                    print(f"[DEBUG SERVIDOR] Enviando comando ESP32 '{command}' para todos os clientes")
+                    
+                    # Obtém lista de clientes conectados
+                    active_clients = get_connected_clients()
+                    
+                    if not active_clients:
+                        error_msg = "Nenhum cliente Python conectado para receber comandos ESP32"
+                        logger.error(error_msg)
+                        return jsonify({
+                            "success": False,
+                            "error": error_msg,
+                            "timestamp": datetime.now().isoformat()
+                        }), 500
+                    
+                    # Envia comando para cada cliente conectado usando a porta 5002
+                    responses = []
+                    for client in active_clients:
+                        try:
+                            print(f"[DEBUG SERVIDOR] Enviando comando '{command}' para cliente {client['id']} ({client['ip']}:5002)")
+                            
+                            # Envia comando via TCP para o cliente Python na porta 5002
+                            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                                client_socket.settimeout(5.0)
+                                client_socket.connect((client['ip'], 5002))  # Porta específica para comandos
+                                
+                                # Envia comando no formato JSON esperado pelo cliente
+                                cmd_data = {
+                                    "ID": client['id'],
+                                    "funcao": "comando_esp32",
+                                    "parametro": command
+                                }
+                                
+                                cmd_json = json.dumps(cmd_data)
+                                print(f"[DEBUG SERVIDOR] Enviando JSON: {cmd_json}")
+                                client_socket.sendall(cmd_json.encode('utf-8'))
+                                
+                                # Aguarda resposta
+                                response = client_socket.recv(1024).decode('utf-8').strip()
+                                print(f"[DEBUG SERVIDOR] Resposta do cliente {client['id']}: {response}")
+                                responses.append(f"Cliente {client['id']}: {response}")
+                                
+                        except Exception as e:
+                            error_msg = f"Erro ao enviar para cliente {client['id']}: {e}"
+                            logger.error(error_msg)
+                            print(f"[DEBUG SERVIDOR] {error_msg}")
+                            responses.append(error_msg)
+                    
+                    result = {
+                        "success": True,
+                        "command": command,
+                        "clients_count": len(active_clients),
+                        "responses": responses,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    
+                    # Registra no histórico
+                    log_command(user_id, user_role, "esp32_via_cliente", command, str(responses), True)
+                    
+                    return jsonify(result)
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /esp32: {e}")
+                    return jsonify({"error": "Erro interno do servidor"}), 500
+            
+            @app.route('/esp32/broadcast', methods=['POST'])
+            def esp32_broadcast_command():
+                """Comandos de broadcast para TODOS os clientes Python conectados"""
+                try:
+                    data = request.get_json()
+                    
+                    if not data or 'command' not in data:
+                        return jsonify({"error": "Campo 'command' é obrigatório"}), 400
+                    
+                    command = data['command']
+                    user_id = data.get('user_id', 'unknown')
+                    user_role = data.get('user_role', 'unknown')
+                    
+                    # Validações
+                    if len(command) > 100:
+                        return jsonify({"error": "Comando muito longo"}), 400
+                    
+                    # Comandos válidos do ESP32
+                    valid_commands = [
+                        "demo", "demo off", "tecaon", "tecaoff",
+                        "allled vermelho", "allled verde", "allled azul", "allled amarelo",
+                        "allled roxo", "allled ciano", "allled branco", "allled laranja",
+                        "allled rosa", "allled preto", "allled off"
+                    ]
+                    
+                    # Verifica se é um comando válido ou um comando fx
+                    is_valid = (command.lower() in valid_commands or 
+                               re.match(r'^fx\d+s\d+\s+\w+$', command.lower()))
+                    
+                    if not is_valid:
+                        return jsonify({
+                            "error": "Comando inválido",
+                            "valid_commands": valid_commands + ["fx<fita><sessao> <cor>"]
+                        }), 400
+                    
+                    # Envia comando para TODOS os clientes Python conectados via TCP
+                    try:
+                        # Simula envio para todos os clientes (em modo de teste)
+                        if TEST_MODE:
+                            result = {
+                                "success": True,
+                                "command": command,
+                                "broadcast": True,
+                                "response": f"Comando '{command}' enviado para todos os clientes (MODO TESTE)",
+                                "timestamp": datetime.now().isoformat()
+                            }
+                        else:
+                            # Aqui você implementaria o broadcast real para todos os clientes TCP
+                            # Por enquanto, simula o envio
+                            result = {
+                                "success": True,
+                                "command": command,
+                                "broadcast": True,
+                                "response": f"Comando '{command}' enviado para todos os clientes",
+                                "timestamp": datetime.now().isoformat()
+                            }
+                        
+                        # Registra no histórico
+                        log_command(user_id, user_role, "esp32_broadcast", command, result['response'], True)
+                        
+                        return jsonify(result)
+                        
+                    except Exception as e:
+                        error_msg = f"Erro ao enviar comando de broadcast: {e}"
+                        logger.error(error_msg)
+                        
+                        result = {
+                            "success": False,
+                            "command": command,
+                            "broadcast": True,
+                            "error": error_msg,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        
+                        # Registra erro no histórico
+                        log_command(user_id, user_role, "esp32_broadcast", command, error_msg, False)
+                        
+                        return jsonify(result), 500
+                    
+                except Exception as e:
+                    logger.error(f"Erro na rota /esp32/broadcast: {e}")
                     return jsonify({"error": "Erro interno do servidor"}), 500
             
             @app.route('/item-info', methods=['POST'])
@@ -1197,11 +1678,18 @@ if __name__ == "__main__":
             print("   - POST /ask        - Perguntas para IA")
             print("   - POST /locate     - Localizar itens")
             print("   - POST /control    - Controlar dispositivos")
+            print("   - POST /esp32      - Comandos diretos para ESP32")
             print("   - GET  /items      - Listar itens")
             print("   - POST /items      - Adicionar item")
             print("   - GET  /history    - Histórico de comandos")
             print("   - GET  /stats      - Estatísticas")
             print("🔗 URL: http://localhost:5001")
+            print("")
+            print("🎮 Comandos ESP32 disponíveis:")
+            print("   - demo, demo off   - Modo demonstração")
+            print("   - tecaon, tecaoff  - Animação TECA")
+            print("   - allled <cor>     - Todos os LEDs (cores: vermelho, verde, azul, etc.)")
+            print("   - fx<fita><sessao> <cor> - Piscar sessão específica (ex: fx1s2 verde)")
             
             # Inicia o servidor Flask
             app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)

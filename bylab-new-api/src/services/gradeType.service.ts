@@ -12,11 +12,21 @@ export const getGradeTypeById = (id: string) => {
   });
 };
 
-export const createGradeType = (data: { name: string; description?: string }) => {
+export const createGradeType = (data: { 
+  name: string; 
+  description?: string; 
+  isConcept?: boolean;
+  isRecovery?: boolean;
+}) => {
   return prisma.gradeType.create({ data });
 };
 
-export const updateGradeType = (id: string, data: Partial<{ name: string; description?: string }>) => {
+export const updateGradeType = (id: string, data: Partial<{ 
+  name: string; 
+  description?: string; 
+  isConcept?: boolean;
+  isRecovery?: boolean;
+}>) => {
   return prisma.gradeType.update({ where: { id }, data });
 };
 
