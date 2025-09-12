@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ERP
+Comment=Sistema ERP Educacional
+Exec=erp
+Icon=erp
+Terminal=false
+Categories=Education;Office;
+StartupWMClass=erp

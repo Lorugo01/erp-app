@@ -49,11 +49,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   // Variáveis para filtragem de armários
   String? _selectedArmarioFilter;
-  
+
   // Variáveis para controle direto dos armários
   List<TecaAIConnectedClient> _connectedClients = [];
   String? _selectedDirectArmario;
-  final TextEditingController _directCommandController = TextEditingController();
+  final TextEditingController _directCommandController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -163,7 +164,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   }
 
   List<String> get _availableArmarios {
-    final armarios = _connectedClients.map((client) => client.id).toSet().toList();
+    final armarios =
+        _connectedClients.map((client) => client.id).toSet().toList();
     armarios.sort();
     return armarios;
   }
@@ -171,7 +173,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   String _getArmarioDisplayName(String armarioId) {
     final client = _connectedClients.firstWhere(
       (client) => client.id == armarioId,
-      orElse: () => TecaAIConnectedClient(id: armarioId, name: 'Armário $armarioId', ip: '', port: 0, connectedAt: '', lastSeen: ''),
+      orElse:
+          () => TecaAIConnectedClient(
+            id: armarioId,
+            name: 'Armário $armarioId',
+            ip: '',
+            port: 0,
+            connectedAt: '',
+            lastSeen: '',
+          ),
     );
     String displayName = client.name;
     if (displayName.isEmpty || displayName == 'Armário $armarioId') {
@@ -836,6 +846,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     _searchController.dispose();
     _classesSearchController.dispose();
     _armarioSearchController.dispose();
+    _directCommandController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
@@ -861,7 +872,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     }
 
     debugPrint(
-              'Fazendo requisição para: ${ApiConfig.baseUrl}/teachers/$teacherId/classes',
+      'Fazendo requisição para: ${ApiConfig.baseUrl}/teachers/$teacherId/classes',
     );
     try {
       final classes = await TeacherService.getTeacherClasses(teacherId);
@@ -1931,20 +1942,275 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
           const SizedBox(height: 16),
 
-          // Comandos Pré-definidos
+          // Controle Direto dos Armários
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Comandos de Controle',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      const Icon(Icons.control_camera, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Controle Direto dos Armários',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed:
+                            _isLoadingArmarios ? null : _loadConnectedClients,
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Atualizar armários conectados',
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Controle as funcionalidades dos armários',
+                    'Controle específico de cada armário conectado',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Status dos armários conectados
+                  if (_connectedClients.isNotEmpty) ...[
+                    Text(
+                      'Armários Conectados:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children:
+                          _connectedClients.map((client) {
+                            return Chip(
+                              avatar: const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 16,
+                              ),
+                              label: Text(_getArmarioDisplayName(client.id)),
+                              backgroundColor: Colors.green.withAlpha(50),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withAlpha(50),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Nenhum armário conectado',
+                            style: TextStyle(color: Colors.orange),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Dropdown para seleção do armário
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Selecionar Armário',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.inventory),
+                    ),
+                    value: _selectedDirectArmario,
+                    items:
+                        _availableArmarios.map((armario) {
+                          return DropdownMenuItem<String>(
+                            value: armario,
+                            child: Text(_getArmarioDisplayName(armario)),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedDirectArmario = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Comandos diretos
+                  const Text(
+                    'Comandos Disponíveis:',
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand('demo'),
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Demo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () =>
+                                    _executeDirectArmarioCommand('demo off'),
+                        icon: const Icon(Icons.stop),
+                        label: const Text('Demo Off'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[700],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand('tecaon'),
+                        icon: const Icon(Icons.lightbulb),
+                        label: const Text('TECA ON'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand('tecaoff'),
+                        icon: const Icon(Icons.lightbulb_outline),
+                        label: const Text('TECA OFF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[600],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand(
+                                  'allled vermelho',
+                                ),
+                        icon: const Icon(Icons.circle, color: Colors.red),
+                        label: const Text('Vermelho'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand(
+                                  'allled verde',
+                                ),
+                        icon: const Icon(Icons.circle, color: Colors.green),
+                        label: const Text('Verde'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () =>
+                                    _executeDirectArmarioCommand('allled azul'),
+                        icon: const Icon(Icons.circle, color: Colors.blue),
+                        label: const Text('Azul'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand(
+                                  'allled branco',
+                                ),
+                        icon: const Icon(Icons.circle, color: Colors.white),
+                        label: const Text('Branco'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[300],
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios || _selectedDirectArmario == null
+                                ? null
+                                : () => _executeDirectArmarioCommand(
+                                  'allled preto',
+                                ),
+                        icon: const Icon(Icons.circle, color: Colors.black),
+                        label: const Text('Apagar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Broadcast de Comandos para Todos os Armários
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.broadcast_on_personal,
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Broadcast de Comandos para Todos os Armários',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Envia comandos para todos os armários conectados simultaneamente',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   const SizedBox(height: 16),
@@ -1956,35 +2222,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                         onPressed:
                             _isLoadingArmarios
                                 ? null
-                                : () => _executePredefinedCommand('ligar_luz'),
-                        icon: const Icon(Icons.lightbulb),
-                        label: const Text('Ligar Luz'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed:
-                            _isLoadingArmarios
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('desligar_luz'),
-                        icon: const Icon(Icons.lightbulb_outline),
-                        label: const Text('Desligar Luz'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[700],
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed:
-                            _isLoadingArmarios
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('modo_festa_on'),
-                        icon: const Icon(Icons.celebration),
-                        label: const Text('Modo Festa ON'),
+                                : () => _executeBroadcastCommand('demo'),
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Demo Todos'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.purple,
                           foregroundColor: Colors.white,
@@ -1994,12 +2234,61 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                         onPressed:
                             _isLoadingArmarios
                                 ? null
-                                : () =>
-                                    _executePredefinedCommand('modo_festa_off'),
-                        icon: const Icon(Icons.celebration_outlined),
-                        label: const Text('Modo Festa OFF'),
+                                : () => _executeBroadcastCommand('demo off'),
+                        icon: const Icon(Icons.stop),
+                        label: const Text('Demo Off Todos'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[700],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () => _executeBroadcastCommand('tecaon'),
+                        icon: const Icon(Icons.lightbulb),
+                        label: const Text('TECA ON Todos'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () => _executeBroadcastCommand('tecaoff'),
+                        icon: const Icon(Icons.lightbulb_outline),
+                        label: const Text('TECA OFF Todos'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey[600],
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () =>
+                                    _executeBroadcastCommand('allled verde'),
+                        icon: const Icon(Icons.circle, color: Colors.green),
+                        label: const Text('Verde Todos'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed:
+                            _isLoadingArmarios
+                                ? null
+                                : () =>
+                                    _executeBroadcastCommand('allled preto'),
+                        icon: const Icon(Icons.circle, color: Colors.black),
+                        label: const Text('Apagar Todos'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -2064,6 +2353,130 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   Widget _buildAgendaTab() {
     return const TeacherCalendarScreen();
+  }
+
+  Future<void> _executeDirectArmarioCommand(String commandKey) async {
+    if (_selectedDirectArmario == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecione um armário primeiro'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingArmarios = true;
+      });
+    }
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final command = TecaAIService.esp32Commands[commandKey];
+
+      if (command == null) {
+        throw Exception('Comando não encontrado');
+      }
+
+      final response = await TecaAIService.executeEsp32CommandDirect(
+        command: command,
+        user: user,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingArmarios = false;
+        });
+      }
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Comando executado com sucesso no ${_getArmarioDisplayName(_selectedDirectArmario!)}!',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: ${response.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingArmarios = false;
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao executar comando: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _executeBroadcastCommand(String commandKey) async {
+    if (mounted) {
+      setState(() {
+        _isLoadingArmarios = true;
+      });
+    }
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user!;
+      final command = TecaAIService.esp32Commands[commandKey];
+
+      if (command == null) {
+        throw Exception('Comando não encontrado');
+      }
+
+      final response = await TecaAIService.executeBroadcastCommand(
+        command: command,
+        user: user,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoadingArmarios = false;
+        });
+      }
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comando enviado para todos os armários!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: ${response.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingArmarios = false;
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao executar comando: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _executePredefinedCommand(String commandKey) async {
