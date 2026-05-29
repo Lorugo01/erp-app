@@ -1,3 +1,5 @@
+require('../scripts/load-env');
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 

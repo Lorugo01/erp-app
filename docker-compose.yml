@@ -1,0 +1,93 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bylab-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bylab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bylab_secret_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-bylab_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bylab} -d ${POSTGRES_DB:-bylab_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bylab-net
+
+  api:
+    build:
+      context: ./bylab-new-api
+      dockerfile: Dockerfile
+    container_name: bylab-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      HTTP_PORT: 3000
+      PORT: 3000
+      ENABLE_HTTPS: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bylab}:${POSTGRES_PASSWORD:-bylab_secret_change_me}@db:5432/${POSTGRES_DB:-bylab_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-altere-esta-chave-secreta-em-producao}
+      RUN_SEED: ${RUN_SEED:-true}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - bylab-net
+
+  web:
+    build:
+      context: ./erp
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: ${ENVIRONMENT:-production}
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:3000}
+        TECAAI_BASE_URL: ${TECAAI_BASE_URL:-http://localhost:5001}
+        UPLOADS_BASE_URL: ${UPLOADS_BASE_URL:-http://localhost:3000}
+        API_REQUEST_TIMEOUT: ${API_REQUEST_TIMEOUT:-30}
+        TECAAI_REQUEST_TIMEOUT: ${TECAAI_REQUEST_TIMEOUT:-30}
+        MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+        ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
+        DEBUG_MODE: ${DEBUG_MODE:-false}
+        LOG_LEVEL: ${LOG_LEVEL:-error}
+    container_name: bylab-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - bylab-net
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  bylab-net:
+    driver: bridge

@@ -5,9 +5,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "start": "node -r ts-node/register/transpile-only src/index.ts",
-    "prisma": "prisma",
-    "seed": "node prisma/seed.js",
+    "start": "node -r ./scripts/load-env.js -r ts-node/register/transpile-only src/index.ts",
+    "prisma": "node scripts/run-prisma.js",
+    "migrate:dev": "node scripts/run-prisma.js migrate dev",
+    "migrate:deploy": "node scripts/run-prisma.js migrate deploy",
+    "seed": "node -r ./scripts/load-env.js prisma/seed.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "generate-ssl": "ts-node src/scripts/generate-ssl.ts"
   },
@@ -16,7 +18,7 @@
   "license": "ISC",
   "type": "commonjs",
   "prisma": {
-    "seed": "node prisma/seed.js"
+    "seed": "node -r ./scripts/load-env.js prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",

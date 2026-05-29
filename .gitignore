@@ -10,6 +10,8 @@ Thumbs.db
 .vscode/
 *.log
 
-# Secrets locais na raiz
+# Secrets — único .env ativo fica na raiz; cópias locais ignoradas
 .env
 .env.local
+erp/.env
+bylab-new-api/.env

@@ -1,71 +1,85 @@
 # ByLAB ERP
 
-Monorepo com o **app Flutter** e a **API REST** do sistema de gestão escolar.
+Monorepo: **app Flutter Web** + **API REST**. Configuração unificada em **`erp-app/.env`**.
 
 ```
 erp-app/
-├── erp/              → App Flutter (Android, iOS, Web, Windows...)
-└── bylab-new-api/    → API Node.js + PostgreSQL (Docker Compose)
+├── .env              ← único arquivo de configuração (não commitar)
+├── .env.example      ← template
+├── docker-compose.yml
+├── erp/              → App Flutter
+└── bylab-new-api/    → API Node.js + PostgreSQL
 ```
-
-Pastas **Servidor/** e **localizações/** ficam fora do Git (uso local apenas).
 
 ---
 
-## Deploy rápido (VPS)
+## Configuração inicial
 
-### 1. API
+```powershell
+cd erp-app
+.\scripts\init-env.ps1
+# Edite .env na raiz
+```
+
+O script copia `.env` → `erp/.env` (Flutter precisa do asset local).
+
+Após alterar `.env` na raiz:
+
+```powershell
+.\scripts\sync-env.ps1
+```
+
+---
+
+## Deploy VPS
 
 ```bash
-cd bylab-new-api
-cp .env.docker.example .env
-# Edite POSTGRES_PASSWORD e JWT_SECRET
+cp .env.example .env
+# Edite API_BASE_URL com IP/domínio público
 docker compose up -d --build
 ```
 
-Documentação: [bylab-new-api/DEPLOY-DOCKER.md](bylab-new-api/DEPLOY-DOCKER.md)
-
-### 2. App Flutter
-
-```bash
-cd erp
-cp .env.example .env
-# Aponte API_BASE_URL para http://SEU_IP_VPS:3000
-flutter pub get
-flutter run
-```
-
----
-
-## Usuários demo (seed)
-
-| Papel | Email | Senha |
-|-------|-------|-------|
-| DEVELOPER | dev@globaltec.com | dev123 |
-| ADMIN | admin@globaltec.com | admin123 |
-| TEACHER | prof@globaltec.com | prof123 |
-| STUDENT | aluno@globaltec.com | aluno123 |
+| Serviço | URL |
+|---------|-----|
+| **ERP Web** | http://SEU_IP:8080 |
+| **API** | http://SEU_IP:3000 |
 
 ---
 
 ## Desenvolvimento local
 
-**API**
+**API** (lê `erp-app/.env`):
 
 ```bash
 cd bylab-new-api
-cp .env.docker.example .env   # ou crie .env com DATABASE_URL local
 npm install
-npx prisma migrate dev
+npm run migrate:dev
 npm run seed
 npm run dev
 ```
 
-**Flutter**
+**App Web**:
 
-```bash
+```powershell
+.\scripts\sync-env.ps1
 cd erp
-cp .env.example .env
-flutter pub get
-flutter run
+flutter run -d chrome
 ```
+
+Ou: `erp\scripts\run_web.ps1`
+
+**Trocar ambiente** (local / development / production):
+
+```powershell
+.\scripts\change_environment.ps1 local
+```
+
+---
+
+## Usuários demo
+
+| Email | Senha |
+|-------|-------|
+| admin@globaltec.com | admin123 |
+| prof@globaltec.com | prof123 |
+| aluno@globaltec.com | aluno123 |

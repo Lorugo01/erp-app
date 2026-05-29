@@ -1,12 +1,12 @@
 {
-    "name": "erp",
-    "short_name": "erp",
+    "name": "ByLAB ERP",
+    "short_name": "ByLAB ERP",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#2953A5",
+    "theme_color": "#2953A5",
+    "description": "Sistema de gestão escolar GlobalTEC",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

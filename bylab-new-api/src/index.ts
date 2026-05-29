@@ -1,6 +1,6 @@
 import cors from 'cors';
-import dotenv from 'dotenv';
 import express from 'express';
+import { loadEnv } from './loadEnv';
 import path from 'path';
 import https from 'https';
 import http from 'http';
@@ -22,7 +22,7 @@ import gradePeriodRoutes from './routes/gradePeriod.routes';
 import assignmentRoutes from './routes/assignment.routes';
 import schoolRoutes from './routes/school.routes';
 
-dotenv.config();
+loadEnv();
 
 const app = express();
 
