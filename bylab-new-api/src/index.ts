@@ -26,14 +26,26 @@ dotenv.config();
 
 const app = express();
 
-// Middlewares
-app.use(cors());
+const HOST = process.env.HOST || '0.0.0.0';
+const HTTP_PORT = Number(process.env.HTTP_PORT || process.env.PORT || 3000);
+const HTTPS_PORT = Number(process.env.HTTPS_PORT || 3001);
+const ENABLE_HTTPS = process.env.ENABLE_HTTPS === 'true';
+
+const corsOrigin = process.env.CORS_ORIGIN;
+
+if (!corsOrigin || corsOrigin === '*') {
+  app.use(cors());
+} else {
+  app.use(
+    cors({
+      origin: corsOrigin.split(',').map((origin) => origin.trim()),
+    }),
+  );
+}
 app.use(express.json());
 
-// Configuração para servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Rotas
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/students', studentRoutes);
@@ -50,32 +62,37 @@ app.use('/grade-periods', gradePeriodRoutes);
 app.use('/assignments', assignmentRoutes);
 app.use('/schools', schoolRoutes);
 
-// Rota de teste
 app.get('/', (req, res) => {
-  res.send('bylab-new-api rodando com HTTP e HTTPS.');
-});
-
-const PORT = process.env.PORT || 3001;
-const HTTP_PORT = 3000;
-
-// Iniciar servidor HTTP
-const httpServer = http.createServer(app);
-httpServer.listen(HTTP_PORT, () => {
-  console.log(`Servidor HTTP rodando na porta ${HTTP_PORT}`);
-});
-
-// Configuração SSL e inicialização do servidor HTTPS
-try {
-  const sslOptions = {
-    key: fs.readFileSync(path.join(__dirname, '../ssl/private.key')),
-    cert: fs.readFileSync(path.join(__dirname, '../ssl/certificate.crt'))
-  };
-  
-  const httpsServer = https.createServer(sslOptions, app);
-  httpsServer.listen(PORT, () => {
-    console.log(`Servidor HTTPS rodando na porta ${PORT}`);
+  res.json({
+    status: 'ok',
+    service: 'bylab-new-api',
+    httpPort: HTTP_PORT,
+    httpsEnabled: ENABLE_HTTPS,
   });
-} catch (error: any) {
-  console.log('Erro ao iniciar servidor HTTPS:', error.message);
-  console.log('Continuando apenas com HTTP...');
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy' });
+});
+
+const httpServer = http.createServer(app);
+httpServer.listen(HTTP_PORT, HOST, () => {
+  console.log(`Servidor HTTP rodando em http://${HOST}:${HTTP_PORT}`);
+});
+
+if (ENABLE_HTTPS) {
+  try {
+    const sslOptions = {
+      key: fs.readFileSync(path.join(__dirname, '../ssl/private.key')),
+      cert: fs.readFileSync(path.join(__dirname, '../ssl/certificate.crt')),
+    };
+
+    const httpsServer = https.createServer(sslOptions, app);
+    httpsServer.listen(HTTPS_PORT, HOST, () => {
+      console.log(`Servidor HTTPS rodando em https://${HOST}:${HTTPS_PORT}`);
+    });
+  } catch (error: any) {
+    console.log('Erro ao iniciar servidor HTTPS:', error.message);
+    console.log('Continuando apenas com HTTP...');
+  }
 }

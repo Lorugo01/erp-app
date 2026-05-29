@@ -4,31 +4,25 @@ import "package:flutter/material.dart";
 /// Configuração centralizada do aplicativo
 ///
 /// Este arquivo centraliza todas as configurações importantes do app,
-/// permitindo fácil mudança entre ambientes de desenvolvimento, produção e local.
+/// permitindo fácil mudança entre ambientes via arquivo `.env`.
 class AppConfig {
-  // Configurações de ambiente
   static Environment get environment => EnvironmentConfig.environment;
   static bool get isDevelopment => EnvironmentConfig.isDevelopment;
   static bool get isProduction => EnvironmentConfig.isProduction;
   static bool get isLocal => EnvironmentConfig.isLocal;
 
-  // URLs das APIs
   static String get apiBaseUrl => EnvironmentConfig.apiBaseUrl;
   static String get tecaaiBaseUrl => EnvironmentConfig.tecaaiBaseUrl;
   static String get uploadsBaseUrl => EnvironmentConfig.uploadsBaseUrl;
 
-  // Timeouts
   static int get apiRequestTimeout => EnvironmentConfig.apiRequestTimeout;
   static int get tecaaiRequestTimeout => EnvironmentConfig.tecaaiRequestTimeout;
 
-  // Configurações de upload
   static int get maxFileSize => EnvironmentConfig.maxFileSize;
 
-  // Configurações de rede
   static bool get enableHttps => EnvironmentConfig.enableHttps;
   static bool get enableCors => EnvironmentConfig.enableCors;
 
-  // Métodos utilitários para URLs
   static String getApiUrl(String endpoint) =>
       EnvironmentConfig.getApiUrl(endpoint);
   static String getUploadUrl(String filePath) =>
@@ -36,42 +30,11 @@ class AppConfig {
   static String getTecaAIUrl(String endpoint) =>
       EnvironmentConfig.getTecaAIUrl(endpoint);
 
-  // Configurações específicas por ambiente
-  static Map<String, dynamic> get environmentSpecificConfig {
-    switch (environment) {
-      case Environment.development:
-        return {
-          'debugMode': true,
-          'logLevel': 'debug',
-          'enableAnalytics': false,
-          'enableCrashReporting': false,
-        };
-      case Environment.production:
-        return {
-          'debugMode': false,
-          'logLevel': 'error',
-          'enableAnalytics': true,
-          'enableCrashReporting': true,
-        };
-      case Environment.local:
-        return {
-          'debugMode': true,
-          'logLevel': 'verbose',
-          'enableAnalytics': false,
-          'enableCrashReporting': false,
-        };
-    }
-  }
+  static bool get debugMode => EnvironmentConfig.debugMode;
+  static String get logLevel => EnvironmentConfig.logLevel;
+  static bool get enableAnalytics => EnvironmentConfig.enableAnalytics;
+  static bool get enableCrashReporting => EnvironmentConfig.enableCrashReporting;
 
-  // Configurações de debug
-  static bool get debugMode => environmentSpecificConfig['debugMode'] ?? false;
-  static String get logLevel => environmentSpecificConfig['logLevel'] ?? 'info';
-  static bool get enableAnalytics =>
-      environmentSpecificConfig['enableAnalytics'] ?? false;
-  static bool get enableCrashReporting =>
-      environmentSpecificConfig['enableCrashReporting'] ?? false;
-
-  // Método para imprimir configurações atuais (útil para debug)
   static void printCurrentConfig() {
     debugPrint('🔧 === CONFIGURAÇÕES ATUAIS DO APP ===');
     debugPrint('🌍 Ambiente: ${environment.name.toUpperCase()}');
@@ -92,7 +55,6 @@ class AppConfig {
     debugPrint('=====================================');
   }
 
-  // Método para validar configurações
   static List<String> validateConfig() {
     final errors = <String>[];
 

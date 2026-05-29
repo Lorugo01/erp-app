@@ -1,3 +1,11 @@
 node_modules
-# Keep environment variables out of version control
 .env
+.env.local
+
+# Uploads gerados em runtime
+uploads/*
+!uploads/.gitkeep
+
+# Certificados SSL locais (gerar com npm run generate-ssl)
+ssl/*.key
+ssl/*.crt

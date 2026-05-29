@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/teacher_service.dart';
@@ -94,7 +95,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _deleteTeacher(Map<String, dynamic> teacher) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/teachers/${teacher['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/teachers/${teacher['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -180,7 +181,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _deleteStudent(Map<String, dynamic> student) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/students/${student['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/students/${student['id']}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -421,7 +422,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 }
 
                 final response = await http.post(
-                  Uri.parse('http://192.168.18.15:3000/teachers'),
+                  Uri.parse('${ApiConfig.baseUrl}/teachers'),
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer $token',
@@ -510,7 +511,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 }
 
                 final response = await http.post(
-                  Uri.parse('http://192.168.18.15:3000/students'),
+                  Uri.parse('${ApiConfig.baseUrl}/students'),
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer $token',
@@ -595,7 +596,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 }
 
                 final response = await http.post(
-                  Uri.parse('http://192.168.18.15:3000/classes'),
+                  Uri.parse('${ApiConfig.baseUrl}/classes'),
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer $token',
@@ -1791,7 +1792,7 @@ class _TeacherCardGrid extends StatelessWidget {
                   backgroundImage:
                       teacher['photoUrl'] != null
                           ? NetworkImage(
-                            'http://192.168.18.15:3000${teacher['photoUrl']}',
+                            '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                           )
                           : null,
                   child:
@@ -1983,7 +1984,7 @@ class _StudentCardGrid extends StatelessWidget {
                   backgroundImage:
                       student['profilePicture'] != null
                           ? NetworkImage(
-                            'http://192.168.18.15:3000${student['profilePicture']}',
+                            '${ApiConfig.baseUrl}${student['profilePicture']}',
                           )
                           : null,
                   child:
@@ -2206,7 +2207,7 @@ class _UserCardGrid extends StatelessWidget {
                           ? NetworkImage(
                             user.photoUrl!.startsWith('http')
                                 ? user.photoUrl!
-                                : 'http://192.168.18.15:3000${user.photoUrl}',
+                                : '${ApiConfig.baseUrl}${user.photoUrl}',
                           )
                           : null,
                   child:
@@ -3208,7 +3209,7 @@ class _AddUserDialogState extends State<_AddUserDialog> {
             const SizedBox(height: 12),
             DropdownButtonFormField<Role>(
               decoration: const InputDecoration(labelText: 'Tipo de Usuário'),
-              value: _selectedRole,
+              initialValue: _selectedRole,
               items:
                   Role.values.map((role) {
                     return DropdownMenuItem(

@@ -321,7 +321,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           const Text('Ambiente', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _currentEnvironment,
+            initialValue: _currentEnvironment,
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -367,7 +367,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              hintText: 'http://192.168.18.15:3000',
+              hintText: ApiConfig.baseUrl,
             ),
             onChanged: (value) {
               setState(() {
@@ -424,7 +424,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         subtitle: Text(subtitle),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF2953A5),
+        activeThumbColor: const Color(0xFF2953A5),
       ),
     );
   }

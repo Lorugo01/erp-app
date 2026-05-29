@@ -1146,7 +1146,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<Role>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     decoration: const InputDecoration(
                       labelText: 'Tipo de Usuário *',
                       border: OutlineInputBorder(),

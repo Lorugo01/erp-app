@@ -1283,7 +1283,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _selectedSubjectId,
+                            initialValue: _selectedSubjectId,
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
                               contentPadding: EdgeInsets.symmetric(
@@ -1314,7 +1314,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _selectedSubjectId,
+                              initialValue: _selectedSubjectId,
                               decoration: const InputDecoration(
                                 border: OutlineInputBorder(),
                                 contentPadding: EdgeInsets.symmetric(
@@ -2277,7 +2277,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           DropdownButtonFormField<String>(
-                            value: _selectedPeriodId,
+                            initialValue: _selectedPeriodId,
                             decoration: const InputDecoration(
                               labelText: 'Período',
                               border: OutlineInputBorder(),
@@ -2318,7 +2318,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _selectedPeriodId,
+                              initialValue: _selectedPeriodId,
                               decoration: const InputDecoration(
                                 labelText: 'Período',
                                 border: OutlineInputBorder(),

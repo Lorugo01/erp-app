@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/data_provider.dart';
@@ -249,7 +250,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
                           backgroundImage:
                               teacher['photoUrl'] != null
                                   ? NetworkImage(
-                                    'http://192.168.18.15:3000${teacher['photoUrl']}',
+                                    '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                                   )
                                   : null,
                           child:

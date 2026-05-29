@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
@@ -63,7 +64,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       }
 
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
+        Uri.parse('${ApiConfig.baseUrl}/students/${widget.student.id}'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -119,7 +120,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     for (final lessonId in lessonIds) {
       if (lessonId == null) continue;
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/lessons/$lessonId'),
+        Uri.parse('${ApiConfig.baseUrl}/lessons/$lessonId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -143,7 +144,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     if (token == null) return; // Se não há token, não busca períodos
 
     final response = await http.get(
-      Uri.parse('http://192.168.18.15:3000/grade-periods'),
+      Uri.parse('${ApiConfig.baseUrl}/grade-periods'),
       headers: {'Authorization': 'Bearer $token'},
     );
     if (response.statusCode == 200) {
@@ -379,7 +380,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           child: SizedBox(
                             width: 400,
                             child: DropdownButtonFormField<String>(
-                              value:
+                              initialValue:
                                   selectedClassId ??
                                   ((_studentDetails!['enrollments'] as List)
                                           .isNotEmpty
@@ -538,7 +539,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                             vertical: 8.0,
                           ),
                           child: DropdownButtonFormField<String>(
-                            value: selectedSubjectIdForAttendance,
+                            initialValue: selectedSubjectIdForAttendance,
                             decoration: InputDecoration(
                               labelText: 'Filtrar por matéria',
                               prefixIcon: const Icon(
@@ -652,7 +653,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final photoUrl =
         widget.student.profilePicture != null &&
                 widget.student.profilePicture!.isNotEmpty
-            ? 'http://192.168.18.15:3000${widget.student.profilePicture}'
+            ? '${ApiConfig.baseUrl}${widget.student.profilePicture}'
             : null;
     return Container(
       padding: const EdgeInsets.all(24.0),
@@ -1139,7 +1140,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://192.168.18.15:3000$currentPhotoUrl',
+                                              '${ApiConfig.baseUrl}$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -1354,7 +1355,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       try {
                         final response = await http.put(
                           Uri.parse(
-                            'http://192.168.18.15:3000/students/${widget.student.id}',
+                            '${ApiConfig.baseUrl}/students/${widget.student.id}',
                           ),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode(updatedData),
@@ -1464,7 +1465,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.18.15:3000/students/$studentId/photo'),
+        Uri.parse('${ApiConfig.baseUrl}/students/$studentId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto
@@ -1499,7 +1500,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/students/${widget.student.id}'),
+        Uri.parse('${ApiConfig.baseUrl}/students/${widget.student.id}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -1762,7 +1763,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: subjectId,
+                      initialValue: subjectId,
                       items:
                           uniqueSubjects
                               .map<DropdownMenuItem<String>>(
@@ -1782,7 +1783,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           subject != null ? Text(subject['name']) : null,
                     ),
                     DropdownButtonFormField<String>(
-                      value: gradeTypeId,
+                      initialValue: gradeTypeId,
                       items:
                           gradeTypes
                               .map<DropdownMenuItem<String>>(
@@ -1810,7 +1811,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       onChanged: (v) => value = double.tryParse(v),
                     ),
                     DropdownButtonFormField<String>(
-                      value: periodId,
+                      initialValue: periodId,
                       items:
                           periods
                               .map<DropdownMenuItem<String>>(
@@ -2447,7 +2448,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
                     // Dropdown para status
                     DropdownButtonFormField<String>(
-                      value: currentStatus,
+                      initialValue: currentStatus,
                       decoration: const InputDecoration(
                         labelText: 'Status da Frequência',
                         border: OutlineInputBorder(),
@@ -2631,7 +2632,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   ) async {
     try {
       final response = await http.put(
-        Uri.parse('http://192.168.18.15:3000/attendances/$attendanceId'),
+        Uri.parse('${ApiConfig.baseUrl}/attendances/$attendanceId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'status': status,
@@ -2667,7 +2668,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   Future<void> _deleteAttendance(String attendanceId) async {
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/attendances/$attendanceId'),
+        Uri.parse('${ApiConfig.baseUrl}/attendances/$attendanceId'),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {

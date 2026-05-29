@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'package:provider/provider.dart';
 import 'class_students_screen.dart';
 import 'class_teachers_screen.dart';
@@ -283,7 +284,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
+        Uri.parse('${ApiConfig.baseUrl}/classes/$turmaId/events'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -330,7 +331,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
     }
 
     final response = await http.post(
-      Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
+      Uri.parse('${ApiConfig.baseUrl}/classes/$turmaId/events'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -374,7 +375,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
     }
 
     final response = await http.put(
-      Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
+      Uri.parse('${ApiConfig.baseUrl}/classes/events/$id'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -397,7 +398,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
     }
 
     final response = await http.delete(
-      Uri.parse('http://192.168.18.15:3000/classes/events/$id'),
+      Uri.parse('${ApiConfig.baseUrl}/classes/events/$id'),
       headers: {'Authorization': 'Bearer $token'},
     );
     if (response.statusCode == 204) {
@@ -496,7 +497,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
       }
 
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/teachers'),
+        Uri.parse('${ApiConfig.baseUrl}/teachers'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
@@ -565,7 +566,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
     }
 
     final response = await http.get(
-      Uri.parse('http://192.168.18.15:3000/classes/$turmaId'),
+      Uri.parse('${ApiConfig.baseUrl}/classes/$turmaId'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -602,7 +603,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: subjectType,
+                      initialValue: subjectType,
                       items:
                           subjectTypesDisponiveis
                               .map(
@@ -628,7 +629,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                           (v) => v == null ? 'Selecione a disciplina' : null,
                     ),
                     DropdownButtonFormField<String>(
-                      value: teacherId,
+                      initialValue: teacherId,
                       items:
                           professoresDisponiveis
                               .map<DropdownMenuItem<String>>(
@@ -644,7 +645,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                           (v) => v == null ? 'Selecione o professor' : null,
                     ),
                     DropdownButtonFormField<int>(
-                      value: dayOfWeek,
+                      initialValue: dayOfWeek,
                       items: List.generate(
                         7,
                         (i) => DropdownMenuItem(
@@ -658,7 +659,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                       ),
                     ),
                     DropdownButtonFormField<String>(
-                      value:
+                      initialValue:
                           horarios.contains(startTime)
                               ? startTime
                               : (horarios.isNotEmpty ? horarios.first : null),
@@ -679,7 +680,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                       decoration: const InputDecoration(labelText: 'Início'),
                     ),
                     DropdownButtonFormField<String>(
-                      value:
+                      initialValue:
                           horarios.contains(endTime)
                               ? endTime
                               : (horarios.length > 1 ? horarios[1] : null),
@@ -805,7 +806,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
     }
 
     final response = await http.get(
-      Uri.parse('http://192.168.18.15:3000/classes/$turmaId'),
+      Uri.parse('${ApiConfig.baseUrl}/classes/$turmaId'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -829,7 +830,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
     if (!mounted) return;
 
     final eventsResponse = await http.get(
-      Uri.parse('http://192.168.18.15:3000/classes/$turmaId/events'),
+      Uri.parse('${ApiConfig.baseUrl}/classes/$turmaId/events'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -857,7 +858,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: subjectType,
+                      initialValue: subjectType,
                       items:
                           subjectTypesDisponiveis
                               .map(
@@ -882,7 +883,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                           (v) => v == null ? 'Selecione a disciplina' : null,
                     ),
                     DropdownButtonFormField<String>(
-                      value: teacherId,
+                      initialValue: teacherId,
                       items:
                           professoresDisponiveis
                               .map<DropdownMenuItem<String>>(
@@ -898,7 +899,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                           (v) => v == null ? 'Selecione o professor' : null,
                     ),
                     DropdownButtonFormField<int>(
-                      value: dayOfWeek,
+                      initialValue: dayOfWeek,
                       items: List.generate(
                         7,
                         (i) => DropdownMenuItem(
@@ -912,7 +913,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                       ),
                     ),
                     DropdownButtonFormField<String>(
-                      value:
+                      initialValue:
                           horarios.contains(startTime)
                               ? startTime
                               : (horarios.isNotEmpty ? horarios.first : null),
@@ -933,7 +934,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
                       decoration: const InputDecoration(labelText: 'Início'),
                     ),
                     DropdownButtonFormField<String>(
-                      value:
+                      initialValue:
                           gerarOpcoesHorarioFim(startTime).contains(endTime)
                               ? endTime
                               : (gerarOpcoesHorarioFim(startTime).isNotEmpty

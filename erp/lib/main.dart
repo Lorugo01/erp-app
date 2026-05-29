@@ -13,11 +13,13 @@ import 'config/environment.dart';
 import 'config/app_config.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Inicializar dados de localização para formatação de datas
   await initializeDateFormatting('pt_BR', null);
 
-  // Configurar ambiente de desenvolvimento
-  EnvironmentConfig.setEnvironment(Environment.development);
+  // Carregar variáveis do arquivo .env
+  await EnvironmentConfig.load();
 
   // Imprimir configurações atuais para debug
   AppConfig.printCurrentConfig();

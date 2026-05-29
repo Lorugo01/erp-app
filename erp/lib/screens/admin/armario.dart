@@ -568,7 +568,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
 
                   // Filtro por armário
                   DropdownButtonFormField<String>(
-                    value: _selectedArmario,
+                    initialValue: _selectedArmario,
                     decoration: const InputDecoration(
                       labelText: 'Filtrar por Armário',
                       border: OutlineInputBorder(),
@@ -1064,7 +1064,7 @@ class _AddEditItemDialogState extends State<_AddEditItemDialog> {
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: _selectedArmario,
+              initialValue: _selectedArmario,
               decoration: const InputDecoration(
                 labelText: 'Armário',
                 border: OutlineInputBorder(),

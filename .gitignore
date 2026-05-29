@@ -1,0 +1,15 @@
+# Pastas excluídas do repositório (mantidas apenas localmente)
+Servidor/
+localizações/
+localizacoes/
+
+# SO / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Secrets locais na raiz
+.env
+.env.local

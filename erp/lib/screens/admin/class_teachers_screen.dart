@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
@@ -37,7 +38,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/classes/$classId'),
+        Uri.parse('${ApiConfig.baseUrl}/classes/$classId'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
@@ -108,7 +109,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                         const SizedBox(height: 8),
                         // Seleção de professor
                         DropdownButtonFormField<String>(
-                          value: selectedTeacherId,
+                          initialValue: selectedTeacherId,
                           items:
                               professoresDisponiveis
                                   .map<DropdownMenuItem<String>>(
@@ -167,7 +168,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                 for (final subjectType in selectedSubjects) {
                                   final response = await http.post(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subjects',
+                                      '${ApiConfig.baseUrl}/subjects',
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -298,7 +299,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                 backgroundImage:
                                     teacher['photoUrl'] != null
                                         ? NetworkImage(
-                                          'http://192.168.18.15:3000${teacher['photoUrl']}',
+                                          '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                                         )
                                         : null,
                                 child:
@@ -517,7 +518,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   for (final subjectId in subjectsToRemove) {
                                     final response = await http.delete(
                                       Uri.parse(
-                                        'http://192.168.18.15:3000/subjects/$subjectId',
+                                        '${ApiConfig.baseUrl}/subjects/$subjectId',
                                       ),
                                       headers: {
                                         'Authorization': 'Bearer $token',
@@ -533,7 +534,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   for (final subjectType in subjectsToAdd) {
                                     final response = await http.post(
                                       Uri.parse(
-                                        'http://192.168.18.15:3000/subjects',
+                                        '${ApiConfig.baseUrl}/subjects',
                                       ),
                                       headers: {
                                         'Content-Type': 'application/json',
@@ -694,7 +695,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     backgroundImage:
                                         teacher['photoUrl'] != null
                                             ? NetworkImage(
-                                              'http://192.168.18.15:3000${teacher['photoUrl']}',
+                                              '${ApiConfig.baseUrl}${teacher['photoUrl']}',
                                             )
                                             : null,
                                     child:

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
@@ -70,7 +71,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         backgroundImage:
                             widget.user.photoUrl != null
                                 ? NetworkImage(
-                                  'http://192.168.18.15:3000${widget.user.photoUrl}',
+                                  '${ApiConfig.baseUrl}${widget.user.photoUrl}',
                                 )
                                 : null,
                         child:
@@ -349,7 +350,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                                     ? FileImage(selectedImage!)
                                     : (currentPhotoUrl != null
                                         ? NetworkImage(
-                                              'http://192.168.18.15:3000$currentPhotoUrl',
+                                              '${ApiConfig.baseUrl}$currentPhotoUrl',
                                             )
                                             as ImageProvider
                                         : null),
@@ -506,7 +507,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       try {
                         final response = await http.put(
                           Uri.parse(
-                            'http://192.168.18.15:3000/users/${widget.user.id}',
+                            '${ApiConfig.baseUrl}/users/${widget.user.id}',
                           ),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode(updatedData),
@@ -597,7 +598,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       // Cria uma requisição multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.18.15:3000/users/$userId/photo'),
+        Uri.parse('${ApiConfig.baseUrl}/users/$userId/photo'),
       );
 
       // Adiciona o arquivo com mimetype correto

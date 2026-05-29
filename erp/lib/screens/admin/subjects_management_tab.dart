@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -99,7 +100,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
       // Comentado temporariamente - descomentar quando a API estiver funcionando
       /*
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/subjects'),
+        Uri.parse('${ApiConfig.baseUrl}/subjects'),
       );
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -179,7 +180,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                       children: [
                         // Seleção de tipo de matéria
                         DropdownButtonFormField<String>(
-                          value: selectedType,
+                          initialValue: selectedType,
                           items:
                               subjectTypes
                                   .map<DropdownMenuItem<String>>(
@@ -294,7 +295,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                                 try {
                                   final response = await http.post(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subjects/types',
+                                      '${ApiConfig.baseUrl}/subjects/types',
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -412,7 +413,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                       children: [
                         // Seleção de tipo de matéria
                         DropdownButtonFormField<String>(
-                          value: selectedType,
+                          initialValue: selectedType,
                           items:
                               subjectTypes
                                   .map<DropdownMenuItem<String>>(
@@ -527,7 +528,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                                 try {
                                   final response = await http.put(
                                     Uri.parse(
-                                      'http://192.168.18.15:3000/subjects/types/${subject['id']}',
+                                      '${ApiConfig.baseUrl}/subjects/types/${subject['id']}',
                                     ),
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -690,7 +691,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://192.168.18.15:3000/subjects/types/${subject['id']}'),
+        Uri.parse('${ApiConfig.baseUrl}/subjects/types/${subject['id']}'),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {

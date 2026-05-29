@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
@@ -38,7 +39,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.18.15:3000/classes/$classId'),
+        Uri.parse('${ApiConfig.baseUrl}/classes/$classId'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (response.statusCode == 200) {
@@ -72,7 +73,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
       }
 
       await http.delete(
-        Uri.parse('http://192.168.18.15:3000/enrollments/$enrollmentId'),
+        Uri.parse('${ApiConfig.baseUrl}/enrollments/$enrollmentId'),
         headers: {'Authorization': 'Bearer $token'},
       );
       await _fetchEnrollments();
@@ -268,7 +269,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
 
                                 final response = await http.post(
                                   Uri.parse(
-                                    'http://192.168.18.15:3000/enrollments',
+                                    '${ApiConfig.baseUrl}/enrollments',
                                   ),
                                   headers: {
                                     'Content-Type': 'application/json',

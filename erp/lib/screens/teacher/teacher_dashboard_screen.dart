@@ -1739,7 +1739,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                             ),
                             prefixIcon: const Icon(Icons.inventory),
                           ),
-                          value: _selectedArmarioFilter,
+                          initialValue: _selectedArmarioFilter,
                           items: [
                             const DropdownMenuItem<String>(
                               value: null,

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../config/api_config.dart';
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../services/attendance_service.dart';
@@ -315,7 +316,7 @@ class _TeacherStudentDetailScreenState
   Widget _buildHeader() {
     final photoUrl =
         widget.student['profilePicture'] != null
-            ? 'http://192.168.18.15:3000${widget.student['profilePicture']}'
+            ? '${ApiConfig.baseUrl}${widget.student['profilePicture']}'
             : null;
 
     return Container(

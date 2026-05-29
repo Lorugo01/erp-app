@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+uploads/*
+!uploads/.gitkeep
+ssl/*
+!ssl/.gitkeep
+*.md
+Insomnia_*.yaml
+FLUXO.txt
+.docker
