@@ -18,6 +18,10 @@ ARG MAX_FILE_SIZE=10485760
 ARG ENABLE_HTTPS=false
 ARG DEBUG_MODE=false
 ARG LOG_LEVEL=error
+ARG CONFIG_HASH=default
+
+# Invalida cache do Docker quando CONFIG_HASH / URLs mudam no .env
+RUN echo "CONFIG_HASH=${CONFIG_HASH}"
 
 RUN printf '%s\n' \
   "ENVIRONMENT=${ENVIRONMENT}" \

@@ -28,7 +28,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -74,10 +74,11 @@ services:
         ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
         DEBUG_MODE: ${DEBUG_MODE:-false}
         LOG_LEVEL: ${LOG_LEVEL:-error}
+        CONFIG_HASH: ${CONFIG_HASH:-default}
     container_name: bylab-web
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
     depends_on:
       api:
         condition: service_healthy

@@ -31,7 +31,23 @@ Após alterar `.env` na raiz:
 
 ---
 
-## Deploy VPS
+## Deploy VPS com domínio (Luditeca)
+
+**https://erp.luditeca.com** + **https://api.luditeca.com**
+
+Guia completo: [deploy/DEPLOY-LUDITECA.md](deploy/DEPLOY-LUDITECA.md)
+
+```bash
+cp deploy/env.luditeca.example .env
+nano .env
+docker compose build --no-cache web
+docker compose up -d
+# Configurar Nginx + certbot (ver guia)
+```
+
+---
+
+## Deploy VPS (IP direto)
 
 ```bash
 cp .env.example .env
