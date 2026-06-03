@@ -58,7 +58,7 @@ docker compose up -d --build
 | Serviço | URL |
 |---------|-----|
 | **ERP Web** | http://SEU_IP:8080 |
-| **API** | http://SEU_IP:3000 |
+| **API** | http://SEU_IP:3040 |
 
 ---
 

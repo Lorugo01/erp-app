@@ -67,7 +67,7 @@ sudo ufw allow OpenSSH
 sudo ufw enable
 ```
 
-Portas **9050** e **3000** ficam só em `127.0.0.1` (Nginx faz o proxy).
+Portas **9050** (web) e **3040** (API) ficam só em `127.0.0.1` (Nginx faz o proxy).
 
 ## URLs finais
 
