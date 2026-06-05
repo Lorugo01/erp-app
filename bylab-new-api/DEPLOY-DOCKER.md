@@ -2,7 +2,7 @@
 
 > **Configuração unificada:** `erp-app/.env` na raiz do repositório.
 
-## Deploy completo (API + ERP Web + PostgreSQL)
+## Deploy VPS (PostgreSQL + API)
 
 Na raiz `erp-app/`:
 
@@ -11,9 +11,9 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-## Desenvolvimento local (só API)
+O app Flutter **não** entra no Docker — build mobile local com `erp/.env`.
 
-A API lê `erp-app/.env` automaticamente:
+## Desenvolvimento local (só API)
 
 ```bash
 cd bylab-new-api

@@ -1,13 +1,13 @@
 # ByLAB ERP
 
-Monorepo: **app Flutter Web** + **API REST**. Configuração unificada em **`erp-app/.env`**.
+Monorepo: **app Flutter (mobile)** + **API REST**. Configuração unificada em **`erp-app/.env`**.
 
 ```
 erp-app/
-├── .env              ← único arquivo de configuração (não commitar)
+├── .env              ← configuração (não commitar)
 ├── .env.example      ← template
-├── docker-compose.yml
-├── erp/              → App Flutter
+├── docker-compose.yml   ← VPS: só PostgreSQL + API
+├── erp/              → App Flutter (mobile/web local)
 └── bylab-new-api/    → API Node.js + PostgreSQL
 ```
 
@@ -19,52 +19,44 @@ erp-app/
 cd erp-app
 .\scripts\init-env.ps1
 # Edite .env na raiz
-```
-
-O script copia `.env` → `erp/.env` (Flutter precisa do asset local).
-
-Após alterar `.env` na raiz:
-
-```powershell
-.\scripts\sync-env.ps1
+.\scripts\sync-env.ps1   # copia → erp/.env (asset do Flutter)
 ```
 
 ---
 
-## Deploy VPS com domínio (Luditeca)
-
-**https://erp.luditeca.com** + **https://api.luditeca.com**
-
-Guia completo: [deploy/DEPLOY-LUDITECA.md](deploy/DEPLOY-LUDITECA.md)
+## Deploy VPS (Docker: db + API)
 
 ```bash
 cp deploy/env.luditeca.example .env
 nano .env
-docker compose build --no-cache web
-docker compose up -d
-# Configurar Nginx + certbot (ver guia)
-```
-
----
-
-## Deploy VPS (IP direto)
-
-```bash
-cp .env.example .env
-# Edite API_BASE_URL com IP/domínio público
 docker compose up -d --build
 ```
 
-| Serviço | URL |
-|---------|-----|
-| **ERP Web** | http://SEU_IP:8080 |
-| **API** | http://SEU_IP:3040 |
+Guia completo: [deploy/DEPLOY-LUDITECA.md](deploy/DEPLOY-LUDITECA.md)
+
+| Serviço | URL (exemplo Luditeca) |
+|---------|-------------------------|
+| **API** | https://bylab-api.luditeca.com |
+| **Health** | https://bylab-api.luditeca.com/health |
+
+---
+
+## App mobile (build local)
+
+Configure URLs no `.env` da raiz e sincronize:
+
+```powershell
+.\scripts\sync-env.ps1
+cd erp
+flutter run
+# ou: flutter build apk
+```
 
 ---
 
 ## Desenvolvimento local
 
-**API** (lê `erp-app/.env`):
+**API**:
 
 ```bash
 cd bylab-new-api
@@ -74,17 +66,15 @@ npm run seed
 npm run dev
 ```
 
-**App Web**:
+**App Flutter**:
 
 ```powershell
 .\scripts\sync-env.ps1
 cd erp
-flutter run -d chrome
+flutter run
 ```
 
-Ou: `erp\scripts\run_web.ps1`
-
-**Trocar ambiente** (local / development / production):
+**Trocar ambiente**:
 
 ```powershell
 .\scripts\change_environment.ps1 local

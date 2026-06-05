@@ -1,3 +1,6 @@
+# Stack VPS: PostgreSQL + API ByLAB
+# App Flutter (mobile/web) roda localmente e lê erp/.env (sync via scripts/sync-env.ps1)
+
 services:
   db:
     image: postgres:16-alpine
@@ -56,32 +59,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - bylab-net
-
-  web:
-    build:
-      context: ./erp
-      dockerfile: Dockerfile
-      args:
-        ENVIRONMENT: ${ENVIRONMENT:-production}
-        API_BASE_URL: ${API_BASE_URL:-http://localhost:3040}
-        TECAAI_BASE_URL: ${TECAAI_BASE_URL:-http://localhost:5001}
-        UPLOADS_BASE_URL: ${UPLOADS_BASE_URL:-http://localhost:3040}
-        API_REQUEST_TIMEOUT: ${API_REQUEST_TIMEOUT:-30}
-        TECAAI_REQUEST_TIMEOUT: ${TECAAI_REQUEST_TIMEOUT:-30}
-        MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-        ENABLE_HTTPS: ${ENABLE_HTTPS:-false}
-        DEBUG_MODE: ${DEBUG_MODE:-false}
-        LOG_LEVEL: ${LOG_LEVEL:-error}
-        CONFIG_HASH: ${CONFIG_HASH:-default}
-    container_name: bylab-web
-    restart: unless-stopped
-    ports:
-      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
-    depends_on:
-      api:
-        condition: service_healthy
     networks:
       - bylab-net
 

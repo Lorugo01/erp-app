@@ -1,92 +1,77 @@
-# Deploy erp.luditeca.com (Hostinger VPS)
+# Deploy ByLAB — VPS Luditeca (API + PostgreSQL)
+
+O **app Flutter** (mobile) **não** roda na VPS. Só **db** + **api** via Docker.
+Configure as URLs no `.env` local e faça build do app no seu PC.
 
 ## 1. DNS na Hostinger
 
-No painel **DNS** do domínio `luditeca.com`, crie registros **A**:
+| Tipo | Nome       | Valor     |
+|------|------------|-----------|
+| A    | bylab-api  | IP da VPS |
+| A    | ia         | IP da VPS |
 
-| Tipo | Nome | Valor        | TTL |
-|------|------|--------------|-----|
-| A    | erp  | IP da VPS    | 300 |
-| A    | api  | IP da VPS    | 300 |
-
-Exemplo: `187.127.0.245`
-
-Aguarde propagação (5–30 min). Teste:
-
-```bash
-ping erp.luditeca.com
-ping api.luditeca.com
-```
+> `api.luditeca.com` e `erp.luditeca.com` pertencem ao **luditeca-vps** — não use para ByLAB.
 
 ## 2. `.env` na VPS
 
 ```bash
 cd /opt/erp-app
 cp deploy/env.luditeca.example .env
-nano .env   # senhas + IP TecaAI se houver
+nano .env   # senhas
 ```
 
-## 3. Subir Docker
+## 3. Docker (só API + banco)
 
 ```bash
-docker compose build --no-cache web
-docker compose up -d
+docker compose up -d --build
 docker compose ps
+curl -s http://127.0.0.1:3040/health
 ```
 
-## 4. Nginx no host (Ubuntu)
+## 4. Nginx + HTTPS
 
 ```bash
-sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx
-
-sudo cp deploy/nginx/erp.luditeca.com.conf /etc/nginx/sites-available/
-sudo cp deploy/nginx/api.luditeca.com.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/erp.luditeca.com.conf /etc/nginx/sites-enabled/
-sudo ln -sf /etc/nginx/sites-available/api.luditeca.com.conf /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
+sudo cp deploy/nginx/bylab-api.luditeca.com.conf /etc/nginx/sites-available/
+sudo cp deploy/nginx/ia.luditeca.com.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/bylab-api.luditeca.com.conf /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/ia.luditeca.com.conf /etc/nginx/sites-enabled/
 
 sudo nginx -t
 sudo systemctl reload nginx
+
+sudo certbot --nginx -d bylab-api.luditeca.com -d ia.luditeca.com
 ```
 
-## 5. HTTPS (Let's Encrypt)
+## 5. App mobile (seu PC)
 
-```bash
-sudo certbot --nginx -d erp.luditeca.com -d api.luditeca.com
+No `erp-app/.env` (local):
+
+```env
+ENVIRONMENT=production
+API_BASE_URL=https://bylab-api.luditeca.com
+UPLOADS_BASE_URL=https://bylab-api.luditeca.com
+TECAAI_BASE_URL=https://ia.luditeca.com
+TECAAI_PATH_PREFIX=/bylab
+ENABLE_HTTPS=true
 ```
 
-Renovação automática já vem configurada.
-
-## 6. Firewall
-
-```bash
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow OpenSSH
-sudo ufw enable
+```powershell
+.\scripts\sync-env.ps1
+cd erp
+flutter build apk
+# ou flutter run
 ```
 
-Portas **9050** (web) e **3040** (API) ficam só em `127.0.0.1` (Nginx faz o proxy).
-
-## URLs finais
+## URLs
 
 | Serviço | URL |
 |---------|-----|
-| **ERP** | https://erp.luditeca.com |
-| **API** | https://api.luditeca.com |
-| **Health** | https://api.luditeca.com/health |
+| **API ByLAB** | https://bylab-api.luditeca.com |
+| **Health** | https://bylab-api.luditeca.com/health |
+| **TecaAI** | https://ia.luditeca.com/bylab |
 
 ## Login demo
 
 | Email | Senha |
 |-------|-------|
 | admin@globaltec.com | admin123 |
-
-## Alterou API_BASE_URL?
-
-```bash
-# Incremente CONFIG_HASH no .env, depois:
-docker compose build --no-cache web
-docker compose up -d web
-```

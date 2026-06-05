@@ -19,5 +19,5 @@ if (Test-Path $target) {
 
 Write-Host ""
 Write-Host "Edite erp-app/.env e rode:" -ForegroundColor Cyan
-Write-Host "  API:  cd bylab-new-api ; npm run dev" -ForegroundColor White
-Write-Host "  Web:  cd erp ; flutter run -d chrome" -ForegroundColor White
+Write-Host "  API:    cd bylab-new-api ; npm run dev" -ForegroundColor White
+Write-Host "  Mobile: .\scripts\sync-env.ps1 ; cd erp ; flutter run" -ForegroundColor White

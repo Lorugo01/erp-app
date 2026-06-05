@@ -39,8 +39,22 @@ class EnvironmentConfig {
 
   static String get apiBaseUrl => _env('API_BASE_URL', 'http://localhost:3000');
 
-  static String get tecaaiBaseUrl =>
-      _env('TECAAI_BASE_URL', 'http://localhost:5001');
+  static String get tecaaiBaseUrl {
+    final base = _stripTrailingSlash(
+      _env('TECAAI_BASE_URL', 'http://localhost:5010'),
+    );
+    final prefix = _env('TECAAI_PATH_PREFIX', '');
+    if (prefix.isEmpty) return base;
+    final normalized = prefix.startsWith('/') ? prefix : '/$prefix';
+    return '$base$normalized';
+  }
+
+  static String _stripTrailingSlash(String value) {
+    if (value.endsWith('/')) {
+      return value.substring(0, value.length - 1);
+    }
+    return value;
+  }
 
   static String get uploadsBaseUrl =>
       _env('UPLOADS_BASE_URL', apiBaseUrl);
@@ -80,6 +94,7 @@ class EnvironmentConfig {
   }
 
   static String getTecaAIUrl(String endpoint) {
-    return '$tecaaiBaseUrl$endpoint';
+    final path = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+    return '$tecaaiBaseUrl$path';
   }
 }
