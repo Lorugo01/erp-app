@@ -6,6 +6,7 @@ import '../../services/grade_period_service.dart';
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../services/teacher_service.dart';
+import '../../services/attendance_service.dart';
 import '../../config/api_config.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
@@ -655,6 +656,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         final periods = json.decode(response.body) as List;
         setState(() {
           _periods = periods.cast<Map<String, dynamic>>();
+          if (_periods.isNotEmpty && _selectedPeriodId == null) {
+            _selectedPeriodId = _periods.first['id'];
+          }
         });
 
         TeacherClassLogger.success('Períodos carregados via API direta');
@@ -789,24 +793,24 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     });
 
     try {
-      // SOLUÇÃO: Como a rota /assignments não existe, simular dados vazios
-      TeacherClassLogger.info(
-        'Rota /assignments não existe, carregando lista vazia',
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      final assignments = await AssignmentService.getAssignmentsByClassAndSubject(
+        widget.classData['id'],
+        _selectedSubjectId!,
+        token,
       );
 
       setState(() {
-        _assignments = []; // Lista vazia por enquanto
-        _loadingAssignments = false;
+        _assignments = assignments;
       });
 
-      TeacherClassLogger.success('Lista de atividades inicializada (vazia)');
+      TeacherClassLogger.success('Atividades carregadas com sucesso');
       TeacherClassLogger.debug('Atividades encontradas', {
-        'count': 0,
+        'count': assignments.length,
         'subjectId': _selectedSubjectId,
-        'nota': 'Rota /assignments não implementada no backend',
       });
-
-      return;
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao carregar atividades', e, stackTrace);
       setState(() {
@@ -819,7 +823,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     }
   }
 
-  Future<void> _loadAttendance() async {
+  Future<void> _loadAttendance({bool force = false}) async {
     if (_selectedSubjectId == null) {
       TeacherClassLogger.warning(
         'Tentativa de carregar frequência sem disciplina selecionada',
@@ -827,8 +831,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       return;
     }
 
-    // Evitar chamadas repetitivas
-    if (_loadingAttendance) {
+    if (!force && _loadingAttendance) {
       TeacherClassLogger.info(
         'Carregamento de frequência já em andamento, pulando...',
       );
@@ -858,27 +861,21 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         throw Exception('Professor não encontrado');
       }
 
-      TeacherClassLogger.api('/attendances/lesson', 'POST', {
+      TeacherClassLogger.api('/lessons/get-or-create', 'POST', {
         'classId': widget.classData['id'],
         'subjectId': _selectedSubjectId!,
         'teacherId': teacherId,
         'date': _selectedDate.toIso8601String(),
       });
 
-      // SOLUÇÃO: Como o endpoint falha, criar aula simulada
-      TeacherClassLogger.info(
-        'Endpoint /attendances/lesson falha, criando aula simulada',
+      final token = authProvider.user?.token;
+      final lesson = await AttendanceService.getOrCreateLesson(
+        classId: widget.classData['id'],
+        subjectId: _selectedSubjectId!,
+        teacherId: teacherId,
+        date: _selectedDate,
+        token: token,
       );
-
-      final lesson = {
-        'id':
-            'lesson_${_selectedSubjectId}_${_selectedDate.millisecondsSinceEpoch}',
-        'classId': widget.classData['id'],
-        'subjectId': _selectedSubjectId,
-        'teacherId': teacherId,
-        'date': _selectedDate.toIso8601String(),
-        'createdAt': DateTime.now().toIso8601String(),
-      };
 
       TeacherClassLogger.success('Aula encontrada/criada com sucesso');
       TeacherClassLogger.debug('Dados da aula', {
@@ -891,9 +888,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         _currentLesson = lesson;
       });
 
-      // SOLUÇÃO: Como o serviço falha, simular frequência vazia
-      TeacherClassLogger.info('Simulando frequência vazia para a aula');
-      final attendances = <Map<String, dynamic>>[];
+      final attendances = await AttendanceService.getAttendanceByLesson(
+        lesson['id'],
+        token,
+      );
 
       TeacherClassLogger.debug('Frequências encontradas', {
         'count': attendances.length,
@@ -974,6 +972,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     });
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
       // Prepara a lista de presenças
       final presences =
           _students
@@ -1012,19 +1013,18 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         'presences': presences,
       });
 
-      TeacherClassLogger.api(
-        '/attendances/lesson/${_currentLesson!['id']}',
-        'POST',
-        {'presences': presences},
+      TeacherClassLogger.api('/attendances/bulk', 'POST', {
+        'lessonId': _currentLesson!['id'],
+        'presences': presences,
+      });
+
+      await AttendanceService.markAttendanceByLesson(
+        lessonId: _currentLesson!['id'],
+        presences: presences,
+        token: token,
       );
 
-      // SOLUÇÃO: Como o endpoint falha, simular salvamento local
-      TeacherClassLogger.info(
-        'Endpoint de salvamento falha, simulando salvamento local',
-      );
-
-      // Simular sucesso do salvamento
-      TeacherClassLogger.success('Frequência simulada salva com sucesso!');
+      TeacherClassLogger.success('Frequência salva com sucesso!');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1036,8 +1036,8 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         );
       }
 
-      // Recarrega a frequência
-      await _loadAttendance();
+      // Recarrega a frequência salva no servidor
+      await _loadAttendance(force: true);
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao salvar frequência', e, stackTrace);
       if (mounted) {
@@ -2935,6 +2935,53 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     Map<String, dynamic>? existingGrade, {
     String? typeId,
   }) async {
+    if (_selectedSubjectId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecione uma disciplina antes de adicionar a nota.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedPeriodId == null) {
+      if (_periods.isEmpty) {
+        await _fetchPeriodsFromAPI();
+      }
+      if (_periods.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nenhum período disponível. Cadastre um período primeiro.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+      setState(() {
+        _selectedPeriodId = _periods.first['id'];
+      });
+    }
+
+    final resolvedTypeId =
+        typeId ??
+        existingGrade?['typeId'] ??
+        (existingGrade?['type'] is Map
+            ? existingGrade!['type']['id']?.toString()
+            : null);
+
+    if (resolvedTypeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tipo de nota não identificado.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final result = await showDialog(
       context: context,
       builder:
@@ -2942,7 +2989,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
             student: student,
             subjectId: _selectedSubjectId!,
             periodId: _selectedPeriodId!,
-            typeId: typeId ?? existingGrade!['typeId'],
+            typeId: resolvedTypeId,
             gradeTypes: _gradeTypes,
             existingGrade: existingGrade,
           ),
@@ -3302,7 +3349,7 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
 
   Future<void> _pickFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles();
+      final result = await FilePicker.platform.pickFiles(withData: true);
       if (result != null && result.files.single.bytes != null) {
         setState(() {
           _fileName = result.files.single.name;
@@ -3324,31 +3371,16 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
     });
     final dialogContext = context;
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
       String? fileUrl;
       if (_fileBytes != null && _fileName != null) {
-        // Enviar arquivo para o backend (implemente o endpoint se necessário)
-        final request = http.MultipartRequest(
-          'POST',
-          Uri.parse('${AssignmentService.baseUrl}/assignments/upload'),
+        fileUrl = await AssignmentService.uploadAssignmentFile(
+          bytes: _fileBytes!,
+          filename: _fileName!,
+          token: token,
         );
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            _fileBytes!,
-            filename: _fileName!,
-          ),
-        );
-        final streamed = await request.send();
-        final resp = await http.Response.fromStream(streamed);
-        if (resp.statusCode == 200) {
-          final data = jsonDecode(resp.body);
-          fileUrl = data['url'] ?? data['fileUrl'];
-        } else {
-          setState(() {
-            _error = 'Erro ao enviar arquivo: ${resp.body}';
-          });
-          return;
-        }
       }
       await AssignmentService.createAssignment(
         classId: widget.classId,
@@ -3356,6 +3388,7 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
         description: '${_nameController.text}\n${_descController.text}',
         dueDate: _dueDate!,
         fileUrl: fileUrl,
+        token: token,
       );
       if (dialogContext.mounted) Navigator.of(dialogContext).pop(true);
     } catch (e) {

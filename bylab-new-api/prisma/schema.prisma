@@ -308,6 +308,21 @@ model AssignmentSubmission {
   student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
+model StoredFile {
+  id           String   @id @default(uuid())
+  originalName String
+  storedName   String
+  mimeType     String
+  size         Int
+  category     String
+  relativePath String   @unique
+  publicUrl    String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@map("stored_files")
+}
+
 enum Role {
   DEVELOPER
   ADMIN

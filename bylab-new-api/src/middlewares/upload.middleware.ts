@@ -1,84 +1,64 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { storageConfig } from '../config/storage.config';
+import { StorageService } from '../services/storage.service';
 
-// Garante que o diretório de uploads existe
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+StorageService.ensureRootDir();
+
+const tempDir = path.join(storageConfig.rootDir, '_temp');
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Configuração do armazenamento
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
+  destination: (_req, _file, cb) => {
+    cb(null, tempDir);
   },
-  filename: (req, file, cb) => {
-    // Gera um nome temporário para o arquivo
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = StorageService.sanitizeExtension(file.originalname);
     cb(null, `temp-${uniqueSuffix}${ext}`);
-  }
+  },
 });
 
-// Filtro para aceitar imagens e documentos
-const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedMimes = [
-    'image/jpeg',
-    'image/pjpeg',
-    'image/png',
-    'image/gif',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/octet-stream' // Para arquivos do Flutter
-  ];
-
-  // Se o mimetype for application/octet-stream, verificar a extensão
-  if (file.mimetype === 'application/octet-stream') {
-    const extension = file.originalname?.toLowerCase().split('.').pop();
-    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'];
-    
-    if (extension && allowedExtensions.includes(extension)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Tipo de arquivo inválido. Apenas imagens e documentos são permitidos.'));
-    }
-  } else if (allowedMimes.includes(file.mimetype)) {
+const fileFilter = (
+  _req: Express.Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+) => {
+  if (StorageService.isAllowedFile(file.originalname, file.mimetype)) {
     cb(null, true);
-  } else {
-    cb(new Error('Tipo de arquivo inválido. Apenas imagens e documentos são permitidos.'));
+    return;
   }
+  cb(new Error('Tipo de arquivo inválido. Apenas imagens e documentos são permitidos.'));
 };
 
-// Função para renomear um arquivo com o ID do aluno
-export const renameStudentPhoto = (tempFilePath: string, studentId: string): string => {
-  if (!fs.existsSync(tempFilePath)) {
-    throw new Error(`Arquivo temporário não encontrado: ${tempFilePath}`);
-  }
-  
-  const uploadDir = path.join(__dirname, '../../uploads');
-  const fileName = path.basename(tempFilePath);
-  const ext = path.extname(fileName);
-  const newFileName = `${studentId}${ext}`;
-  const newFilePath = path.join(uploadDir, newFileName);
-  
-  // Renomeia o arquivo
-  fs.renameSync(tempFilePath, newFilePath);
-  
-  return newFileName;
-};
-
-// Configuração do multer
 export const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB
-  }
-}); 
+    fileSize: storageConfig.maxFileSizeBytes,
+  },
+});
 
-// Linha teste da PR
+/** Renomeia foto de perfil com ID do aluno (legado) */
+export const renameStudentPhoto = (tempFilePath: string, studentId: string): string => {
+  if (!fs.existsSync(tempFilePath)) {
+    throw new Error(`Arquivo temporário não encontrado: ${tempFilePath}`);
+  }
+
+  const profilesDir = StorageService.getCategoryDir('profiles');
+  const ext = path.extname(tempFilePath);
+  const newFileName = `${studentId}${ext}`;
+  const newFilePath = path.join(profilesDir, newFileName);
+
+  fs.renameSync(tempFilePath, newFilePath);
+
+  return path.posix.join(
+    'profiles',
+    String(new Date().getFullYear()),
+    String(new Date().getMonth() + 1).padStart(2, '0'),
+    newFileName,
+  );
+};

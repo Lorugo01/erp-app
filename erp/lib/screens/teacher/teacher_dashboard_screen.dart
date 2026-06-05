@@ -1049,33 +1049,38 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           color: const Color(0xFF2953A5),
           child: Column(
             children: [
-              const SizedBox(height: 24),
-              // Menu
-              _SidebarButton(
-                icon: Icons.class_,
-                label: 'Minhas Turmas',
-                selected: _tabController.index == 0,
-                onTap: () => setState(() => _tabController.animateTo(0)),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _SidebarButton(
+                      icon: Icons.class_,
+                      label: 'Minhas Turmas',
+                      selected: _tabController.index == 0,
+                      onTap: () => setState(() => _tabController.animateTo(0)),
+                    ),
+                    _SidebarButton(
+                      icon: Icons.groups,
+                      label: 'Meus Alunos',
+                      selected: _tabController.index == 1,
+                      onTap: () => setState(() => _tabController.animateTo(1)),
+                    ),
+                    _SidebarButton(
+                      icon: Icons.inventory_2,
+                      label: 'Armários',
+                      selected: _tabController.index == 2,
+                      onTap: () => setState(() => _tabController.animateTo(2)),
+                    ),
+                    _SidebarButton(
+                      icon: Icons.calendar_today,
+                      label: 'Agenda',
+                      selected: _tabController.index == 3,
+                      onTap: () => setState(() => _tabController.animateTo(3)),
+                    ),
+                  ],
+                ),
               ),
-              _SidebarButton(
-                icon: Icons.groups,
-                label: 'Meus Alunos',
-                selected: _tabController.index == 1,
-                onTap: () => setState(() => _tabController.animateTo(1)),
-              ),
-              _SidebarButton(
-                icon: Icons.inventory_2,
-                label: 'Armários',
-                selected: _tabController.index == 2,
-                onTap: () => setState(() => _tabController.animateTo(2)),
-              ),
-              _SidebarButton(
-                icon: Icons.calendar_today,
-                label: 'Agenda',
-                selected: _tabController.index == 3,
-                onTap: () => setState(() => _tabController.animateTo(3)),
-              ),
-              const Spacer(),
               const Divider(color: Colors.white54, indent: 16, endIndent: 16),
               _SidebarButton(
                 icon: Icons.help_outline,
@@ -1099,7 +1104,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                 selected: false,
                 onTap: () => _showLogoutConfirmation(),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
             ],
           ),
         ),

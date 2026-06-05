@@ -21,6 +21,8 @@ import gradeTypeRoutes from './routes/gradeType.routes';
 import gradePeriodRoutes from './routes/gradePeriod.routes';
 import assignmentRoutes from './routes/assignment.routes';
 import schoolRoutes from './routes/school.routes';
+import storageRoutes from './routes/storage.routes';
+import { storageConfig } from './config/storage.config';
 
 loadEnv();
 
@@ -44,7 +46,7 @@ if (!corsOrigin || corsOrigin === '*') {
 }
 app.use(express.json());
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use(storageConfig.publicPathPrefix, express.static(storageConfig.rootDir));
 
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
@@ -60,6 +62,7 @@ app.use('/grades', gradeRoutes);
 app.use('/grade-types', gradeTypeRoutes);
 app.use('/grade-periods', gradePeriodRoutes);
 app.use('/assignments', assignmentRoutes);
+app.use('/storage', storageRoutes);
 app.use('/schools', schoolRoutes);
 
 app.get('/', (req, res) => {
@@ -73,6 +76,21 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy' });
+});
+
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction): void => {
+  if (err?.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: 'Arquivo excede o tamanho máximo permitido' });
+    return;
+  }
+  if (err instanceof Error && err.message.includes('Tipo de arquivo')) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  console.error('Erro não tratado:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Erro interno do servidor',
+  });
 });
 
 const httpServer = http.createServer(app);

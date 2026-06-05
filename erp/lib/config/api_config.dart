@@ -12,8 +12,9 @@ class ApiConfig {
   static const String classesEndpoint = '/classes';
   static const String subjectsEndpoint = '/subjects';
   static const String gradesEndpoint = '/grades';
-  static const String attendanceEndpoint = '/attendance';
+  static const String attendanceEndpoint = '/attendances';
   static const String assignmentsEndpoint = '/assignments';
+  static const String storageEndpoint = '/storage';
   static const String chatEndpoint = '/chat';
   static const String enrollmentsEndpoint = '/enrollments';
   static const String lessonsEndpoint = '/lessons';
@@ -38,6 +39,7 @@ class ApiConfig {
   static String getGradesUrl(String endpoint) => EnvironmentConfig.getApiUrl('$gradesEndpoint$endpoint');
   static String getAttendanceUrl(String endpoint) => EnvironmentConfig.getApiUrl('$attendanceEndpoint$endpoint');
   static String getAssignmentsUrl(String endpoint) => EnvironmentConfig.getApiUrl('$assignmentsEndpoint$endpoint');
+  static String getStorageUrl(String endpoint) => EnvironmentConfig.getApiUrl('$storageEndpoint$endpoint');
   static String getChatUrl(String endpoint) => EnvironmentConfig.getApiUrl('$chatEndpoint$endpoint');
   static String getEnrollmentsUrl(String endpoint) => EnvironmentConfig.getApiUrl('$enrollmentsEndpoint$endpoint');
   static String getLessonsUrl(String endpoint) => EnvironmentConfig.getApiUrl('$lessonsEndpoint$endpoint');

@@ -198,7 +198,10 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
 
         final teacherResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/teachers/user/${user?.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${authProvider.user?.token}',
+          },
         );
 
         if (teacherResponse.statusCode == 200) {
@@ -303,9 +306,13 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
       TeacherCalendarLogger.calendar('Carregando eventos da turma');
       TeacherCalendarLogger.debug('Class ID', {'classId': _selectedClassId});
 
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/classes/$_selectedClassId/events'),
-        headers: ApiConfig.defaultHeaders,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${authProvider.user?.token}',
+        },
       );
 
       if (response.statusCode == 200) {

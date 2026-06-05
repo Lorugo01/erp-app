@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as AssignmentService from '../services/assignment.service';
+import { StorageService } from '../services/storage.service';
 import prisma from '../prisma/client';
 
 // Listar assignments de uma turma
@@ -74,7 +75,12 @@ export const createSubmission = async (req: Request, res: Response, next: NextFu
     
     let fileUrl = null;
     if (req.file) {
-      fileUrl = `/uploads/${req.file.filename}`;
+      const stored = await StorageService.registerFromMulterFile(
+        req.file,
+        'submissions',
+        req.user?.id,
+      );
+      fileUrl = stored.fileUrl;
     }
     
     const submission = await AssignmentService.createSubmission(assignmentId, {
@@ -90,28 +96,80 @@ export const createSubmission = async (req: Request, res: Response, next: NextFu
   }
 };
 
-// Upload de arquivo para assignment
-export function uploadAssignmentFile(req: Request, res: Response, next: NextFunction) {
-  const assignmentId = req.params.id;
-  if (!req.file) return res.status(400).json({ error: 'Arquivo não enviado' });
-  const fileUrl = `/uploads/${req.file.filename}`;
-  prisma.assignment.update({
-    where: { id: assignmentId },
-    data: { fileUrl },
-  })
-    .then(() => res.status(200).json({ fileUrl }))
-    .catch(next);
+// Upload genérico de arquivo para atividades (legado — preferir POST /storage/upload)
+export const uploadFile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Arquivo não enviado' });
+      return;
+    }
+    const stored = await StorageService.registerFromMulterFile(
+      req.file,
+      'assignments',
+      req.user?.id,
+    );
+    res.status(201).json(stored);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Upload de arquivo para assignment existente
+export async function uploadAssignmentFile(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const assignmentId = req.params.id;
+    if (!req.file) {
+      res.status(400).json({ error: 'Arquivo não enviado' });
+      return;
+    }
+
+    const stored = await StorageService.registerFromMulterFile(
+      req.file,
+      'assignments',
+      req.user?.id,
+    );
+
+    await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { fileUrl: stored.fileUrl },
+    });
+
+    res.status(200).json(stored);
+  } catch (error) {
+    next(error);
+  }
 }
 
 // Upload de arquivo para submissão
-export function uploadSubmissionFile(req: Request, res: Response, next: NextFunction) {
-  const submissionId = req.params.id;
-  if (!req.file) return res.status(400).json({ error: 'Arquivo não enviado' });
-  const fileUrl = `/uploads/${req.file.filename}`;
-  prisma.assignmentSubmission.update({
-    where: { id: submissionId },
-    data: { fileUrl },
-  })
-    .then(() => res.status(200).json({ fileUrl }))
-    .catch(next);
+export async function uploadSubmissionFile(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const submissionId = req.params.id;
+    if (!req.file) {
+      res.status(400).json({ error: 'Arquivo não enviado' });
+      return;
+    }
+
+    const stored = await StorageService.registerFromMulterFile(
+      req.file,
+      'submissions',
+      req.user?.id,
+    );
+
+    await prisma.assignmentSubmission.update({
+      where: { id: submissionId },
+      data: { fileUrl: stored.fileUrl },
+    });
+
+    res.status(200).json(stored);
+  } catch (error) {
+    next(error);
+  }
 } 

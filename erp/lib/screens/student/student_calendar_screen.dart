@@ -66,7 +66,10 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
       } else if (user?.id != null) {
         final studentResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user?.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${authProvider.user?.token}',
+          },
         );
 
         if (studentResponse.statusCode == 200) {
@@ -78,7 +81,10 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
       if (studentId != null) {
         final response = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/enrollments/student/$studentId'),
-          headers: ApiConfig.defaultHeaders,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${authProvider.user?.token}',
+          },
         );
 
         debugPrint('🔍 Status da resposta das turmas: ${response.statusCode}');
@@ -137,9 +143,13 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
       debugPrint('🔍 === CARREGANDO EVENTOS DA TURMA ===');
       debugPrint('🔍 Class ID: $_selectedClassId');
 
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/classes/$_selectedClassId/events'),
-        headers: ApiConfig.defaultHeaders,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${authProvider.user?.token}',
+        },
       );
 
       debugPrint('🔍 Status da resposta dos eventos: ${response.statusCode}');

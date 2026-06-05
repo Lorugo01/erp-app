@@ -50,68 +50,74 @@ class _AdminSidebar extends StatelessWidget {
       color: const Color(0xFF2953A5),
       child: Column(
         children: [
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           const CircleAvatar(
-            radius: 40,
+            radius: 32,
             backgroundColor: Colors.white,
-            child: Icon(Icons.person, size: 60, color: Color(0xFF2953A5)),
+            child: Icon(Icons.person, size: 48, color: Color(0xFF2953A5)),
           ),
-          const SizedBox(height: 24),
-          _SidebarButton(
-            icon: Icons.dashboard,
-            label: 'Dashboard',
-            selected: selectedIndex == 0,
-            onTap: () => onSelect(0),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _SidebarButton(
+                  icon: Icons.dashboard,
+                  label: 'Dashboard',
+                  selected: selectedIndex == 0,
+                  onTap: () => onSelect(0),
+                ),
+                _SidebarButton(
+                  icon: Icons.people,
+                  label: 'Usuários',
+                  selected: selectedIndex == 1,
+                  onTap: () => onSelect(1),
+                ),
+                _SidebarButton(
+                  icon: Icons.school,
+                  label: 'Professores',
+                  selected: selectedIndex == 2,
+                  onTap: () => onSelect(2),
+                ),
+                _SidebarButton(
+                  icon: Icons.groups,
+                  label: 'Alunos',
+                  selected: selectedIndex == 3,
+                  onTap: () => onSelect(3),
+                ),
+                _SidebarButton(
+                  icon: Icons.class_,
+                  label: 'Turmas',
+                  selected: selectedIndex == 4,
+                  onTap: () => onSelect(4),
+                ),
+                _SidebarButton(
+                  icon: Icons.computer,
+                  label: 'Armários',
+                  selected: selectedIndex == 5,
+                  onTap: () => onSelect(5),
+                ),
+                _SidebarButton(
+                  icon: Icons.bar_chart,
+                  label: 'Relatórios',
+                  selected: selectedIndex == 6,
+                  onTap: () => onSelect(6),
+                ),
+                _SidebarButton(
+                  icon: Icons.grade,
+                  label: 'Gestão de Notas',
+                  selected: selectedIndex == 7,
+                  onTap: () => onSelect(7),
+                ),
+                _SidebarButton(
+                  icon: Icons.book,
+                  label: 'Gerenciar Matérias',
+                  selected: selectedIndex == 8,
+                  onTap: () => onSelect(8),
+                ),
+              ],
+            ),
           ),
-          _SidebarButton(
-            icon: Icons.people,
-            label: 'Usuários',
-            selected: selectedIndex == 1,
-            onTap: () => onSelect(1),
-          ),
-          _SidebarButton(
-            icon: Icons.school,
-            label: 'Professores',
-            selected: selectedIndex == 2,
-            onTap: () => onSelect(2),
-          ),
-          _SidebarButton(
-            icon: Icons.groups,
-            label: 'Alunos',
-            selected: selectedIndex == 3,
-            onTap: () => onSelect(3),
-          ),
-          _SidebarButton(
-            icon: Icons.class_,
-            label: 'Turmas',
-            selected: selectedIndex == 4,
-            onTap: () => onSelect(4),
-          ),
-          _SidebarButton(
-            icon: Icons.computer,
-            label: 'Armários',
-            selected: selectedIndex == 5,
-            onTap: () => onSelect(5),
-          ),
-          _SidebarButton(
-            icon: Icons.bar_chart,
-            label: 'Relatórios',
-            selected: selectedIndex == 6,
-            onTap: () => onSelect(6),
-          ),
-          _SidebarButton(
-            icon: Icons.grade,
-            label: 'Gestão de Notas',
-            selected: selectedIndex == 7,
-            onTap: () => onSelect(7),
-          ),
-          _SidebarButton(
-            icon: Icons.book,
-            label: 'Gerenciar\nMatérias',
-            selected: selectedIndex == 8,
-            onTap: () => onSelect(8),
-          ),
-          const Spacer(),
           const Divider(color: Colors.white54, indent: 16, endIndent: 16),
           _SidebarButton(
             icon: Icons.settings,
@@ -125,7 +131,7 @@ class _AdminSidebar extends StatelessWidget {
             selected: false,
             onTap: onLogout,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -193,7 +199,7 @@ class _SidebarButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
           child: Row(
             children: [
               Icon(icon, color: Colors.white, size: 24),
@@ -207,7 +213,7 @@ class _SidebarButton extends StatelessWidget {
                     fontSize: 16,
                   ),
                   textAlign: TextAlign.left,
-                  overflow: TextOverflow.visible,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'providers/auth_provider.dart';
 import 'providers/data_provider.dart';
 import 'screens/login_screen.dart';
@@ -15,8 +17,9 @@ import 'config/app_config.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar dados de localização para formatação de datas
+  // Inicializar dados de localização para formatação de datas em PT-BR
   await initializeDateFormatting('pt_BR', null);
+  Intl.defaultLocale = 'pt_BR';
 
   // Carregar variáveis do arquivo .env
   await EnvironmentConfig.load();
@@ -49,6 +52,13 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'ByLAB ERP',
         debugShowCheckedModeBanner: false,
+        locale: const Locale('pt', 'BR'),
+        supportedLocales: const [Locale('pt', 'BR')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2953A5)),
           useMaterial3: true,
