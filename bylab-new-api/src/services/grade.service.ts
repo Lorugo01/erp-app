@@ -125,38 +125,36 @@ function calcularMedia(valores: number[]): number {
 }
 
 // Função auxiliar para calcular a média considerando recuperações
-const calculateFinalGrade = (grades: any[]) => {
-  // Separar as notas por tipo
-  const regularGrades = grades.filter(g => 
-    !['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(g.typeId)
-  );
-  const recGrade = grades.find(g => g.typeId === 'RECUPERACAO');
-  const recFinalGrade = grades.find(g => g.typeId === 'RECUPERACAO_FINAL');
+const isRecoveryGrade = (grade: any) =>
+  grade.type?.isRecovery === true ||
+  ['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(grade.typeId);
 
-  // Se não houver notas regulares, retorna 0
+const calculateFinalGrade = (grades: any[]) => {
+  const regularGrades = grades.filter(g => !isRecoveryGrade(g));
+  const recoveryGrades = grades.filter(g => isRecoveryGrade(g));
+
   if (regularGrades.length === 0) return 0;
 
-  // Criar uma cópia das notas para manipulação
   let finalGrades = [...regularGrades];
 
-  // Encontrar a menor nota regular
   let minGradeIndex = 0;
   for (let i = 1; i < finalGrades.length; i++) {
-    if (finalGrades[i].value < finalGrades[minGradeIndex].value) {
+    if ((finalGrades[i].value ?? 0) < (finalGrades[minGradeIndex].value ?? 0)) {
       minGradeIndex = i;
     }
   }
 
-  // Se houver recuperação final, ela substitui a menor nota
-  if (recFinalGrade && recFinalGrade.value > finalGrades[minGradeIndex].value) {
-    finalGrades[minGradeIndex] = recFinalGrade;
-  }
-  // Se não houver recuperação final mas houver recuperação normal, ela pode substituir a menor nota
-  else if (recGrade && recGrade.value > finalGrades[minGradeIndex].value) {
-    finalGrades[minGradeIndex] = recGrade;
+  const minValue = finalGrades[minGradeIndex].value ?? 0;
+  const bestRecovery = recoveryGrades.reduce<any | null>((best, grade) => {
+    if (grade.value == null) return best;
+    if (!best || grade.value > best.value) return grade;
+    return best;
+  }, null);
+
+  if (bestRecovery && bestRecovery.value > minValue) {
+    finalGrades[minGradeIndex] = bestRecovery;
   }
 
-  // Calcular a média final
   const sum = finalGrades.reduce((acc, grade) => acc + (grade.value || 0), 0);
   const average = sum / finalGrades.length;
   
@@ -197,12 +195,11 @@ export const getGradesByStudent = async (studentId: string) => {
     gradesGroup.forEach(grade => {
       grade.calculatedAverage = average;
       // Adicionar flag para indicar se a nota foi substituída
-      if (grade.typeId === 'RECUPERACAO' || grade.typeId === 'RECUPERACAO_FINAL') {
-        const regularGrades = gradesGroup.filter(g => 
-          !['RECUPERACAO', 'RECUPERACAO_FINAL'].includes(g.typeId)
-        );
-        const minRegularGrade = Math.min(...regularGrades.map(g => g.value));
-        grade.replacedGrade = grade.value > minRegularGrade;
+      if (isRecoveryGrade(grade)) {
+        const regularGrades = gradesGroup.filter(g => !isRecoveryGrade(g));
+        if (regularGrades.length === 0) return;
+        const minRegularGrade = Math.min(...regularGrades.map(g => g.value ?? 0));
+        grade.replacedGrade = (grade.value ?? 0) > minRegularGrade;
       }
     });
   }
@@ -261,7 +258,7 @@ export async function getBoletimCompleto(studentId: string) {
     // Conceitos (se houver)
     const conceitos = gradesDisc.filter(g => g.type?.isConcept === true && g.concept !== null).map(g => g.concept);
     // Recuperação (se houver)
-    const rec = gradesDisc.find(g => g.type?.name?.toLowerCase().includes('recupera'));
+    const rec = gradesDisc.find(g => g.type?.isRecovery === true);
     let mediaComRec = mediaFinal;
     if (rec && rec.value !== null && (rec.value as number) > mediaFinal) {
       mediaComRec = rec.value as number;

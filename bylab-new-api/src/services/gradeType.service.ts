@@ -19,6 +19,8 @@ export const getGradeTypeById = (id: string, schoolId?: string) => {
 export const createGradeType = (data: { 
   name: string; 
   description?: string;
+  isConcept?: boolean;
+  isRecovery?: boolean;
   schoolId: string;
 }) => {
   return prisma.gradeType.create({ data });
@@ -26,7 +28,7 @@ export const createGradeType = (data: {
 
 export const updateGradeType = (
   id: string, 
-  data: Partial<{ name: string; description?: string }>,
+  data: Partial<{ name: string; description?: string; isConcept?: boolean; isRecovery?: boolean }>,
   schoolId?: string
 ) => {
   return prisma.gradeType.update({ 

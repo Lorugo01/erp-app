@@ -56,6 +56,7 @@ class GradeTypeService {
     required String name,
     String? description,
     bool isConcept = false,
+    bool isRecovery = false,
     String? token,
   }) async {
     final response = await http.post(
@@ -65,6 +66,7 @@ class GradeTypeService {
         'name': name,
         if (description != null) 'description': description,
         'isConcept': isConcept,
+        'isRecovery': isRecovery,
       }),
     );
     if (response.statusCode == 201) {
@@ -80,6 +82,7 @@ class GradeTypeService {
     String? name,
     String? description,
     bool? isConcept,
+    bool? isRecovery,
     String? token,
   }) async {
     final response = await http.put(
@@ -89,6 +92,7 @@ class GradeTypeService {
         if (name != null) 'name': name,
         if (description != null) 'description': description,
         if (isConcept != null) 'isConcept': isConcept,
+        if (isRecovery != null) 'isRecovery': isRecovery,
       }),
     );
     if (response.statusCode == 200) {

@@ -227,9 +227,10 @@ model GradeType {
   name        String
   description String?
   isConcept   Boolean @default(false)
+  isRecovery  Boolean @default(false)
   schoolId    String
   grades      Grade[]
-  
+
   // Relacionamentos
   school      School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }

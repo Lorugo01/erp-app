@@ -2816,28 +2816,35 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     return null;
   }
 
+  bool _isRecoveryType(String? typeId) {
+    if (typeId == null) return false;
+    if (typeId == 'RECUPERACAO' || typeId == 'RECUPERACAO_FINAL') {
+      return true;
+    }
+    for (final type in _gradeTypes) {
+      if (type['id'] == typeId) {
+        return type['isRecovery'] == true;
+      }
+    }
+    return false;
+  }
+
   double? _calculateAverage(Map<String, Map<String, dynamic>> studentGrades) {
     if (studentGrades.isEmpty) return null;
 
-    // Separar notas por tipo
     final regularGrades = <Map<String, dynamic>>[];
-    Map<String, dynamic>? recGrade;
-    Map<String, dynamic>? recFinalGrade;
+    final recoveryGrades = <Map<String, dynamic>>[];
 
     studentGrades.forEach((typeId, grade) {
-      if (typeId == 'RECUPERACAO') {
-        recGrade = grade;
-      } else if (typeId == 'RECUPERACAO_FINAL') {
-        recFinalGrade = grade;
+      if (_isRecoveryType(typeId)) {
+        recoveryGrades.add(grade);
       } else {
         regularGrades.add(grade);
       }
     });
 
-    // Se não houver notas regulares, retorna null
     if (regularGrades.isEmpty) return null;
 
-    // Encontrar a menor nota regular
     var minGrade = regularGrades[0];
     for (var grade in regularGrades.skip(1)) {
       final currentValue = _safeToDouble(grade['value']) ?? 0.0;
@@ -2847,36 +2854,27 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       }
     }
 
-    // Criar lista final de notas para cálculo
     final finalGrades = List<Map<String, dynamic>>.from(regularGrades);
     final minGradeIndex = finalGrades.indexOf(minGrade);
     final minGradeValue = _safeToDouble(minGrade['value']) ?? 0.0;
 
-    // Se houver recuperação final e for maior que a menor nota, substitui
-    if (recFinalGrade != null) {
-      final value = recFinalGrade?['value'];
-      if (value != null) {
-        final recFinalValue = _safeToDouble(value) ?? 0.0;
-        if (recFinalValue > minGradeValue) {
-          finalGrades[minGradeIndex] = {
-            ...?recFinalGrade,
-            'value': recFinalValue,
-          };
-        }
-      }
-    }
-    // Se não houver recuperação final mas houver recuperação normal, pode substituir
-    else if (recGrade != null) {
-      final value = recGrade?['value'];
-      if (value != null) {
-        final recValue = _safeToDouble(value) ?? 0.0;
-        if (recValue > minGradeValue) {
-          finalGrades[minGradeIndex] = {...?recGrade, 'value': recValue};
-        }
+    Map<String, dynamic>? bestRecovery;
+    for (final grade in recoveryGrades) {
+      final value = _safeToDouble(grade['value']);
+      if (value == null) continue;
+      final bestValue = _safeToDouble(bestRecovery?['value']);
+      if (bestRecovery == null || bestValue == null || value > bestValue) {
+        bestRecovery = grade;
       }
     }
 
-    // Calcular média final
+    if (bestRecovery != null) {
+      final recValue = _safeToDouble(bestRecovery['value']) ?? 0.0;
+      if (recValue > minGradeValue) {
+        finalGrades[minGradeIndex] = {...bestRecovery, 'value': recValue};
+      }
+    }
+
     double sum = 0;
     int count = 0;
     for (var grade in finalGrades) {

@@ -106,6 +106,19 @@ class _TeacherStudentDetailScreenState
     _fetchAttendances();
   }
 
+  bool _isRecoveryType(String? typeId) {
+    if (typeId == null) return false;
+    if (typeId == 'RECUPERACAO' || typeId == 'RECUPERACAO_FINAL') {
+      return true;
+    }
+    for (final type in _gradeTypes) {
+      if (type['id'] == typeId) {
+        return type['isRecovery'] == true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _fetchPeriods() async {
     TeacherStudentDetailLogger.info(
       'Iniciando busca por períodos de avaliação',
@@ -487,41 +500,26 @@ class _TeacherStudentDetailScreenState
             orElse: () => {'name': 'Período não encontrado'},
           );
 
-          // Ordenar notas: regulares primeiro, depois recuperação, por último recuperação final
+          // Ordenar notas: regulares primeiro, recuperação por último
           final sortedGrades = List<Map<String, dynamic>>.from(entry.value)
             ..sort((a, b) {
-              final aType = a['typeId'];
-              final bType = b['typeId'];
-              if (aType == 'RECUPERACAO_FINAL') return 1;
-              if (bType == 'RECUPERACAO_FINAL') return -1;
-              if (aType == 'RECUPERACAO') return 1;
-              if (bType == 'RECUPERACAO') return -1;
+              final aRecovery = _isRecoveryType(a['typeId']);
+              final bRecovery = _isRecoveryType(b['typeId']);
+              if (aRecovery && !bRecovery) return 1;
+              if (!aRecovery && bRecovery) return -1;
               return 0;
             });
 
-          // Separar notas por tipo
           final regularGrades =
               sortedGrades
-                  .where(
-                    (g) =>
-                        ![
-                          'RECUPERACAO',
-                          'RECUPERACAO_FINAL',
-                        ].contains(g['typeId']),
-                  )
+                  .where((g) => !_isRecoveryType(g['typeId']))
                   .toList();
 
-          final recoveryGrade = sortedGrades.firstWhere(
-            (g) => g['typeId'] == 'RECUPERACAO',
-            orElse: () => <String, dynamic>{},
-          );
+          final recoveryGrades =
+              sortedGrades
+                  .where((g) => _isRecoveryType(g['typeId']))
+                  .toList();
 
-          final finalRecoveryGrade = sortedGrades.firstWhere(
-            (g) => g['typeId'] == 'RECUPERACAO_FINAL',
-            orElse: () => <String, dynamic>{},
-          );
-
-          // Encontrar a menor nota regular
           final minRegularGrade =
               regularGrades.isEmpty
                   ? null
@@ -529,41 +527,32 @@ class _TeacherStudentDetailScreenState
                     (a, b) => (a['value'] ?? 0.0) < (b['value'] ?? 0.0) ? a : b,
                   );
 
-          // Calcular média
           double calculatedAverage = 0.0;
           if (regularGrades.isNotEmpty) {
-            // Criar uma cópia das notas regulares
             final gradesToAverage = List<Map<String, dynamic>>.from(
               regularGrades,
             );
 
-            // Se houver nota de recuperação maior que a menor nota regular
-            if (minRegularGrade != null) {
+            if (minRegularGrade != null && recoveryGrades.isNotEmpty) {
               final minRegularValue = minRegularGrade['value'] ?? 0.0;
-
-              // Verificar recuperação final primeiro
-              if (finalRecoveryGrade.isNotEmpty) {
-                final finalRecoveryValue = finalRecoveryGrade['value'] ?? 0.0;
-                if (finalRecoveryValue > minRegularValue) {
-                  // Substituir a menor nota pela recuperação final
-                  final index = gradesToAverage.indexOf(minRegularGrade);
-                  if (index != -1) {
-                    gradesToAverage[index] = {
-                      ...finalRecoveryGrade,
-                      'replacedGrade': true,
-                    };
-                  }
+              Map<String, dynamic>? bestRecovery;
+              for (final grade in recoveryGrades) {
+                final value = grade['value'];
+                if (value == null) continue;
+                final bestValue = bestRecovery?['value'];
+                if (bestRecovery == null ||
+                    (bestValue ?? 0.0) < (value ?? 0.0)) {
+                  bestRecovery = grade;
                 }
               }
-              // Se não substituiu com recuperação final, tentar com recuperação normal
-              else if (recoveryGrade.isNotEmpty) {
-                final recoveryValue = recoveryGrade['value'] ?? 0.0;
+
+              if (bestRecovery != null) {
+                final recoveryValue = bestRecovery['value'] ?? 0.0;
                 if (recoveryValue > minRegularValue) {
-                  // Substituir a menor nota pela recuperação
                   final index = gradesToAverage.indexOf(minRegularGrade);
                   if (index != -1) {
                     gradesToAverage[index] = {
-                      ...recoveryGrade,
+                      ...bestRecovery,
                       'replacedGrade': true,
                     };
                   }
@@ -571,7 +560,6 @@ class _TeacherStudentDetailScreenState
               }
             }
 
-            // Calcular a média com as notas após possível substituição
             final sum = gradesToAverage.fold<double>(
               0.0,
               (sum, grade) => sum + (grade['value'] ?? 0.0),
@@ -623,20 +611,20 @@ class _TeacherStudentDetailScreenState
                     orElse: () => {'name': 'Tipo não encontrado'},
                   );
 
-                  final isRecovery =
-                      grade['typeId'] == 'RECUPERACAO' ||
-                      grade['typeId'] == 'RECUPERACAO_FINAL';
+                  final isRecovery = _isRecoveryType(grade['typeId']);
 
                   final isReplacingGrade =
-                      isRecovery && grade['replacedGrade'] == true;
+                      isRecovery &&
+                      minRegularGrade != null &&
+                      (grade['value'] ?? 0.0) >
+                          (minRegularGrade['value'] ?? 0.0);
                   final isBeingReplaced =
                       minRegularGrade != null &&
                       grade == minRegularGrade &&
-                      sortedGrades.any(
+                      recoveryGrades.any(
                         (g) =>
-                            (g['typeId'] == 'RECUPERACAO' ||
-                                g['typeId'] == 'RECUPERACAO_FINAL') &&
-                            g['replacedGrade'] == true,
+                            (g['value'] ?? 0.0) >
+                            (minRegularGrade['value'] ?? 0.0),
                       );
 
                   return ListTile(

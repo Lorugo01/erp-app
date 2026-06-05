@@ -322,14 +322,19 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       // Buscar ID do aluno
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
       String? studentId;
 
       if (user?.student?.id != null) {
         studentId = user!.student!.id;
       } else if (user?.id != null) {
+        final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        }
         final studentResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: headers,
         );
 
         if (studentResponse.statusCode == 200) {
@@ -351,7 +356,11 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       );
 
       // Adicionar headers
-      request.headers.addAll(ApiConfig.defaultHeaders);
+      final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers.addAll(headers);
 
       // Adicionar campos
       request.fields['studentId'] = studentId;

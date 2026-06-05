@@ -57,6 +57,18 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     super.dispose();
   }
 
+  Map<String, String> _authHeaders(String? token) {
+    final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  String? _token() {
+    return Provider.of<AuthProvider>(context, listen: false).user?.token;
+  }
+
   Future<void> _loadSubjects() async {
     setState(() {
       _loadingSubjects = true;
@@ -75,9 +87,10 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
         return;
       }
 
+      final token = _token();
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/subjects/class/$classId'),
-        headers: ApiConfig.defaultHeaders,
+        headers: _authHeaders(token),
       );
 
       debugPrint(
@@ -117,9 +130,10 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
 
     try {
       debugPrint('🔍 === CARREGANDO PERÍODOS ===');
+      final token = _token();
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/grade-periods'),
-        headers: ApiConfig.defaultHeaders,
+        headers: _authHeaders(token),
       );
 
       debugPrint('🔍 Status da resposta dos períodos: ${response.statusCode}');
@@ -164,11 +178,12 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
       debugPrint('🔍 Subject ID: $subjectId');
       debugPrint('🔍 Class ID: ${widget.classData['id']}');
 
+      final token = _token();
       final response = await http.get(
         Uri.parse(
-          '${ApiConfig.baseUrl}/classes/${widget.classData['id']}/assignments?subjectId=$subjectId',
+          '${ApiConfig.baseUrl}/assignments/class/${widget.classData['id']}?subjectId=$subjectId',
         ),
-        headers: ApiConfig.defaultHeaders,
+        headers: _authHeaders(token),
       );
 
       debugPrint(
@@ -214,6 +229,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
       // Buscar notas do aluno para esta disciplina
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
       String? studentId;
 
       if (user?.student?.id != null) {
@@ -221,7 +237,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
       } else if (user?.id != null) {
         final studentResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user?.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         if (studentResponse.statusCode == 200) {
@@ -233,7 +249,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
       if (studentId != null) {
         final response = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/grades/student/$studentId'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         debugPrint('🔍 Status da resposta das notas: ${response.statusCode}');

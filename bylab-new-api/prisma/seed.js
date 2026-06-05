@@ -162,9 +162,10 @@ async function upsertStudent(schoolId) {
 
 async function seedGradeTypes(schoolId) {
   const gradeTypes = [
-    { name: 'Prova 1', description: 'Primeira prova', isConcept: false },
-    { name: 'Prova 2', description: 'Segunda prova', isConcept: false },
-    { name: 'Trabalho', description: 'Trabalho/atividade avaliativa', isConcept: false },
+    { name: 'Prova 1', description: 'Primeira prova', isConcept: false, isRecovery: false },
+    { name: 'Prova 2', description: 'Segunda prova', isConcept: false, isRecovery: false },
+    { name: 'Trabalho', description: 'Trabalho/atividade avaliativa', isConcept: false, isRecovery: false },
+    { name: 'Recuperação', description: 'Substitui a menor nota do período', isConcept: false, isRecovery: true },
   ];
 
   for (const type of gradeTypes) {
@@ -214,14 +215,86 @@ async function seedConfig(schoolId) {
   });
 }
 
+async function seedDemoClass(schoolId, teacher, student) {
+  const year = new Date().getFullYear();
+  const className = `6º Ano A ${year} - MATUTINO`;
+
+  let classRecord = await prisma.class.findFirst({
+    where: { schoolId, name: className },
+  });
+
+  if (!classRecord) {
+    classRecord = await prisma.class.create({
+      data: {
+        name: className,
+        grade: 6,
+        letter: 'A',
+        academicYear: year,
+        shift: 'MATUTINO',
+        evaluationModel: 'BIMESTRAL',
+        schoolId,
+      },
+    });
+  }
+
+  const existingSubject = await prisma.subject.findFirst({
+    where: { classId: classRecord.id, name: 'Educação Física' },
+  });
+
+  if (!existingSubject) {
+    await prisma.subject.create({
+      data: {
+        name: 'Educação Física',
+        classId: classRecord.id,
+        teacherId: teacher.id,
+        schoolId,
+        type: 'EDUCACAO_FISICA',
+      },
+    });
+  }
+
+  const existingEnrollment = await prisma.enrollment.findFirst({
+    where: { studentId: student.id, classId: classRecord.id, year },
+  });
+
+  if (!existingEnrollment) {
+    await prisma.enrollment.updateMany({
+      where: { studentId: student.id, current: true },
+      data: { current: false },
+    });
+
+    await prisma.enrollment.create({
+      data: {
+        studentId: student.id,
+        classId: classRecord.id,
+        year,
+        current: true,
+      },
+    });
+  } else if (!existingEnrollment.current) {
+    await prisma.enrollment.updateMany({
+      where: { studentId: student.id, current: true },
+      data: { current: false },
+    });
+
+    await prisma.enrollment.update({
+      where: { id: existingEnrollment.id },
+      data: { current: true },
+    });
+  }
+
+  return classRecord;
+}
+
 async function main() {
   console.log('Iniciando seed GlobalTEC...\n');
 
   await upsertDeveloper();
   const school = await upsertSchool();
   await upsertAdmin(school.id);
-  await upsertTeacher(school.id);
-  await upsertStudent(school.id);
+  const teacher = await upsertTeacher(school.id);
+  const student = await upsertStudent(school.id);
+  await seedDemoClass(school.id, teacher, student);
   await seedGradeTypes(school.id);
   await seedGradePeriods(school.id);
   await seedConfig(school.id);

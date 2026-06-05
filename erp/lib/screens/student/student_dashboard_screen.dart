@@ -39,11 +39,32 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    _hydrateStudentFromAuth(authProvider.user);
     _loadStudentData();
     _loadClasses();
     _loadAttendanceData();
     _loadTodayLessons();
     _loadGrades();
+  }
+
+  Map<String, String> _authHeaders(String? token) {
+    final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  void _hydrateStudentFromAuth(dynamic user) {
+    if (user?.student != null) {
+      _studentData = {
+        'id': user.student!.id,
+        'name': user.student!.name,
+        'registrationNumber': user.student!.registrationNumber,
+        'profilePicture': user.student!.profilePicture,
+      };
+    }
   }
 
   @override
@@ -63,17 +84,20 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
 
       debugPrint('🔍 === CARREGANDO DADOS DO ALUNO ===');
       debugPrint('🔍 User: ${user?.toJson()}');
       debugPrint('🔍 Student ID: ${user?.student?.id}');
       debugPrint('🔍 User ID: ${user?.id}');
 
+      _hydrateStudentFromAuth(user);
+
       if (user?.student?.id != null) {
         debugPrint('🔍 Usando student ID: ${user!.student!.id}');
         final response = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/${user.student!.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         debugPrint('🔍 Status da resposta: ${response.statusCode}');
@@ -95,7 +119,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         debugPrint('🔍 Usando user ID como fallback: ${user!.id}');
         final response = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         debugPrint('🔍 Status da resposta (fallback): ${response.statusCode}');
@@ -133,6 +157,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
 
       debugPrint('🔍 === CARREGANDO TURMAS ===');
       debugPrint('🔍 User: ${user?.toJson()}');
@@ -149,7 +174,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         debugPrint('🔍 Buscando student pelo user ID: ${user!.id}');
         final studentResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         if (studentResponse.statusCode == 200) {
@@ -167,7 +192,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/enrollments/student/$studentId'),
-        headers: ApiConfig.defaultHeaders,
+        headers: _authHeaders(token),
       );
 
       debugPrint('🔍 Status da resposta das turmas: ${response.statusCode}');
@@ -177,13 +202,19 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         final List data = jsonDecode(response.body);
         debugPrint('🔍 Dados das turmas: $data');
         final classes =
-            data.map((e) => Map<String, dynamic>.from(e['class'])).toList();
+            data
+                .where((e) => e['current'] == true && e['class'] != null)
+                .map((e) => Map<String, dynamic>.from(e['class']))
+                .toList();
         debugPrint('🔍 Turmas processadas: $classes');
         setState(() {
           _classes = classes;
         });
       } else {
         debugPrint('❌ Erro ao carregar turmas: ${response.statusCode}');
+        setState(() {
+          _errorClasses = 'Erro ao carregar turmas (${response.statusCode})';
+        });
       }
     } catch (e) {
       debugPrint('❌ Erro ao carregar turmas: $e');
@@ -205,6 +236,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
 
       debugPrint('🔍 === CARREGANDO FREQUÊNCIA ===');
       debugPrint('🔍 User: ${user?.toJson()}');
@@ -221,7 +253,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         debugPrint('🔍 Buscando student pelo user ID: ${user!.id}');
         final studentResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         if (studentResponse.statusCode == 200) {
@@ -239,7 +271,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/attendances/student/$studentId'),
-        headers: ApiConfig.defaultHeaders,
+        headers: _authHeaders(token),
       );
 
       debugPrint('🔍 Status da resposta da frequência: ${response.statusCode}');
@@ -274,6 +306,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       // Primeiro, buscar as turmas do aluno
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
       String? studentId;
 
       if (user?.student?.id != null) {
@@ -281,7 +314,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       } else if (user?.id != null) {
         final studentResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         if (studentResponse.statusCode == 200) {
@@ -298,7 +331,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       // Buscar matrículas do aluno
       final enrollmentsResponse = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/enrollments/student/$studentId'),
-        headers: ApiConfig.defaultHeaders,
+        headers: _authHeaders(token),
       );
 
       if (enrollmentsResponse.statusCode != 200) {
@@ -329,7 +362,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
         final eventsResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/classes/$classId/events'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         if (eventsResponse.statusCode == 200) {
@@ -383,12 +416,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
+      final token = user?.token;
 
       if (user?.student?.id != null || user?.id != null) {
         final studentId = user!.student?.id ?? user.id;
         final response = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/grades/student/$studentId'),
-          headers: ApiConfig.defaultHeaders,
+          headers: _authHeaders(token),
         );
 
         if (response.statusCode == 200) {
@@ -662,6 +696,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Widget _buildSidebar() {
+    final user = Provider.of<AuthProvider>(context).user;
+    final studentName =
+        _studentData?['name'] ?? user?.student?.name ?? user?.displayName ?? 'Aluno';
+    final registration =
+        _studentData?['registrationNumber'] ??
+        user?.student?.registrationNumber ??
+        'N/A';
+
     return Container(
       width: 220,
       color: const Color(0xFF2953A5),
@@ -686,7 +728,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            _studentData?['name'] ?? 'Aluno',
+            studentName,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -696,7 +738,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Matrícula: ${_studentData?['registrationNumber'] ?? 'N/A'}',
+            'Matrícula: $registration',
             style: const TextStyle(color: Colors.white70, fontSize: 14),
             textAlign: TextAlign.center,
           ),
@@ -843,6 +885,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Widget _buildProfileHeader() {
+    final user = Provider.of<AuthProvider>(context).user;
+    final studentName =
+        _studentData?['name'] ?? user?.student?.name ?? user?.displayName ?? 'Carregando...';
+    final registration =
+        _studentData?['registrationNumber'] ??
+        user?.student?.registrationNumber ??
+        'N/A';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -865,7 +915,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _studentData?['name'] ?? 'Carregando...',
+                    studentName,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -873,7 +923,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Matrícula: ${_studentData?['registrationNumber'] ?? 'N/A'}',
+                    'Matrícula: $registration',
                     style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 ],
@@ -1093,25 +1143,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 const Text(
                   'Mensagens',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    '2',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
               ],
             ),
