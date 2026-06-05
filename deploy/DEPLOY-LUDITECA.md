@@ -25,7 +25,7 @@ nano .env   # senhas
 ```bash
 docker compose up -d --build
 docker compose ps
-curl -s http://127.0.0.1:3040/health
+curl -s http://127.0.0.1:3150/health
 ```
 
 ## 4. Nginx + HTTPS

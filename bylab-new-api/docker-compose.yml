@@ -24,7 +24,7 @@ services:
     container_name: bylab-api
     restart: unless-stopped
     ports:
-      - "${API_PORT:-3040}:3000"
+      - "${API_PORT:-3150}:3000"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
