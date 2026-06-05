@@ -1,13 +1,15 @@
 # ByLAB ERP
 
-Monorepo: **app Flutter (mobile)** + **API REST**. Configuração unificada em **`erp-app/.env`**.
+Monorepo: **app Flutter (mobile)** + **API REST**.
 
 ```
 erp-app/
-├── .env              ← configuração (não commitar)
-├── .env.example      ← template
-├── docker-compose.yml   ← VPS: só PostgreSQL + API
-├── erp/              → App Flutter (mobile/web local)
+├── .env              ← API + Docker (não commitar)
+├── .env.example
+├── erp/.env          ← Flutter mobile (não commitar)
+├── erp/.env.example
+├── docker-compose.yml
+├── erp/              → App Flutter
 └── bylab-new-api/    → API Node.js + PostgreSQL
 ```
 
@@ -18,8 +20,7 @@ erp-app/
 ```powershell
 cd erp-app
 .\scripts\init-env.ps1
-# Edite .env na raiz
-.\scripts\sync-env.ps1   # copia → erp/.env (asset do Flutter)
+# Edite .env (API) e erp/.env (Flutter)
 ```
 
 ---
@@ -34,19 +35,18 @@ docker compose up -d --build
 
 Guia completo: [deploy/DEPLOY-LUDITECA.md](deploy/DEPLOY-LUDITECA.md)
 
-| Serviço | URL (exemplo Luditeca) |
-|---------|-------------------------|
-| **API** | https://bylab-api.luditeca.com |
-| **Health** | https://bylab-api.luditeca.com/health |
+| Serviço | URL (exemplo) |
+|---------|----------------|
+| **API** | http://SEU_IP:3150 |
+| **Health** | http://SEU_IP:3150/health |
 
 ---
 
 ## App mobile (build local)
 
-Configure URLs no `.env` da raiz e sincronize:
+Configure **`erp/.env`**:
 
 ```powershell
-.\scripts\sync-env.ps1
 cd erp
 flutter run
 # ou: flutter build apk
@@ -69,7 +69,6 @@ npm run dev
 **App Flutter**:
 
 ```powershell
-.\scripts\sync-env.ps1
 cd erp
 flutter run
 ```

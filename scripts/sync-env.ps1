@@ -1,19 +1,19 @@
-# Copia erp-app/.env → erp/.env (Flutter exige o asset dentro de erp/)
+# Garante erp/.env a partir de erp/.env.example (Flutter asset)
 # Uso: .\scripts\sync-env.ps1
 
 $root = Split-Path $PSScriptRoot -Parent
-$source = Join-Path $root ".env"
-$target = Join-Path $root "erp\.env"
+$erpDir = Join-Path $root "erp"
+$target = Join-Path $erpDir ".env"
+$example = Join-Path $erpDir ".env.example"
 
-if (-not (Test-Path $source)) {
-    if (Test-Path (Join-Path $root ".env.example")) {
-        Copy-Item (Join-Path $root ".env.example") $source
-        Write-Host ".env criado a partir de .env.example" -ForegroundColor Yellow
-    } else {
-        Write-Host "Erro: .env nao encontrado na raiz do projeto" -ForegroundColor Red
-        exit 1
-    }
+if (-not (Test-Path $example)) {
+    Write-Host "Erro: erp/.env.example nao encontrado" -ForegroundColor Red
+    exit 1
 }
 
-Copy-Item $source $target -Force
-Write-Host "OK: $source -> $target" -ForegroundColor Green
+if (-not (Test-Path $target)) {
+    Copy-Item $example $target
+    Write-Host ".env criado: $target" -ForegroundColor Yellow
+} else {
+    Write-Host "OK: erp/.env ja existe (nao sobrescrito)" -ForegroundColor Green
+}

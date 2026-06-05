@@ -1,74 +1,59 @@
-# Deploy ByLAB — VPS Luditeca (API + PostgreSQL)
+# Deploy ByLAB — VPS (IP + porta)
 
-O **app Flutter** (mobile) **não** roda na VPS. Só **db** + **api** via Docker.
-Configure as URLs no `.env` local e faça build do app no seu PC.
+O **app Flutter (mobile)** roda no seu PC com `.env` apontando para **IP:porta** da VPS.
+Na VPS só sobem **PostgreSQL + API** via Docker — **sem Nginx, DNS ou HTTPS**.
 
-## 1. DNS na Hostinger
-
-| Tipo | Nome       | Valor     |
-|------|------------|-----------|
-| A    | bylab-api  | IP da VPS |
-| A    | ia         | IP da VPS |
-
-> `api.luditeca.com` e `erp.luditeca.com` pertencem ao **luditeca-vps** — não use para ByLAB.
-
-## 2. `.env` na VPS
+## 1. `.env` na VPS
 
 ```bash
 cd /opt/erp-app
 cp deploy/env.luditeca.example .env
-nano .env   # senhas
+nano .env   # senhas + confirme VPS_IP
 ```
 
-## 3. Docker (só API + banco)
+Remova do `.env` da VPS variáveis que só servem ao mobile (`API_BASE_URL`, etc.) se quiser — o Docker usa só a seção API.
+
+## 2. Docker
 
 ```bash
 docker compose up -d --build
 docker compose ps
 curl -s http://127.0.0.1:3150/health
+curl -s http://187.127.0.245:3150/health
 ```
 
-## 4. Nginx + HTTPS
+## 3. Firewall (se usar ufw)
 
 ```bash
-sudo cp deploy/nginx/bylab-api.luditeca.com.conf /etc/nginx/sites-available/
-sudo cp deploy/nginx/ia.luditeca.com.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/bylab-api.luditeca.com.conf /etc/nginx/sites-enabled/
-sudo ln -sf /etc/nginx/sites-available/ia.luditeca.com.conf /etc/nginx/sites-enabled/
-
-sudo nginx -t
-sudo systemctl reload nginx
-
-sudo certbot --nginx -d bylab-api.luditeca.com -d ia.luditeca.com
+sudo ufw allow 3150/tcp
+sudo ufw allow OpenSSH
+sudo ufw enable
 ```
 
-## 5. App mobile (seu PC)
+## 4. App mobile (seu PC)
 
-No `erp-app/.env` (local):
+Edite **`erp/.env`** (template: `erp/.env.example`):
 
 ```env
 ENVIRONMENT=production
-API_BASE_URL=https://bylab-api.luditeca.com
-UPLOADS_BASE_URL=https://bylab-api.luditeca.com
-TECAAI_BASE_URL=https://ia.luditeca.com
-TECAAI_PATH_PREFIX=/bylab
-ENABLE_HTTPS=true
+API_BASE_URL=http://187.127.0.245:3150
+UPLOADS_BASE_URL=http://187.127.0.245:3150
+TECAAI_BASE_URL=http://187.127.0.245:5010
+ENABLE_HTTPS=false
 ```
 
 ```powershell
-.\scripts\sync-env.ps1
 cd erp
-flutter build apk
-# ou flutter run
+flutter run
 ```
 
 ## URLs
 
 | Serviço | URL |
 |---------|-----|
-| **API ByLAB** | https://bylab-api.luditeca.com |
-| **Health** | https://bylab-api.luditeca.com/health |
-| **TecaAI** | https://ia.luditeca.com/bylab |
+| **API** | http://187.127.0.245:3150 |
+| **Health** | http://187.127.0.245:3150/health |
+| **TecaAI** | http://187.127.0.245:5010 |
 
 ## Login demo
 
