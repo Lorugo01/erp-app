@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../config/api_config.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -14,10 +15,9 @@ import 'student_detail_screen.dart';
 import 'teacher_detail_screen.dart';
 import 'user_detail_screen.dart';
 import 'grade_management_screen.dart';
-import 'admin_settings_screen.dart';
 import 'armario.dart';
 import '../../widgets/admin_responsive_navigation.dart';
-import '../../widgets/admin_app_bar_menu.dart';
+import '../../widgets/bylab_safe_area.dart';
 import 'subjects_management_tab.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -80,7 +80,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorTeachers = e.toString();
+          _errorTeachers = userErrorMessage(e);
         });
       }
     } finally {
@@ -120,7 +120,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao excluir professor: ${e.toString()}'),
+            content: Text('Erro ao excluir professor: ${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -166,7 +166,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorStudents = e.toString();
+          _errorStudents = userErrorMessage(e);
         });
       }
     } finally {
@@ -204,7 +204,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao excluir aluno: ${e.toString()}'),
+            content: Text('Erro ao excluir aluno: ${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -248,7 +248,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorClasses = e.toString();
+          _errorClasses = userErrorMessage(e);
         });
       }
     } finally {
@@ -287,7 +287,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao excluir turma: ${e.toString()}'),
+            content: Text('Erro ao excluir turma: ${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -319,7 +319,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorUsers = e.toString();
+          _errorUsers = userErrorMessage(e);
         });
       }
     } finally {
@@ -358,7 +358,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao excluir usuário: ${e.toString()}'),
+            content: Text('Erro ao excluir usuário: ${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -470,7 +470,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Erro ao cadastrar professor: ${e.toString()}',
+                      'Erro ao cadastrar professor: ${userErrorMessage(e)}',
                     ),
                     backgroundColor: Colors.red,
                   ),
@@ -556,7 +556,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Erro ao cadastrar aluno: ${e.toString()}'),
+                    content: Text('Erro ao cadastrar aluno: ${userErrorMessage(e)}'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -646,7 +646,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Erro ao cadastrar turma: ${e.toString()}'),
+                    content: Text('Erro ao cadastrar turma: ${userErrorMessage(e)}'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -700,7 +700,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Erro ao cadastrar usuário: ${e.toString()}'),
+                    content: Text('Erro ao cadastrar usuário: ${userErrorMessage(e)}'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -1223,7 +1223,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         );
       case 7:
-        return const GradeManagementScreen();
+        return const GradeManagementScreen(embedded: true);
       case 8:
         return _buildSubjectsManagementTab();
       case 9:
@@ -1325,68 +1325,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     Provider.of<AuthProvider>(context, listen: false);
     final isWide = MediaQuery.of(context).size.width > 900;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
-      appBar:
-          isWide
-              ? null
-              : AppBar(
-                backgroundColor: Colors.white,
-                elevation: 0,
-                title: const Text(
-                  'Painel Administrativo',
-                  style: TextStyle(
-                    color: Color(0xFF2953A5),
-                    fontWeight: FontWeight.bold,
+    final content =
+        isWide
+            ? Row(
+              children: [
+                AdminResponsiveNavigation(
+                  selectedIndex: _selectedIndex,
+                  onSelect: (index) {
+                    if (mounted) {
+                      setState(() => _selectedIndex = index);
+                    }
+                  },
+                  onLogout: () => _showLogoutConfirmation(),
+                  isWide: true,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: _buildTabContent(),
                   ),
                 ),
-                actions: [
-                  AdminAppBarMenu(
-                    onConfig: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AdminSettingsScreen(),
-                        ),
-                      );
-                    },
-                    onLogout: () => _showLogoutConfirmation(),
+              ],
+            )
+            : Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: _buildTabContent(),
                   ),
-                ],
-                iconTheme: const IconThemeData(color: Color(0xFF2953A5)),
-              ),
+                ),
+              ],
+            );
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FB),
       body:
           isWide
-              ? Row(
-                children: [
-                  AdminResponsiveNavigation(
-                    selectedIndex: _selectedIndex,
-                    onSelect: (index) {
-                      if (mounted) {
-                        setState(() => _selectedIndex = index);
-                      }
-                    },
-                    onLogout: () => _showLogoutConfirmation(),
-                    isWide: true,
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: _buildTabContent(),
-                    ),
-                  ),
-                ],
-              )
-              : Column(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: _buildTabContent(),
-                    ),
-                  ),
-                ],
-              ),
+              ? BylabSafeArea(child: content)
+              : BylabSafeArea.withBottomNav(child: content),
       bottomNavigationBar:
           isWide
               ? null

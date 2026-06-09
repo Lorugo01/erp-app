@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/grade_period_service.dart';
 import '../../services/grade_type_service.dart';
 
+import '../../widgets/bylab_safe_area.dart';
+
 class GradeManagementScreen extends StatefulWidget {
-  const GradeManagementScreen({super.key});
+  final bool embedded;
+
+  const GradeManagementScreen({super.key, this.embedded = false});
 
   @override
   State<GradeManagementScreen> createState() => _GradeManagementScreenState();
@@ -58,7 +63,7 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorPeriods = e.toString();
+          _errorPeriods = userErrorMessage(e);
         });
       }
     } finally {
@@ -89,7 +94,7 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorGradeTypes = e.toString();
+          _errorGradeTypes = userErrorMessage(e);
         });
       }
     } finally {
@@ -142,7 +147,7 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erro ao excluir período: $e'),
+              content: Text('Erro ao excluir período: \${userErrorMessage(e)}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -192,7 +197,7 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erro ao excluir tipo de nota: $e'),
+              content: Text('Erro ao excluir tipo de nota: \${userErrorMessage(e)}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -243,24 +248,57 @@ class _GradeManagementScreenState extends State<GradeManagementScreen>
 
   @override
   Widget build(BuildContext context) {
+    final tabBar = TabBar(
+      controller: _tabController,
+      labelColor: Colors.white,
+      unselectedLabelColor: Colors.white70,
+      indicatorColor: Colors.white,
+      tabs: const [
+        Tab(text: 'Períodos', icon: Icon(Icons.schedule)),
+        Tab(text: 'Tipos de Nota', icon: Icon(Icons.assignment)),
+      ],
+    );
+
+    final content = TabBarView(
+      controller: _tabController,
+      children: [_buildPeriodsTab(), _buildGradeTypesTab()],
+    );
+
+    if (widget.embedded) {
+      return Column(
+        children: [
+          Material(
+            color: const Color(0xFF2953A5),
+            child: tabBar,
+          ),
+          Expanded(child: content),
+        ],
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gerenciar Sistema de Notas'),
-        backgroundColor: const Color(0xFF2953A5),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: 'Períodos', icon: Icon(Icons.schedule)),
-            Tab(text: 'Tipos de Nota', icon: Icon(Icons.assignment)),
+      body: BylabSafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                'Gerenciar Sistema de Notas',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2953A5),
+                ),
+              ),
+            ),
+            Material(
+              color: const Color(0xFF2953A5),
+              child: tabBar,
+            ),
+            Expanded(child: content),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildPeriodsTab(), _buildGradeTypesTab()],
       ),
     );
   }
@@ -534,7 +572,7 @@ class _AddPeriodDialogState extends State<AddPeriodDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = userErrorMessage(e);
         });
       }
     } finally {
@@ -655,7 +693,7 @@ class _EditPeriodDialogState extends State<EditPeriodDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = userErrorMessage(e);
         });
       }
     } finally {
@@ -773,7 +811,7 @@ class _AddGradeTypeDialogState extends State<AddGradeTypeDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = userErrorMessage(e);
         });
       }
     } finally {
@@ -928,7 +966,7 @@ class _EditGradeTypeDialogState extends State<EditGradeTypeDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = userErrorMessage(e);
         });
       }
     } finally {

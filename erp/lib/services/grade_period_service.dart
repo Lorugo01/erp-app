@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
@@ -49,7 +50,7 @@ class GradePeriodService {
         );
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 

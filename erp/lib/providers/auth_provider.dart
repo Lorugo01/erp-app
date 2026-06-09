@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
-import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _user;
@@ -41,7 +42,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(userErrorMessage(e));
       _setLoading(false);
       return false;
     }
@@ -68,7 +69,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(userErrorMessage(e));
       _setLoading(false);
       return false;
     }
@@ -91,7 +92,7 @@ class AuthProvider extends ChangeNotifier {
       await _saveUserToStorage(updatedUser);
       notifyListeners();
     } catch (e) {
-      _setError('Erro ao atualizar dados do usuário: $e');
+      _setError(userErrorMessage(e, fallback: 'Não foi possível atualizar seus dados.'));
     }
   }
 

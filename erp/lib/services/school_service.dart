@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../models/school.dart';
 import '../config/api_config.dart';
@@ -24,7 +25,7 @@ class SchoolService {
       }
     } catch (e) {
       debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -47,7 +48,7 @@ class SchoolService {
       }
     } catch (e) {
       debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -86,7 +87,7 @@ class SchoolService {
       }
     } catch (e) {
       debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -126,7 +127,7 @@ class SchoolService {
       }
     } catch (e) {
       debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -150,7 +151,7 @@ class SchoolService {
       }
     } catch (e) {
       debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -173,7 +174,7 @@ class SchoolService {
       }
     } catch (e) {
       debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 }

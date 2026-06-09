@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/bylab_safe_area.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -123,21 +124,27 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bem-vindo ao ByLAB ERP'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => authProvider.logout(),
-            tooltip: 'Sair',
-          ),
-        ],
-      ),
-      body: Center(
-        child: Text(
-          'Olá, ${authProvider.user?.displayName ?? 'usuário'}!\nSeu papel: ${authProvider.user?.role.toString().split('.').last ?? ''}',
-          style: const TextStyle(fontSize: 22),
-          textAlign: TextAlign.center,
+      body: BylabSafeArea(
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () => authProvider.logout(),
+                tooltip: 'Sair',
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Text(
+                  'Olá, ${authProvider.user?.displayName ?? 'usuário'}!\nSeu papel: ${authProvider.user?.role.toString().split('.').last ?? ''}',
+                  style: const TextStyle(fontSize: 22),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

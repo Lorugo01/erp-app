@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -74,7 +75,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Erro de conexão: ${e.toString()}';
+        _error = userErrorMessage(e);
       });
     } finally {
       if (mounted) {
@@ -132,7 +133,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao atualizar professor: ${e.toString()}'),
+            content: Text('Erro ao atualizar professor: ${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -849,7 +850,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao excluir professor: ${e.toString()}'),
+          content: Text('Erro ao excluir professor: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -938,7 +939,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                                       ).showSnackBar(
                                         SnackBar(
                                           content: Text(
-                                            'Erro ao selecionar imagem: ${e.toString()}',
+                                            'Erro ao selecionar imagem: ${userErrorMessage(e)}',
                                           ),
                                           backgroundColor: Colors.red,
                                         ),
@@ -1049,7 +1050,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Erro ao fazer upload da foto: ${e.toString()}',
+                                  'Erro ao fazer upload da foto: ${userErrorMessage(e)}',
                                 ),
                                 backgroundColor: Colors.red,
                               ),
@@ -1073,7 +1074,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Erro ao atualizar professor: ${e.toString()}',
+                            'Erro ao atualizar professor: ${userErrorMessage(e)}',
                           ),
                           backgroundColor: Colors.red,
                         ),
@@ -1137,7 +1138,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
         throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 

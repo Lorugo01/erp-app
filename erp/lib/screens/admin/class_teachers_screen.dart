@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -582,7 +583,7 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Erro ao gerenciar matérias: $e',
+                                        'Erro ao gerenciar matérias: ${userErrorMessage(e)}',
                                       ),
                                       backgroundColor: Colors.red,
                                       duration: const Duration(seconds: 5),

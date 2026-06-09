@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/bylab_safe_area.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/school_service.dart';
 import '../../models/school.dart';
@@ -41,7 +42,7 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao carregar escolas: $e')));
+        ).showSnackBar(SnackBar(content: Text('Erro ao carregar escolas: \${userErrorMessage(e)}')));
       }
     }
   }
@@ -52,27 +53,41 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
     final user = authProvider.user;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard do Desenvolvedor'),
-        backgroundColor: const Color(0xFF2953A5),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadSchools,
-            tooltip: 'Atualizar',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => authProvider.logout(),
-            tooltip: 'Sair',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Header com informações do usuário
-          Container(
+      body: BylabSafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Dashboard do Desenvolvedor',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2953A5),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _loadSchools,
+                        tooltip: 'Atualizar',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.logout),
+                        onPressed: () => authProvider.logout(),
+                        tooltip: 'Sair',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Header com informações do usuário
+            Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -231,6 +246,7 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -531,7 +547,7 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao criar escola: $e'),
+                        content: Text('Erro ao criar escola: \${userErrorMessage(e)}'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -669,7 +685,7 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao atualizar escola: $e'),
+                        content: Text('Erro ao atualizar escola: \${userErrorMessage(e)}'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -778,7 +794,7 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao excluir escola: $e'),
+                        content: Text('Erro ao excluir escola: \${userErrorMessage(e)}'),
                         backgroundColor: Colors.red,
                       ),
                     );

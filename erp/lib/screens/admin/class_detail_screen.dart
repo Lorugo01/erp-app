@@ -508,7 +508,7 @@ class _WeeklyScheduleTabState extends State<WeeklyScheduleTab> {
         });
       }
     } catch (e) {
-      debugPrint('Erro ao buscar professores: $e');
+      debugPrint('buscar professores: \${userErrorMessage(e)}');
     }
   }
 

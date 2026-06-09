@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/assignment_service.dart';
@@ -188,7 +189,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       });
     } catch (e) {
       TeacherClassLogger.network('Falha no health check', {
-        'error': e.toString(),
+        'error': userErrorMessage(e),
         'url': '${ApiConfig.baseUrl}/health',
         'baseUrl': ApiConfig.baseUrl,
       });
@@ -208,7 +209,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       });
     } catch (e) {
       TeacherClassLogger.network('Falha no endpoint de turmas', {
-        'error': e.toString(),
+        'error': userErrorMessage(e),
         'url': '${ApiConfig.baseUrl}/classes',
       });
     }
@@ -244,7 +245,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       }
     } catch (e) {
       TeacherClassLogger.network('Falha no teste de autenticação', {
-        'error': e.toString(),
+        'error': userErrorMessage(e),
         'url': '${ApiConfig.baseUrl}/classes',
       });
     }
@@ -298,7 +299,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         });
       } catch (e) {
         TeacherClassLogger.network('Falha na rota $route', {
-          'error': e.toString(),
+          'error': userErrorMessage(e),
           'url': '${ApiConfig.baseUrl}$route',
         });
       }
@@ -476,7 +477,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar disciplinas: $e'),
+            content: Text('Erro ao carregar disciplinas: \${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -764,7 +765,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao carregar notas', e, stackTrace);
       setState(() {
-        _errorGrades = e.toString();
+        _errorGrades = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -814,7 +815,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao carregar atividades', e, stackTrace);
       setState(() {
-        _errorAssignments = e.toString();
+        _errorAssignments = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -933,13 +934,13 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
     } catch (e, stackTrace) {
       TeacherClassLogger.error('Erro ao carregar frequência', e, stackTrace);
       setState(() {
-        _errorAttendance = 'Erro ao carregar chamada: $e';
+        _errorAttendance = userErrorMessage(e);
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar chamada: $e'),
+            content: Text('Erro ao carregar chamada: \${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -1043,7 +1044,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao salvar frequência: $e'),
+            content: Text('Erro ao salvar frequência: \${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
@@ -1174,7 +1175,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erro ao excluir: $e'),
+              content: Text('Erro ao excluir: \${userErrorMessage(e)}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -3051,7 +3052,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erro ao excluir nota: $e'),
+              content: Text('Erro ao excluir nota: \${userErrorMessage(e)}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -3239,7 +3240,7 @@ class _GradeDialogState extends State<GradeDialog> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -3356,7 +3357,7 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
       }
     } catch (e) {
       setState(() {
-        _error = 'Erro ao selecionar arquivo: $e';
+        _error = userErrorMessage(e);
       });
     }
   }
@@ -3391,7 +3392,7 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
       if (dialogContext.mounted) Navigator.of(dialogContext).pop(true);
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = userErrorMessage(e);
       });
     } finally {
       setState(() {

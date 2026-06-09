@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../providers/auth_provider.dart';
 import '../../config/api_config.dart';
 import 'class_details_screen.dart';
+import '../../widgets/bylab_safe_area.dart';
 import 'student_calendar_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
@@ -219,7 +221,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     } catch (e) {
       debugPrint('❌ Erro ao carregar turmas: $e');
       setState(() {
-        _errorClasses = e.toString();
+        _errorClasses = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -678,18 +680,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     _isWide = screenWidth > 600;
 
     return Scaffold(
-      body: Row(
-        children: [
-          if (_isWide) _buildSidebar(),
-          Expanded(
-            child: Column(
-              children: [
-                if (!_isWide) _buildAppBar(),
-                Expanded(child: _buildContent()),
-              ],
-            ),
-          ),
-        ],
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: BylabSafeArea.withBottomNav(
+        child: Row(
+          children: [
+            if (_isWide) _buildSidebar(),
+            Expanded(child: _buildContent()),
+          ],
+        ),
       ),
       bottomNavigationBar: _isWide ? null : _buildBottomNavBar(),
     );
@@ -784,32 +782,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           const SizedBox(height: 24),
         ],
       ),
-    );
-  }
-
-  Widget _buildAppBar() {
-    return AppBar(
-      title: Text(_getPageTitle()),
-      backgroundColor: const Color(0xFF2953A5),
-      foregroundColor: Colors.white,
-      elevation: 0,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.help_outline, color: Colors.white),
-          onPressed: _showHelpDialog,
-          tooltip: 'Ajuda',
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings, color: Colors.white),
-          onPressed: _showSettingsDialog,
-          tooltip: 'Configurações',
-        ),
-        IconButton(
-          icon: const Icon(Icons.logout, color: Colors.white),
-          onPressed: _showLogoutDialog,
-          tooltip: 'Sair',
-        ),
-      ],
     );
   }
 
@@ -1432,13 +1404,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   Widget _buildCalendarTab() {
-    return Navigator(
-      onGenerateRoute: (settings) {
-        return MaterialPageRoute(
-          builder: (context) => const StudentCalendarScreen(),
-        );
-      },
-    );
+    return const StudentCalendarScreen(embedded: true);
   }
 }
 

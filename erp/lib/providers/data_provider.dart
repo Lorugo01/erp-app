@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/user_friendly_error.dart';
 import '../services/teacher_service.dart';
 import '../services/student_service.dart';
 import '../services/user_service.dart';
@@ -43,7 +44,7 @@ class DataProvider extends ChangeNotifier {
       _currentTeacher = updatedTeacher;
       _setLoading(false);
     } catch (e) {
-      _setError('Erro ao atualizar dados do professor: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar dados do professor.'));
       _setLoading(false);
     }
   }
@@ -66,7 +67,7 @@ class DataProvider extends ChangeNotifier {
       };
       _setLoading(false);
     } catch (e) {
-      _setError('Erro ao atualizar dados do aluno: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar dados do aluno.'));
       _setLoading(false);
     }
   }
@@ -80,7 +81,7 @@ class DataProvider extends ChangeNotifier {
       _teachers = updatedTeachers;
       _setLoading(false);
     } catch (e) {
-      _setError('Erro ao atualizar lista de professores: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar lista de professores.'));
       _setLoading(false);
     }
   }
@@ -106,7 +107,7 @@ class DataProvider extends ChangeNotifier {
               .toList();
       _setLoading(false);
     } catch (e) {
-      _setError('Erro ao atualizar lista de alunos: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar lista de alunos.'));
       _setLoading(false);
     }
   }
@@ -133,7 +134,7 @@ class DataProvider extends ChangeNotifier {
 
       _setLoading(false);
     } catch (e) {
-      _setError('Erro ao atualizar dados do professor: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar dados do professor.'));
       _setLoading(false);
     }
   }
@@ -157,7 +158,7 @@ class DataProvider extends ChangeNotifier {
 
       _setLoading(false);
     } catch (e) {
-      _setError('Erro ao atualizar foto do professor: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar foto do professor.'));
       _setLoading(false);
     }
   }
@@ -174,7 +175,7 @@ class DataProvider extends ChangeNotifier {
       _setLoading(false);
       return updatedUser;
     } catch (e) {
-      _setError('Erro ao atualizar dados do usuário: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar dados do usuário.'));
       _setLoading(false);
       rethrow;
     }
@@ -189,7 +190,7 @@ class DataProvider extends ChangeNotifier {
       _setLoading(false);
       return updatedUser;
     } catch (e) {
-      _setError('Erro ao atualizar foto do usuário: $e');
+      _setError(userErrorMessage(e, fallback: 'Erro ao atualizar foto do usuário.'));
       _setLoading(false);
       rethrow;
     }

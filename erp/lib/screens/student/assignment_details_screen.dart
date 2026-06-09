@@ -289,7 +289,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao selecionar arquivo: $e'),
+          content: Text('Erro ao selecionar arquivo: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -401,7 +401,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao enviar entrega: $e'),
+          content: Text('Erro ao enviar entrega: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );

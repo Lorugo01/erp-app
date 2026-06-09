@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import '../../config/api_config.dart';
 import '../../providers/auth_provider.dart';
@@ -129,7 +130,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = e.toString());
+        setState(() => _error = userErrorMessage(e));
       }
     } finally {
       if (mounted) {
@@ -342,7 +343,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Erro ao criar matéria: $e'),
+                                    content: Text('Erro ao criar matéria: \${userErrorMessage(e)}'),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
@@ -503,7 +504,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao excluir matéria: $e'),
+          content: Text('Erro ao excluir matéria: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
         ),

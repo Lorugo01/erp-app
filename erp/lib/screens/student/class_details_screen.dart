@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../config/api_config.dart';
@@ -113,7 +114,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     } catch (e) {
       debugPrint('❌ Erro ao carregar disciplinas: $e');
       setState(() {
-        _errorSubjects = e.toString();
+        _errorSubjects = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -158,7 +159,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     } catch (e) {
       debugPrint('❌ Erro ao carregar períodos: $e');
       setState(() {
-        _errorPeriods = e.toString();
+        _errorPeriods = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -206,7 +207,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     } catch (e) {
       debugPrint('❌ Erro ao carregar atividades: $e');
       setState(() {
-        _errorAssignments = e.toString();
+        _errorAssignments = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -288,7 +289,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     } catch (e) {
       debugPrint('❌ Erro ao carregar notas: $e');
       setState(() {
-        _errorGrades = e.toString();
+        _errorGrades = userErrorMessage(e);
       });
     } finally {
       setState(() {

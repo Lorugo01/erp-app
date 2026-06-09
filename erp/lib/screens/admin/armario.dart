@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/tecaai_service.dart';
@@ -179,7 +180,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
           _isLoading = false;
         });
       }
-      _showSnackBar('Erro: $e');
+      _showSnackBar(userErrorMessage(e));
     }
   }
 
@@ -216,7 +217,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
           _isLoading = false;
         });
       }
-      _showSnackBar('Erro: $e');
+      _showSnackBar(userErrorMessage(e));
     }
   }
 
@@ -282,7 +283,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
           setState(() => _isLoading = false);
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(userErrorMessage(e)), backgroundColor: Colors.red),
         );
       }
     }
@@ -362,7 +363,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
           setState(() => _isLoading = false);
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(userErrorMessage(e)), backgroundColor: Colors.red),
         );
       }
     }
@@ -429,7 +430,7 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
           setState(() => _isLoading = false);
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(userErrorMessage(e)), backgroundColor: Colors.red),
         );
       }
     }

@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../config/api_config.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -94,7 +95,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Erro de conexão:  [${e.toString()}';
+        _error = userErrorMessage(e);
       });
     } finally {
       if (mounted) {
@@ -1182,7 +1183,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                       ).showSnackBar(
                                         SnackBar(
                                           content: Text(
-                                            'Erro ao selecionar imagem: ${e.toString()}',
+                                            'Erro ao selecionar imagem: ${userErrorMessage(e)}',
                                           ),
                                           backgroundColor: Colors.red,
                                         ),
@@ -1341,7 +1342,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Erro ao fazer upload da foto: ${e.toString()}',
+                                  'Erro ao fazer upload da foto: ${userErrorMessage(e)}',
                                 ),
                                 backgroundColor: Colors.red,
                               ),
@@ -1409,7 +1410,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Erro ao atualizar aluno: ${e.toString()}',
+                                'Erro ao atualizar aluno: ${userErrorMessage(e)}',
                               ),
                               backgroundColor: Colors.red,
                             ),
@@ -1425,7 +1426,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Erro ao atualizar aluno: ${e.toString()}',
+                            'Erro ao atualizar aluno: ${userErrorMessage(e)}',
                           ),
                           backgroundColor: Colors.red,
                         ),
@@ -1489,7 +1490,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -1521,7 +1522,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao excluir aluno: ${e.toString()}'),
+          content: Text('Erro ao excluir aluno: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1899,7 +1900,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           );
                         }
                       } catch (e) {
-                        debugPrint('Erro ao lançar nota: $e');
+                        debugPrint('lançar nota: \${userErrorMessage(e)}');
                         debugPrint('Dados enviados:');
                         debugPrint('  studentId: ${widget.student.id}');
                         debugPrint('  subjectId: $subjectId');
@@ -1911,7 +1912,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           ScaffoldMessenger.of(dialogContext).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Erro ao lançar nota: ${e.toString()}',
+                                'Erro ao lançar nota: ${userErrorMessage(e)}',
                               ),
                               backgroundColor: Colors.red,
                             ),
@@ -2165,7 +2166,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       }
       return null;
     } catch (e) {
-      debugPrint('Erro ao verificar nota existente: $e');
+      debugPrint('verificar nota existente: \${userErrorMessage(e)}');
       return null;
     }
   }
@@ -2189,7 +2190,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       }
       return null;
     } catch (e) {
-      debugPrint('Erro ao verificar nota existente: $e');
+      debugPrint('verificar nota existente: \${userErrorMessage(e)}');
       return null;
     }
   }
@@ -2296,7 +2297,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final shift = classData['shift'] ?? '';
     // Monta só com os campos que existem e não são nulos/vazios
     return [name, year, shift]
-        .where((e) => e != null && e.toString().isNotEmpty && e != 'null')
+        .where((e) => e != null && userErrorMessage(e).isNotEmpty && e != 'null')
         .join(' - ');
   }
 
@@ -2657,7 +2658,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao atualizar frequência: $e'),
+          content: Text('Erro ao atualizar frequência: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -2686,7 +2687,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao excluir frequência: $e'),
+          content: Text('Erro ao excluir frequência: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );

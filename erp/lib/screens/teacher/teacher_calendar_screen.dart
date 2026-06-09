@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../config/api_config.dart';
@@ -288,7 +289,7 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
     } catch (e, stackTrace) {
       TeacherCalendarLogger.error('Erro ao carregar turmas', e, stackTrace);
       setState(() {
-        _errorClasses = 'Erro ao carregar turmas: $e';
+        _errorClasses = userErrorMessage(e);
         _loadingClasses = false;
       });
     }
@@ -349,7 +350,7 @@ class _TeacherCalendarScreenState extends State<TeacherCalendarScreen> {
     } catch (e, stackTrace) {
       TeacherCalendarLogger.error('Erro ao carregar eventos', e, stackTrace);
       setState(() {
-        _errorLessons = e.toString();
+        _errorLessons = userErrorMessage(e);
       });
     } finally {
       setState(() {

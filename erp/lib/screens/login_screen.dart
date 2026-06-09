@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/bylab_safe_area.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -24,10 +25,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      body:
-          isMobile
-              ? _buildMobileLayout(authProvider, isLoading, error)
-              : _buildDesktopLayout(authProvider, isLoading, error),
+      body: BylabSafeArea(
+        child:
+            isMobile
+                ? _buildMobileLayout(authProvider, isLoading, error)
+                : _buildDesktopLayout(authProvider, isLoading, error),
+      ),
     );
   }
 

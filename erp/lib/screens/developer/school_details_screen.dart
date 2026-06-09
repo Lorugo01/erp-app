@@ -52,7 +52,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar estatísticas: $e'),
+            content: Text('Erro ao carregar estatísticas: \${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1088,7 +1088,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao criar usuário: $e'),
+                        content: Text('Erro ao criar usuário: \${userErrorMessage(e)}'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1269,7 +1269,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao criar usuário: $e'),
+                        content: Text('Erro ao criar usuário: \${userErrorMessage(e)}'),
                         backgroundColor: Colors.red,
                       ),
                     );

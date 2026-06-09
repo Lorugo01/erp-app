@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../config/api_config.dart';
@@ -6,8 +7,12 @@ import '../../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import '../../widgets/bylab_safe_area.dart';
+
 class StudentCalendarScreen extends StatefulWidget {
-  const StudentCalendarScreen({super.key});
+  final bool embedded;
+
+  const StudentCalendarScreen({super.key, this.embedded = false});
 
   @override
   State<StudentCalendarScreen> createState() => _StudentCalendarScreenState();
@@ -122,7 +127,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
     } catch (e) {
       debugPrint('❌ Erro ao carregar turmas: $e');
       setState(() {
-        _errorClasses = e.toString();
+        _errorClasses = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -183,7 +188,7 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
     } catch (e) {
       debugPrint('❌ Erro ao carregar eventos: $e');
       setState(() {
-        _errorLessons = e.toString();
+        _errorLessons = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -224,14 +229,8 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Horário Semanal'),
-        backgroundColor: const Color(0xFF2953A5),
-        foregroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
+    final body = Column(
+      children: [
           // Seletor de turma
           Container(
             padding: const EdgeInsets.all(16),
@@ -508,7 +507,14 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
                     ),
           ),
         ],
-      ),
+      );
+
+    if (widget.embedded) {
+      return body;
+    }
+
+    return Scaffold(
+      body: BylabSafeArea(child: body),
     );
   }
 

@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../config/api_config.dart';
+import '../utils/api_error.dart';
 import 'package:flutter/material.dart';
 
 class AuthService {
-  // Login
   static Future<User> login(String email, String password) async {
     try {
       final response = await http
@@ -19,18 +19,24 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return User.fromJson(data);
-      } else {
-        debugPrint('❌ Erro HTTP: ${response.statusCode} - ${response.body}');
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Erro no login');
       }
+
+      debugPrint('❌ Erro HTTP login: ${response.statusCode} - ${response.body}');
+      throwApiResponseError(
+        response,
+        fallback: 'Não foi possível entrar. Verifique e-mail e senha.',
+      );
+    } on Exception {
+      rethrow;
     } catch (e) {
-      debugPrint('❌ Erro de conexão: $e');
-      throw Exception('Erro de conexão: $e');
+      debugPrint('❌ Erro de conexão login: $e');
+      rethrowServiceError(
+        e,
+        fallback: 'Não foi possível conectar. Verifique sua internet.',
+      );
     }
   }
 
-  // Registro de usuário
   static Future<User> register({
     required String email,
     required String password,
@@ -54,16 +60,22 @@ class AuthService {
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         return User.fromJson(data);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Erro no registro');
       }
+
+      throwApiResponseError(
+        response,
+        fallback: 'Não foi possível criar a conta. Tente novamente.',
+      );
+    } on Exception {
+      rethrow;
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      rethrowServiceError(
+        e,
+        fallback: 'Não foi possível conectar. Verifique sua internet.',
+      );
     }
   }
 
-  // Registro de admin
   static Future<User> registerAdmin({
     required String email,
     required String password,
@@ -80,16 +92,22 @@ class AuthService {
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         return User.fromJson(data);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Erro no registro de admin');
       }
+
+      throwApiResponseError(
+        response,
+        fallback: 'Não foi possível criar o administrador.',
+      );
+    } on Exception {
+      rethrow;
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      rethrowServiceError(
+        e,
+        fallback: 'Não foi possível conectar. Verifique sua internet.',
+      );
     }
   }
 
-  // Verificar se a API está online
   static Future<bool> checkApiConnection() async {
     try {
       final response = await http.get(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../config/tecaai_config.dart';
@@ -170,7 +171,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }
@@ -208,7 +209,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }
@@ -246,7 +247,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }
@@ -284,7 +285,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }
@@ -400,7 +401,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }
@@ -443,7 +444,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }
@@ -480,7 +481,7 @@ class TecaAIService {
     } catch (e) {
       return TecaAIResponse(
         success: false,
-        error: 'Erro de conexão: $e',
+        error: userErrorMessage(e),
         timestamp: DateTime.now().toIso8601String(),
       );
     }

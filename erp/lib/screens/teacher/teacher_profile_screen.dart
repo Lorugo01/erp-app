@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../config/api_config.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -126,7 +127,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
         e,
         stackTrace,
       );
-      showErrorSnackBar('Erro ao carregar dados: $e');
+      showErrorSnackBar(userErrorMessage(e));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -177,7 +178,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen>
         e,
         stackTrace,
       );
-      showErrorSnackBar('Erro ao atualizar dados: $e');
+      showErrorSnackBar(userErrorMessage(e));
     } finally {
       setState(() => _isLoading = false);
     }

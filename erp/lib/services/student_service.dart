@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
@@ -28,7 +29,7 @@ class Student {
       id: json['id'],
       name: json['name'],
       registrationNumber: json['registrationNumber'],
-      subjects: (json['subjects'] as List?)?.map((e) => e.toString()).toList(),
+      subjects: (json['subjects'] as List?)?.map((e) => userErrorMessage(e)).toList(),
       email: json['email'] ?? (json['user']?['email'] ?? ''),
       createdAt:
           json['createdAt'] != null
@@ -83,7 +84,7 @@ class StudentService {
         throw Exception('Erro ao buscar aluno: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -102,7 +103,7 @@ class StudentService {
         throw Exception('Erro ao buscar aluno: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 

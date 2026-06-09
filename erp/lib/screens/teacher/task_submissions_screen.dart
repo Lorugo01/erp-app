@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../services/assignment_service.dart';
 import '../../config/api_config.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -136,7 +137,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     } catch (e, stackTrace) {
       TaskSubmissionsLogger.error('Erro ao carregar submissões', e, stackTrace);
       setState(() {
-        _error = e.toString();
+        _error = userErrorMessage(e);
       });
     } finally {
       setState(() {
@@ -272,7 +273,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao duplicar atividade: $e'),
+            content: Text('Erro ao duplicar atividade: \${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
@@ -45,7 +46,7 @@ class TeacherService {
         throw Exception('Erro ao buscar professor: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -106,7 +107,7 @@ class TeacherService {
         throw Exception('Erro ao buscar turmas do professor');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -131,7 +132,7 @@ class TeacherService {
         throw Exception('Erro ao buscar disciplinas da turma');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -153,7 +154,7 @@ class TeacherService {
         throw Exception('Erro ao buscar alunos da turma');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 }

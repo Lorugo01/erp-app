@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import '../../config/api_config.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -389,7 +390,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Erro ao selecionar imagem: ${e.toString()}',
+                                          'Erro ao selecionar imagem: ${userErrorMessage(e)}',
                                         ),
                                         backgroundColor: Colors.red,
                                       ),
@@ -494,7 +495,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Erro ao fazer upload da foto: ${e.toString()}',
+                                'Erro ao fazer upload da foto: ${userErrorMessage(e)}',
                               ),
                               backgroundColor: Colors.red,
                             ),
@@ -543,7 +544,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Erro ao atualizar usuário: ${e.toString()}',
+                              'Erro ao atualizar usuário: ${userErrorMessage(e)}',
                             ),
                             backgroundColor: Colors.red,
                           ),
@@ -558,7 +559,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Erro ao atualizar usuário: ${e.toString()}',
+                            'Erro ao atualizar usuário: ${userErrorMessage(e)}',
                           ),
                           backgroundColor: Colors.red,
                         ),
@@ -622,7 +623,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         throw Exception(error['error'] ?? 'Erro ao fazer upload da foto');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -644,7 +645,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao excluir usuário: ${e.toString()}'),
+          content: Text('Erro ao excluir usuário: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );

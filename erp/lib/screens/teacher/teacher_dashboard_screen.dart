@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/data_provider.dart';
+import '../../widgets/bylab_safe_area.dart';
 import '../../widgets/data_refresh_widget.dart';
 import '../../services/teacher_service.dart';
 import '../../services/tecaai_service.dart';
@@ -113,6 +115,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging &&
+          _tabController.index == 1 &&
+          _allStudents.isEmpty &&
+          !_loadingStudents) {
+        _loadAllStudents();
+      }
+    });
 
     // Debug inicial
     TeacherDashboardLogger.info('Inicializando dashboard do professor');
@@ -361,28 +371,60 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       }
     } catch (e) {
       setState(() {
-        _errorClasses = e.toString();
+        _errorClasses = userErrorMessage(e);
         _loadingClasses = false;
       });
     }
   }
 
   Future<void> _loadAllStudents() async {
+    if (!mounted) return;
     setState(() {
       _loadingStudents = true;
       _errorStudents = null;
     });
 
     try {
-      final dataProvider = Provider.of<DataProvider>(context, listen: false);
-      await dataProvider.refreshStudents();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.user?.token;
+
+      if (_teacherClasses.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _allStudents = [];
+          _loadingStudents = false;
+        });
+        return;
+      }
+
+      final List<Map<String, dynamic>> allStudents = [];
+      for (final classData in _teacherClasses) {
+        final classId = classData['id']?.toString();
+        if (classId == null) continue;
+        final students = await TeacherService.getClassStudents(
+          classId,
+          token: token,
+        );
+        allStudents.addAll(students);
+      }
+
+      final uniqueStudents = <String, Map<String, dynamic>>{};
+      for (final student in allStudents) {
+        final id = student['id']?.toString();
+        if (id != null) {
+          uniqueStudents[id] = student;
+        }
+      }
+
+      if (!mounted) return;
       setState(() {
-        _allStudents = dataProvider.students;
+        _allStudents = uniqueStudents.values.toList();
         _loadingStudents = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorStudents = e.toString();
+        _errorStudents = userErrorMessage(e);
         _loadingStudents = false;
       });
     }
@@ -618,7 +660,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                                               ).showSnackBar(
                                                 SnackBar(
                                                   content: Text(
-                                                    'Erro ao selecionar imagem: $e',
+                                                    'selecionar imagem: \${userErrorMessage(e)}',
                                                   ),
                                                   backgroundColor: Colors.red,
                                                 ),
@@ -816,7 +858,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Erro ao atualizar perfil: $e',
+                                          'atualizar perfil: \${userErrorMessage(e)}',
                                         ),
                                         backgroundColor: Colors.red,
                                       ),
@@ -871,7 +913,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       TeacherDashboardLogger.info('Foto do professor atualizada com sucesso');
     } catch (e) {
       TeacherDashboardLogger.error('Erro no upload da foto', e);
-      throw Exception('Erro ao atualizar foto: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -893,88 +935,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     });
   }
 
-  Future<void> _fetchTeacherClasses() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final teacherId = authProvider.user?.teacher?.id;
-
-    if (teacherId == null) {
-      if (!mounted) return;
-      setState(() {
-        _errorClasses =
-            'Professor não encontrado. Verifique se você está logado como professor.';
-      });
-      return;
-    }
-
-    TeacherDashboardLogger.api('/teachers/$teacherId/classes', 'GET');
-    try {
-      final classes = await TeacherService.getTeacherClasses(
-        teacherId,
-        token: authProvider.user?.token,
-      );
-      TeacherDashboardLogger.debug('Classes encontradas', {
-        'total': classes.length,
-      });
-      if (!mounted) return;
-      setState(() {
-        _teacherClasses = classes;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorClasses = e.toString();
-      });
-    }
-
-    if (mounted) {
-      setState(() {
-        _loadingClasses = false;
-      });
-    }
+  Future<void> _fetchStudentsFromClasses() async {
+    await _loadTeacherClasses();
+    await _loadAllStudents();
   }
 
-  Future<void> _fetchStudentsFromClasses() async {
-    if (!mounted) return;
-    setState(() {
-      _loadingStudents = true;
-      _errorStudents = null;
-    });
-
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      List<Map<String, dynamic>> allStudents = [];
-
-      for (final classData in _teacherClasses) {
-        final classId = classData['id'];
-        final students = await TeacherService.getClassStudents(
-          classId,
-          token: authProvider.user?.token,
-        );
-        allStudents.addAll(students);
-      }
-
-      // Remove duplicatas baseado no ID do aluno
-      final uniqueStudents = <String, Map<String, dynamic>>{};
-      for (final student in allStudents) {
-        uniqueStudents[student['id']] = student;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _allStudents = uniqueStudents.values.toList();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorStudents = e.toString();
-      });
-    }
-
-    if (mounted) {
-      setState(() {
-        _loadingStudents = false;
-      });
-    }
+  Future<void> _fetchTeacherClasses() async {
+    await _loadTeacherClasses();
+    await _loadAllStudents();
   }
 
   List<Map<String, dynamic>> get _filteredStudents {
@@ -1001,41 +969,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFEFEFEF),
-      appBar:
-          isWide
-              ? null
-              : AppBar(
-                backgroundColor: const Color(0xFF2953A5),
-                elevation: 0,
-                title: Text(
-                  _getTabTitle(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.help_outline, color: Colors.white),
-                    onPressed: _showHelpDialog,
-                    tooltip: 'Ajuda',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.white),
-                    onPressed: _showSettingsDialog,
-                    tooltip: 'Configurações',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.logout, color: Colors.white),
-                    onPressed: _showLogoutConfirmation,
-                    tooltip: 'Sair',
-                  ),
-                ],
-              ),
-      body:
-          isWide
-              ? _buildWideLayout(authProvider)
-              : _buildMobileLayout(authProvider),
+      body: BylabSafeArea.withBottomNav(
+        child:
+            isWide
+                ? _buildWideLayout(authProvider)
+                : _buildMobileLayout(authProvider),
+      ),
       bottomNavigationBar: isWide ? null : _buildBottomNavigation(),
     );
   }
@@ -2183,7 +2122,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao executar comando: $e'),
+          content: Text('Erro ao executar comando: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -2245,7 +2184,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao localizar item: $e'),
+          content: Text('Erro ao localizar item: \${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -2647,7 +2586,7 @@ class _StudentCardState extends State<_StudentCard> {
       TeacherDashboardLogger.error('Erro ao carregar turmas', error);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao carregar turmas: $error'),
+          content: Text('Erro ao carregar turmas: \${userErrorMessage(error)}'),
           backgroundColor: Colors.red,
         ),
       );

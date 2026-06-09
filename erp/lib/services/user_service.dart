@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../config/api_config.dart';
@@ -30,7 +31,7 @@ class UserService {
         throw Exception('Erro ao buscar usuários: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -48,7 +49,7 @@ class UserService {
         throw Exception('Erro ao buscar usuário: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 
@@ -132,7 +133,7 @@ class UserService {
         throw Exception(error['error'] ?? 'Erro ao criar usuário');
       }
     } catch (e) {
-      throw Exception('Erro de conexão: $e');
+      throw Exception(userErrorMessage(e));
     }
   }
 }

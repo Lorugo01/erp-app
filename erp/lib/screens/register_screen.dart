@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/bylab_safe_area.dart';
 import '../providers/auth_provider.dart';
 import '../models/user.dart';
 
@@ -31,7 +32,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final error = authProvider.error;
 
     return Scaffold(
-      body: Row(
+      body: BylabSafeArea(
+        child: Row(
         children: [
           // Lado esquerdo azul com logo
           Expanded(
@@ -310,6 +312,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

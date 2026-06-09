@@ -86,7 +86,7 @@ class _ClassStudentsScreenState extends State<ClassStudentsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao remover aluno: $e')));
+      ).showSnackBar(SnackBar(content: Text('Erro ao remover aluno: \${userErrorMessage(e)}')));
     }
   }
 
