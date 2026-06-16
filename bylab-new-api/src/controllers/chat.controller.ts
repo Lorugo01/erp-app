@@ -24,13 +24,13 @@ export const getChatById = async (req: Request, res: Response) => {
 
 export const createChat = async (req: Request, res: Response) => {
   try {
-    const { title, participants } = req.body;
+    const { title, participants, schoolId } = req.body;
     
     if (!title) {
       return res.status(400).json({ error: 'Título do chat é obrigatório' });
     }
 
-    const chat = await ChatService.createChat({ title, participants });
+    const chat = await ChatService.createChat({ title, participants, schoolId });
     res.status(201).json(chat);
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });

@@ -132,19 +132,26 @@ export const getChatById = async (id: string) => {
 export const createChat = async (data: {
   title: string;
   participants?: string[];
+  schoolId?: string;
 }) => {
-  // Removido: Verificação de título único
-  // const existingChat = await prisma.chat.findFirst({
-  //   where: { title: data.title }
-  // });
-  // if (existingChat) {
-  //   throw new Error('Já existe um chat com este título');
-  // }
+  let schoolId = data.schoolId;
 
-  // Cria o chat normalmente
+  if (!schoolId && data.participants && data.participants.length > 0) {
+    const user = await prisma.user.findUnique({
+      where: { id: data.participants[0] },
+      select: { schoolId: true },
+    });
+    schoolId = user?.schoolId ?? undefined;
+  }
+
+  if (!schoolId) {
+    schoolId = 'default-school-id';
+  }
+
   const chat = await prisma.chat.create({
     data: {
-      title: data.title
+      title: data.title,
+      schoolId,
     },
     include: {
       participants: {

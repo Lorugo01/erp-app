@@ -1972,71 +1972,53 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                       ),
                                     ),
 
-                                    // Radio button Presente
                                     Expanded(
-                                      flex: 1,
-                                      child: Center(
-                                        child: Radio<String>(
-                                          value: 'PRESENT',
-                                          groupValue: currentStatus,
-                                          onChanged: (String? value) {
-                                            if (value != null) {
-                                              setState(() {
-                                                _attendanceMap[studentId] =
-                                                    value;
-                                                _justificationMap[studentId] =
-                                                    ''; // Limpa justificativa
-                                              });
+                                      flex: 3,
+                                      child: RadioGroup<String>(
+                                        groupValue: currentStatus,
+                                        onChanged: (String? value) {
+                                          if (value == null) return;
+                                          setState(() {
+                                            _attendanceMap[studentId] = value;
+                                            if (value != 'JUSTIFIED_ABSENT') {
+                                              _justificationMap[studentId] =
+                                                  '';
                                             }
-                                          },
-                                          activeColor: Colors.green,
-                                        ),
-                                      ),
-                                    ),
-
-                                    // Radio button Falta
-                                    Expanded(
-                                      flex: 1,
-                                      child: Center(
-                                        child: Radio<String>(
-                                          value: 'ABSENT',
-                                          groupValue: currentStatus,
-                                          onChanged: (String? value) {
-                                            if (value != null) {
-                                              setState(() {
-                                                _attendanceMap[studentId] =
-                                                    value;
-                                                _justificationMap[studentId] =
-                                                    ''; // Limpa justificativa
-                                              });
-                                            }
-                                          },
-                                          activeColor: Colors.red,
-                                        ),
-                                      ),
-                                    ),
-
-                                    // Radio button Falta Justificada
-                                    Expanded(
-                                      flex: 1,
-                                      child: Center(
-                                        child: Radio<String>(
-                                          value: 'JUSTIFIED_ABSENT',
-                                          groupValue: currentStatus,
-                                          onChanged: (String? value) {
-                                            if (value != null) {
-                                              setState(() {
-                                                _attendanceMap[studentId] =
-                                                    value;
-                                              });
-                                              // Mostrar dialog para justificativa
-                                              _showJustificationDialog(
-                                                studentId,
-                                                student['name'],
-                                              );
-                                            }
-                                          },
-                                          activeColor: Colors.orange,
+                                          });
+                                          if (value == 'JUSTIFIED_ABSENT') {
+                                            _showJustificationDialog(
+                                              studentId,
+                                              student['name'],
+                                            );
+                                          }
+                                        },
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Center(
+                                                child: Radio<String>(
+                                                  value: 'PRESENT',
+                                                  activeColor: Colors.green,
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Center(
+                                                child: Radio<String>(
+                                                  value: 'ABSENT',
+                                                  activeColor: Colors.red,
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Center(
+                                                child: Radio<String>(
+                                                  value: 'JUSTIFIED_ABSENT',
+                                                  activeColor: Colors.orange,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
