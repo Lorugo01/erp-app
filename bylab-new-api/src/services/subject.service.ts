@@ -1,30 +1,36 @@
 import prisma from '../prisma/client';
+import {
+  ensureSchoolSubject,
+  getSubjectLabel,
+} from './schoolSubject.service';
+
+export { getSubjectLabel };
 
 export const getAllSubjects = (schoolId?: string, role?: string) => {
-  // DEVELOPER pode ver todas as disciplinas
   if (role === 'DEVELOPER') {
     return prisma.subject.findMany({
       include: {
         class: true,
         teacher: true,
         lessons: true,
+        schoolSubject: true,
       },
     });
   }
 
-  // Outros usuários só veem disciplinas da sua escola
   if (!schoolId) {
     throw new Error('School ID é obrigatório para usuários não-developer');
   }
 
   return prisma.subject.findMany({
     where: {
-      schoolId: schoolId
+      schoolId: schoolId,
     },
     include: {
       class: true,
       teacher: true,
       lessons: true,
+      schoolSubject: true,
     },
   });
 };
@@ -40,6 +46,7 @@ export const getSubjectById = async (id: string) => {
       class: true,
       teacher: true,
       lessons: true,
+      schoolSubject: true,
     },
   });
 
@@ -50,46 +57,67 @@ export const getSubjectById = async (id: string) => {
   return subject;
 };
 
-export const createSubject = async (data: {
-  type: string;
-  classId: string;
-  teacherId: string;
-}, schoolId?: string, role?: string) => {
-  // Verificar se a turma existe e obter o schoolId dela
+export const createSubject = async (
+  data: {
+    type: string;
+    classId: string;
+    teacherId: string;
+    name?: string;
+  },
+  schoolId?: string,
+  role?: string,
+) => {
   const turma = await prisma.class.findUnique({
     where: { id: data.classId },
-    select: { id: true, name: true, schoolId: true }
+    select: { id: true, name: true, schoolId: true },
   });
 
   if (!turma) throw new Error('Turma não encontrada');
 
-  // Verificar se o professor existe e obter o schoolId dele
   const professor = await prisma.teacher.findUnique({
     where: { id: data.teacherId },
-    select: { id: true, schoolId: true }
+    select: { id: true, schoolId: true },
   });
 
   if (!professor) throw new Error('Professor não encontrado');
 
-  // Verificar se a turma e o professor são da mesma escola
   if (turma.schoolId !== professor.schoolId) {
     throw new Error('Turma e professor devem ser da mesma escola');
   }
 
-  // Para usuários não-developer, verificar se estão criando na escola correta
   if (role !== 'DEVELOPER' && schoolId && turma.schoolId !== schoolId) {
-    throw new Error('Não é possível criar disciplina em escola diferente da sua');
+    throw new Error(
+      'Não é possível criar disciplina em escola diferente da sua',
+    );
   }
 
-  const subjectLabel = getSubjectLabel(data.type);
-  const name = `${subjectLabel} - ${turma.name}`;
+  const existing = await prisma.subject.findFirst({
+    where: { classId: data.classId, type: data.type as any },
+  });
+  if (existing) {
+    throw new Error('Esta matéria já está vinculada a esta turma');
+  }
+
+  const catalog = await ensureSchoolSubject(
+    turma.schoolId,
+    data.type,
+    data.name,
+  );
 
   return prisma.subject.create({
     data: {
-      ...data,
-      name,
-      schoolId: turma.schoolId // Usar o schoolId da turma
-    }
+      type: data.type as any,
+      classId: data.classId,
+      teacherId: data.teacherId,
+      name: catalog.name,
+      schoolId: turma.schoolId,
+      schoolSubjectId: catalog.id,
+    },
+    include: {
+      class: true,
+      teacher: true,
+      schoolSubject: true,
+    },
   });
 };
 
@@ -100,53 +128,45 @@ export const getSubjectsByClassId = async (classId: string) => {
       class: true,
       teacher: true,
       lessons: true,
+      schoolSubject: true,
     },
   });
 };
 
-export const getSubjectsByClassIdAndTeacher = async (classId: string, teacherId: string) => {
+export const getSubjectsByClassIdAndTeacher = async (
+  classId: string,
+  teacherId: string,
+) => {
   return prisma.subject.findMany({
-    where: { 
+    where: {
       classId,
-      teacherId 
+      teacherId,
     },
     include: {
       class: true,
       teacher: true,
       lessons: true,
+      schoolSubject: true,
     },
   });
 };
 
-function getSubjectLabel(type: string): string {
-  const map = {
-    LINGUA_INGLESA: "Língua Inglesa",
-    ARTE: "Arte",
-    EDUCACAO_FISICA: "Educação Física",
-    MATEMATICA: "Matemática",
-    CIENCIAS: "Ciências",
-    HISTORIA: "História",
-    GEOGRAFIA: "Geografia",
-    ENSINO_RELIGIOSO: "Ensino Religioso",
-    BIOLOGIA: "Biologia",
-    FISICA: "Física",
-    QUIMICA: "Química",
-    FILOSOFIA: "Filosofia",
-    SOCIOLOGIA: "Sociologia",
-    CONTEUDO_INTERDISCIPLINAR: "Conteúdo Interdisciplinar"
-  };
-
-  return map[type as keyof typeof map] || type;
-}
-
-export const updateSubject = (id: string, data: {
-  name?: string;
-  classId?: string;
-  teacherId?: string;
-}) => {
+export const updateSubject = (
+  id: string,
+  data: {
+    name?: string;
+    classId?: string;
+    teacherId?: string;
+  },
+) => {
   return prisma.subject.update({
     where: { id },
     data,
+    include: {
+      class: true,
+      teacher: true,
+      schoolSubject: true,
+    },
   });
 };
 

@@ -1,5 +1,4 @@
 import 'environment.dart';
-import "package:flutter/material.dart";
 
 /// Configuração centralizada do aplicativo
 ///
@@ -36,23 +35,7 @@ class AppConfig {
   static bool get enableCrashReporting => EnvironmentConfig.enableCrashReporting;
 
   static void printCurrentConfig() {
-    debugPrint('🔧 === CONFIGURAÇÕES ATUAIS DO APP ===');
-    debugPrint('🌍 Ambiente: ${environment.name.toUpperCase()}');
-    debugPrint('🔗 API Base URL: $apiBaseUrl');
-    debugPrint('🤖 TecaAI Base URL: $tecaaiBaseUrl');
-    debugPrint('📁 Uploads Base URL: $uploadsBaseUrl');
-    debugPrint('⏱️ API Timeout: ${apiRequestTimeout}s');
-    debugPrint('⏱️ TecaAI Timeout: ${tecaaiRequestTimeout}s');
-    debugPrint(
-      '📏 Max File Size: ${(maxFileSize / (1024 * 1024)).toStringAsFixed(1)}MB',
-    );
-    debugPrint('🔒 HTTPS: $enableHttps');
-    debugPrint('🌐 CORS: $enableCors');
-    debugPrint('🐛 Debug Mode: $debugMode');
-    debugPrint('📝 Log Level: $logLevel');
-    debugPrint('📊 Analytics: $enableAnalytics');
-    debugPrint('🚨 Crash Reporting: $enableCrashReporting');
-    debugPrint('=====================================');
+    // Reservado para diagnóstico manual — não imprime no startup.
   }
 
   static List<String> validateConfig() {

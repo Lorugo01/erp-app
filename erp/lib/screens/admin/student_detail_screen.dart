@@ -377,93 +377,78 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: SizedBox(
-                            width: 400,
-                            child: DropdownButtonFormField<String>(
-                              initialValue:
-                                  selectedClassId ??
-                                  ((_studentDetails!['enrollments'] as List)
-                                          .isNotEmpty
-                                      ? (_studentDetails!['enrollments']
-                                          as List)[0]['class']['id']
-                                      : null),
-                              hint: const Text('Selecione a turma'),
-                              items:
-                                  (_studentDetails!['enrollments'] as List).map<
-                                    DropdownMenuItem<String>
-                                  >((enrollment) {
-                                    final classData = enrollment['class'];
-                                    return DropdownMenuItem<String>(
-                                      value: classData['id'],
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.class_,
-                                            size: 16,
-                                            color: Colors.blue[600],
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            child: Text(
-                                              _formatClassLabel(classData),
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  selectedClassId = newValue;
-                                });
-                              },
-                              style: TextStyle(
-                                color: Colors.grey[800],
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: Colors.grey[50],
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey[300]!,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey[300]!,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Colors.blue[400]!,
-                                    width: 2,
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.school,
-                                  color: Colors.blue[600],
-                                ),
-                                suffixIcon: Icon(
-                                  Icons.arrow_drop_down,
-                                  color: Colors.grey[600],
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue:
+                                selectedClassId ??
+                                ((_studentDetails!['enrollments'] as List)
+                                        .isNotEmpty
+                                    ? (_studentDetails!['enrollments']
+                                        as List)[0]['class']['id']
+                                    : null),
+                            hint: const Text(
+                              'Selecione a turma',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            items:
+                                (_studentDetails!['enrollments'] as List)
+                                    .map<DropdownMenuItem<String>>((
+                                      enrollment,
+                                    ) {
+                                      final classData = enrollment['class'];
+                                      return DropdownMenuItem<String>(
+                                        value: classData['id'],
+                                        child: Text(
+                                          _formatClassLabel(classData),
+                                          style: const TextStyle(fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      );
+                                    })
+                                    .toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                selectedClassId = newValue;
+                              });
+                            },
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
                                 ),
                               ),
-                              icon: const SizedBox.shrink(),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.blue[400]!,
+                                  width: 2,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.school,
+                                color: Colors.blue[600],
+                              ),
                             ),
                           ),
                         ),
@@ -540,6 +525,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                             vertical: 8.0,
                           ),
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true,
                             initialValue: selectedSubjectIdForAttendance,
                             decoration: InputDecoration(
                               labelText: 'Filtrar por matéria',
@@ -1901,12 +1887,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                         }
                       } catch (e) {
                         debugPrint('lançar nota: \${userErrorMessage(e)}');
-                        debugPrint('Dados enviados:');
-                        debugPrint('  studentId: ${widget.student.id}');
-                        debugPrint('  subjectId: $subjectId');
-                        debugPrint('  typeId: $gradeTypeId');
-                        debugPrint('  periodId: $periodId');
-                        debugPrint('  value: $value');
 
                         if (dialogContext.mounted) {
                           ScaffoldMessenger.of(dialogContext).showSnackBar(
@@ -1999,11 +1979,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
               // Debug: verificar estrutura dos dados
               if (grades.isNotEmpty) {
-                debugPrint('Estrutura da primeira nota:');
-                debugPrint('${grades.first}');
-                debugPrint('TypeId: ${grades.first['typeId']}');
-                debugPrint('GradeTypeId: ${grades.first['gradeTypeId']}');
-                debugPrint('Type object: ${grades.first['type']}');
               }
               if (grades.isEmpty) {
                 return Column(
@@ -2292,13 +2267,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   String _formatClassLabel(Map classData) {
-    final name = classData['name'] ?? '';
-    final year = classData['year']?.toString() ?? '';
-    final shift = classData['shift'] ?? '';
-    // Monta só com os campos que existem e não são nulos/vazios
-    return [name, year, shift]
-        .where((e) => e != null && userErrorMessage(e).isNotEmpty && e != 'null')
-        .join(' - ');
+    final name = classData['name']?.toString().trim() ?? '';
+    if (name.isNotEmpty) return name;
+
+    final grade = classData['grade']?.toString() ?? '';
+    final letter = classData['letter']?.toString() ?? '';
+    final year =
+        classData['academicYear']?.toString() ??
+        classData['year']?.toString() ??
+        '';
+    final shift = classData['shift']?.toString() ?? '';
+
+    final parts = <String>[
+      if (grade.isNotEmpty && letter.isNotEmpty) '$gradeº Ano $letter',
+      if (year.isNotEmpty) year,
+      if (shift.isNotEmpty) shift,
+    ];
+    return parts.isEmpty ? 'Turma' : parts.join(' - ');
   }
 
   // Função para filtrar frequências por matéria e aplicar limitação

@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/data_provider.dart';
 import '../../widgets/bylab_safe_area.dart';
 import '../../widgets/data_refresh_widget.dart';
+import '../../utils/responsive.dart';
 import '../../services/teacher_service.dart';
 import '../../services/tecaai_service.dart';
 import 'dart:async';
@@ -21,17 +22,11 @@ import 'teacher_calendar_screen.dart';
 class TeacherDashboardLogger {
   static const String _prefix = '🏫 [TeacherDashboard]';
 
-  static void info(String message) {
-    debugPrint('$_prefix ℹ️ $message');
-  }
+  static void info(String message) {}
 
-  static void success(String message) {
-    debugPrint('$_prefix ✅ $message');
-  }
+  static void success(String message) {}
 
-  static void warning(String message) {
-    debugPrint('$_prefix ⚠️ $message');
-  }
+  static void warning(String message) {}
 
   static void error(String message, [dynamic error, StackTrace? stackTrace]) {
     debugPrint('$_prefix ❌ $message');
@@ -43,37 +38,17 @@ class TeacherDashboardLogger {
     }
   }
 
-  static void debug(String message, [Map<String, dynamic>? data]) {
-    debugPrint('$_prefix 🐛 $message');
-    if (data != null) {
-      debugPrint('$_prefix 📊 Dados: $data');
-    }
-  }
+  static void debug(String message, [Map<String, dynamic>? data]) {}
 
   static void api(
     String endpoint,
     String method, [
     Map<String, dynamic>? params,
-  ]) {
-    debugPrint('$_prefix 🌐 API: $method $endpoint');
-    if (params != null) {
-      debugPrint('$_prefix 📝 Parâmetros: $params');
-    }
-  }
+  ]) {}
 
-  static void state(String message, [Map<String, dynamic>? state]) {
-    debugPrint('$_prefix 🔄 Estado: $message');
-    if (state != null) {
-      debugPrint('$_prefix 📊 Estado atual: $state');
-    }
-  }
+  static void state(String message, [Map<String, dynamic>? state]) {}
 
-  static void armario(String message, [Map<String, dynamic>? data]) {
-    debugPrint('$_prefix 🗄️ [Armário] $message');
-    if (data != null) {
-      debugPrint('$_prefix 📊 Dados do armário: $data');
-    }
-  }
+  static void armario(String message, [Map<String, dynamic>? data]) {}
 }
 
 class TeacherDashboardScreen extends StatefulWidget {
@@ -965,16 +940,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final isWide = MediaQuery.of(context).size.width > 900;
+    final isWide = AppResponsive.useSideNav(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFEFEFEF),
-      body: BylabSafeArea.withBottomNav(
-        child:
-            isWide
-                ? _buildWideLayout(authProvider)
-                : _buildMobileLayout(authProvider),
-      ),
+      body:
+          isWide
+              ? BylabSafeArea(child: _buildWideLayout(authProvider))
+              : BylabSafeArea.withBottomNav(
+                child: _buildMobileLayout(authProvider),
+              ),
       bottomNavigationBar: isWide ? null : _buildBottomNavigation(),
     );
   }
@@ -982,75 +957,79 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   Widget _buildWideLayout(AuthProvider authProvider) {
     return Row(
       children: [
-        // Menu lateral azul
         Container(
           width: 220,
           color: const Color(0xFF2953A5),
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    _SidebarButton(
-                      icon: Icons.class_,
-                      label: 'Minhas Turmas',
-                      selected: _tabController.index == 0,
-                      onTap: () => setState(() => _tabController.animateTo(0)),
-                    ),
-                    _SidebarButton(
-                      icon: Icons.groups,
-                      label: 'Meus Alunos',
-                      selected: _tabController.index == 1,
-                      onTap: () => setState(() => _tabController.animateTo(1)),
-                    ),
-                    _SidebarButton(
-                      icon: Icons.inventory_2,
-                      label: 'Armários',
-                      selected: _tabController.index == 2,
-                      onTap: () => setState(() => _tabController.animateTo(2)),
-                    ),
-                    _SidebarButton(
-                      icon: Icons.calendar_today,
-                      label: 'Agenda',
-                      selected: _tabController.index == 3,
-                      onTap: () => setState(() => _tabController.animateTo(3)),
-                    ),
-                  ],
+          child: SafeArea(
+            right: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      _SidebarButton(
+                        icon: Icons.class_,
+                        label: 'Minhas Turmas',
+                        selected: _tabController.index == 0,
+                        onTap:
+                            () => setState(() => _tabController.animateTo(0)),
+                      ),
+                      _SidebarButton(
+                        icon: Icons.groups,
+                        label: 'Meus Alunos',
+                        selected: _tabController.index == 1,
+                        onTap:
+                            () => setState(() => _tabController.animateTo(1)),
+                      ),
+                      _SidebarButton(
+                        icon: Icons.inventory_2,
+                        label: 'Armários',
+                        selected: _tabController.index == 2,
+                        onTap:
+                            () => setState(() => _tabController.animateTo(2)),
+                      ),
+                      _SidebarButton(
+                        icon: Icons.calendar_today,
+                        label: 'Agenda',
+                        selected: _tabController.index == 3,
+                        onTap:
+                            () => setState(() => _tabController.animateTo(3)),
+                      ),
+                      const Divider(
+                        color: Colors.white54,
+                        indent: 16,
+                        endIndent: 16,
+                      ),
+                      _SidebarButton(
+                        icon: Icons.help_outline,
+                        label: 'Ajuda',
+                        selected: false,
+                        onTap: _showHelpDialog,
+                      ),
+                      _SidebarButton(
+                        icon: Icons.settings,
+                        label: 'Configurações',
+                        selected: false,
+                        onTap: _showSettingsDialog,
+                      ),
+                      _SidebarButton(
+                        icon: Icons.logout,
+                        label: 'Sair',
+                        selected: false,
+                        onTap: _showLogoutConfirmation,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Divider(color: Colors.white54, indent: 16, endIndent: 16),
-              _SidebarButton(
-                icon: Icons.help_outline,
-                label: 'Ajuda',
-                selected: false,
-                onTap: () {
-                  _showHelpDialog();
-                },
-              ),
-              _SidebarButton(
-                icon: Icons.settings,
-                label: 'Configurações',
-                selected: false,
-                onTap: () {
-                  _showSettingsDialog();
-                },
-              ),
-              _SidebarButton(
-                icon: Icons.logout,
-                label: 'Sair',
-                selected: false,
-                onTap: () => _showLogoutConfirmation(),
-              ),
-              const SizedBox(height: 12),
-            ],
+              ],
+            ),
           ),
         ),
-        // Área principal
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: AppResponsive.contentPadding(context),
             child: _buildMainContent(),
           ),
         ),
@@ -1060,7 +1039,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   Widget _buildMobileLayout(AuthProvider authProvider) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: AppResponsive.contentPadding(context),
       child: _buildMainContent(),
     );
   }
@@ -1251,48 +1230,112 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     }
   }
 
-  Widget _buildBottomNavigation() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF2953A5),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+  Future<void> _openTeacherMoreSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _BottomNavItem(
-                icon: Icons.class_,
-                label: 'Turmas',
-                isSelected: _tabController.index == 0,
-                onTap: () => setState(() => _tabController.animateTo(0)),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Mais opções',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-              _BottomNavItem(
-                icon: Icons.groups,
-                label: 'Alunos',
-                isSelected: _tabController.index == 1,
-                onTap: () => setState(() => _tabController.animateTo(1)),
+              ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Ajuda'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showHelpDialog();
+                },
               ),
-              _BottomNavItem(
-                icon: Icons.inventory_2,
-                label: 'Armários',
-                isSelected: _tabController.index == 2,
-                onTap: () => setState(() => _tabController.animateTo(2)),
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('Configurações'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showSettingsDialog();
+                },
               ),
-              _BottomNavItem(
-                icon: Icons.calendar_today,
-                label: 'Agenda',
-                isSelected: _tabController.index == 3,
-                onTap: () => setState(() => _tabController.animateTo(3)),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.orange),
+                title: const Text('Sair'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showLogoutConfirmation();
+                },
               ),
+              const SizedBox(height: 8),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomNavigation() {
+    final isLandscape = AppResponsive.isLandscape(context);
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF2953A5),
+          indicatorColor: Colors.white.withAlpha(40),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+              fontSize: 12,
+              color: selected ? Colors.white : Colors.white70,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            );
+          }),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return IconThemeData(
+              color: selected ? Colors.white : Colors.white70,
+            );
+          }),
         ),
+      ),
+      child: NavigationBar(
+        height: isLandscape ? 56 : 68,
+        labelBehavior:
+            isLandscape
+                ? NavigationDestinationLabelBehavior.alwaysHide
+                : NavigationDestinationLabelBehavior.alwaysShow,
+        selectedIndex: _tabController.index.clamp(0, 3),
+        onDestinationSelected: (index) {
+          if (index == 4) {
+            _openTeacherMoreSheet();
+            return;
+          }
+          setState(() => _tabController.animateTo(index));
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.class_), label: 'Turmas'),
+          NavigationDestination(icon: Icon(Icons.groups), label: 'Alunos'),
+          NavigationDestination(
+            icon: Icon(Icons.inventory_2),
+            label: 'Armários',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today),
+            label: 'Agenda',
+          ),
+          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mais'),
+        ],
       ),
     );
   }
@@ -1376,24 +1419,29 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
-        int crossAxisCount;
-        double childAspectRatio;
+        // Mesmos breakpoints da aba Alunos
+        final int crossAxisCount;
+        final double childAspectRatio;
 
         if (screenWidth > 1200) {
-          crossAxisCount = 4;
-          childAspectRatio = 1.4;
+          crossAxisCount = 5;
+          childAspectRatio = 0.9;
         } else if (screenWidth > 800) {
-          crossAxisCount = 3;
-          childAspectRatio = 1.2;
+          crossAxisCount = 4;
+          childAspectRatio = 0.85;
         } else if (screenWidth > 600) {
+          crossAxisCount = 3;
+          childAspectRatio = 0.8;
+        } else if (screenWidth > 400) {
           crossAxisCount = 2;
-          childAspectRatio = 1.1;
+          childAspectRatio = 0.75;
         } else {
-          crossAxisCount = 1;
-          childAspectRatio = 1.0;
+          crossAxisCount = 2;
+          childAspectRatio = 0.7;
         }
 
         return GridView.builder(
+          padding: const EdgeInsets.only(bottom: 8),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: screenWidth > 600 ? 24 : 16,
@@ -1402,8 +1450,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           ),
           itemCount: _filteredClasses.length,
           itemBuilder: (context, index) {
-            final classData = _filteredClasses[index];
-            return _ClassCard(classData: classData);
+            return _ClassCard(classData: _filteredClasses[index]);
           },
         );
       },
@@ -1505,7 +1552,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
           crossAxisCount = 2;
           childAspectRatio = 0.75;
         } else {
-          crossAxisCount = 1;
+          crossAxisCount = 2;
           childAspectRatio = 0.7;
         }
 
@@ -2287,47 +2334,6 @@ class _SidebarButton extends StatelessWidget {
   }
 }
 
-class _BottomNavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  const _BottomNavItem({
-    required this.icon,
-    required this.label,
-    this.isSelected = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.white54,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white54,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ClassCard extends StatelessWidget {
   final Map<String, dynamic> classData;
 
@@ -2348,14 +2354,18 @@ class _ClassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSmall = MediaQuery.of(context).size.width < 600;
-    final isVerySmall = MediaQuery.of(context).size.width < 400;
+    final width = MediaQuery.sizeOf(context).width;
+    final isSmall = width < 600;
+    final isVerySmall = width < 400;
+    final year =
+        classData['academicYear'] ?? classData['year'] ?? classData['grade'];
+    final shift = _getShiftText(classData['shift']?.toString());
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 4,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -2364,101 +2374,54 @@ class _ClassCard extends StatelessWidget {
           );
         },
         child: Padding(
-          padding: EdgeInsets.all(
-            isVerySmall
-                ? 8.0
-                : isSmall
-                ? 12.0
-                : 16.0,
-          ),
+          padding: EdgeInsets.all(isVerySmall ? 8.0 : isSmall ? 12.0 : 16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius:
-                    isVerySmall
-                        ? 20
-                        : isSmall
-                        ? 24
-                        : 32,
+                radius: isVerySmall ? 20 : isSmall ? 24 : 32,
                 backgroundColor: const Color(0xFF2953A5),
                 child: Icon(
                   Icons.class_,
-                  size:
-                      isVerySmall
-                          ? 24
-                          : isSmall
-                          ? 28
-                          : 40,
+                  size: isVerySmall ? 24 : isSmall ? 28 : 40,
                   color: Colors.white,
                 ),
               ),
-              SizedBox(
-                height:
-                    isVerySmall
-                        ? 8
-                        : isSmall
-                        ? 12
-                        : 16,
-              ),
+              SizedBox(height: isVerySmall ? 8 : isSmall ? 12 : 16),
               Text(
-                classData['name'] ?? 'Turma',
+                classData['name']?.toString() ?? 'Turma',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize:
-                      isVerySmall
-                          ? 12
-                          : isSmall
-                          ? 14
-                          : 16,
+                  fontSize: isVerySmall ? 12 : isSmall ? 14 : 16,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(
-                height:
-                    isVerySmall
-                        ? 4
-                        : isSmall
-                        ? 6
-                        : 8,
-              ),
-              Text(
-                'Ano: ${classData['year'] ?? ''}',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize:
-                      isVerySmall
-                          ? 10
-                          : isSmall
-                          ? 12
-                          : 14,
+              SizedBox(height: isVerySmall ? 4 : 6),
+              if (year != null)
+                Text(
+                  'Ano: $year',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: isVerySmall ? 10 : isSmall ? 12 : 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              SizedBox(
-                height:
-                    isVerySmall
-                        ? 2
-                        : isSmall
-                        ? 3
-                        : 4,
-              ),
-              Text(
-                _getShiftText(classData['shift']),
-                style: TextStyle(
-                  color: Colors.blueGrey,
-                  fontSize:
-                      isVerySmall
-                          ? 9
-                          : isSmall
-                          ? 11
-                          : 13,
+              if (shift.isNotEmpty) ...[
+                SizedBox(height: isVerySmall ? 2 : 4),
+                Text(
+                  shift,
+                  style: TextStyle(
+                    color: Colors.blueGrey,
+                    fontSize: isVerySmall ? 9 : isSmall ? 11 : 13,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              ],
             ],
           ),
         ),

@@ -14,15 +14,32 @@ class SubjectsManagementTab extends StatefulWidget {
 }
 
 class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
-  List<Map<String, dynamic>> _subjects = [];
+  List<Map<String, dynamic>> _catalog = [];
   bool _loading = false;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
 
+  static const subjectTypes = [
+    'LINGUA_INGLESA',
+    'ARTE',
+    'EDUCACAO_FISICA',
+    'MATEMATICA',
+    'CIENCIAS',
+    'HISTORIA',
+    'GEOGRAFIA',
+    'ENSINO_RELIGIOSO',
+    'BIOLOGIA',
+    'FISICA',
+    'QUIMICA',
+    'FILOSOFIA',
+    'SOCIOLOGIA',
+    'CONTEUDO_INTERDISCIPLINAR',
+  ];
+
   @override
   void initState() {
     super.initState();
-    _fetchSubjects();
+    _fetchCatalog();
   }
 
   @override
@@ -43,477 +60,7 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
     return Provider.of<AuthProvider>(context, listen: false).user?.token;
   }
 
-  int _countStudentsInClass(Map<String, dynamic>? classData) {
-    if (classData == null) return 0;
-    final enrollments = classData['enrollments'];
-    if (enrollments is! List) return 0;
-    return enrollments.where((e) => e['current'] == true).length;
-  }
-
-  Map<String, dynamic> _mapSubjectForUi(Map<String, dynamic> subject) {
-    final classData = subject['class'] as Map<String, dynamic>?;
-    final teacher = subject['teacher'] as Map<String, dynamic>?;
-    final type = subject['type']?.toString() ?? '';
-
-    return {
-      'id': subject['id'],
-      'type': type,
-      'name': subject['name'] ?? _formatSubjectType(type),
-      'description': teacher?['name'] != null
-          ? 'Professor: ${teacher!['name']}'
-          : 'Professor não informado',
-      'className': classData?['name'] ?? 'Turma não informada',
-      'isEvaluative': type != 'EDUCACAO_FISICA',
-      'classCount': 1,
-      'teacherCount': teacher?['id'] != null ? 1 : 0,
-      'studentCount': _countStudentsInClass(classData),
-      'raw': subject,
-    };
-  }
-
-  Future<void> _fetchSubjects() async {
-    if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final token = _token();
-      if (token == null || token.isEmpty) {
-        throw Exception('Sessão expirada. Faça login novamente.');
-      }
-
-      final headers = _authHeaders(token);
-      final subjectsFuture = http.get(
-        Uri.parse('${ApiConfig.baseUrl}/subjects'),
-        headers: headers,
-      );
-      final classesFuture = http.get(
-        Uri.parse('${ApiConfig.baseUrl}/classes'),
-        headers: headers,
-      );
-
-      final results = await Future.wait([subjectsFuture, classesFuture]);
-      final response = results[0];
-      final classesResponse = results[1];
-
-      if (response.statusCode != 200) {
-        throw Exception('Erro ao carregar matérias (${response.statusCode})');
-      }
-
-      final Map<String, Map<String, dynamic>> classesById = {};
-      if (classesResponse.statusCode == 200) {
-        final List<dynamic> classes = jsonDecode(classesResponse.body);
-        for (final item in classes) {
-          final classData = Map<String, dynamic>.from(item);
-          classesById[classData['id']] = classData;
-        }
-      }
-
-      final List<dynamic> data = jsonDecode(response.body);
-      final subjects =
-          data.map((item) {
-            final subject = Map<String, dynamic>.from(item);
-            final classId = subject['classId']?.toString();
-            if (classId != null && classesById.containsKey(classId)) {
-              subject['class'] = classesById[classId];
-            }
-            return _mapSubjectForUi(subject);
-          }).toList();
-
-      if (mounted) {
-        setState(() {
-          _subjects = subjects;
-          _error = null;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _error = userErrorMessage(e));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
-  List<Map<String, dynamic>> get _filteredSubjects {
-    if (_searchController.text.isEmpty) return _subjects;
-    return _subjects.where((subject) {
-      final name = (subject['name'] ?? '').toString().toLowerCase();
-      final type = _formatSubjectType(subject['type']).toLowerCase();
-      final className = (subject['className'] ?? '').toString().toLowerCase();
-      final search = _searchController.text.toLowerCase();
-      return name.contains(search) ||
-          type.contains(search) ||
-          className.contains(search);
-    }).toList();
-  }
-
-  void _showAddSubjectDialog() {
-    final subjectTypes = [
-      'LINGUA_INGLESA',
-      'ARTE',
-      'EDUCACAO_FISICA',
-      'MATEMATICA',
-      'CIENCIAS',
-      'HISTORIA',
-      'GEOGRAFIA',
-      'ENSINO_RELIGIOSO',
-      'BIOLOGIA',
-      'FISICA',
-      'QUIMICA',
-      'FILOSOFIA',
-      'SOCIOLOGIA',
-      'CONTEUDO_INTERDISCIPLINAR',
-    ];
-
-    String? selectedType;
-    String? selectedClassId;
-    String? selectedTeacherId;
-    List<Map<String, dynamic>> classes = [];
-    List<Map<String, dynamic>> teachers = [];
-    bool loadingOptions = true;
-    bool isLoading = false;
-
-    bool optionsLoaded = false;
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => StatefulBuilder(
-            builder: (context, setState) {
-              Future<void> loadOptions() async {
-                final token = _token();
-                if (token == null) return;
-                final headers = _authHeaders(token);
-                try {
-                  final classesRes = await http.get(
-                    Uri.parse('${ApiConfig.baseUrl}/classes'),
-                    headers: headers,
-                  );
-                  final teachersRes = await http.get(
-                    Uri.parse('${ApiConfig.baseUrl}/teachers'),
-                    headers: headers,
-                  );
-                  if (classesRes.statusCode == 200) {
-                    classes = List<Map<String, dynamic>>.from(
-                      jsonDecode(classesRes.body),
-                    );
-                  }
-                  if (teachersRes.statusCode == 200) {
-                    teachers = List<Map<String, dynamic>>.from(
-                      jsonDecode(teachersRes.body),
-                    );
-                  }
-                } finally {
-                  if (context.mounted) {
-                    setState(() => loadingOptions = false);
-                  }
-                }
-              }
-
-              if (!optionsLoaded) {
-                optionsLoaded = true;
-                loadOptions();
-              }
-
-              return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                title: const Text('Adicionar Nova Matéria'),
-                content: SizedBox(
-                  width: 500,
-                  child: loadingOptions
-                      ? const Center(child: CircularProgressIndicator())
-                      : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedClassId,
-                            items:
-                                classes
-                                    .map(
-                                      (c) => DropdownMenuItem(
-                                        value: c['id']?.toString(),
-                                        child: Text(c['name']?.toString() ?? 'Turma'),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged: (v) => setState(() => selectedClassId = v),
-                            decoration: const InputDecoration(
-                              labelText: 'Turma *',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedTeacherId,
-                            items:
-                                teachers
-                                    .map(
-                                      (t) => DropdownMenuItem(
-                                        value: t['id']?.toString(),
-                                        child: Text(t['name']?.toString() ?? 'Professor'),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged:
-                                (v) => setState(() => selectedTeacherId = v),
-                            decoration: const InputDecoration(
-                              labelText: 'Professor *',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedType,
-                            items:
-                                subjectTypes
-                                    .map(
-                                      (type) => DropdownMenuItem(
-                                        value: type,
-                                        child: Text(_formatSubjectType(type)),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged: (v) => setState(() => selectedType = v),
-                            decoration: const InputDecoration(
-                              labelText: 'Tipo de Matéria *',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ],
-                      ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed:
-                        isLoading ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'),
-                  ),
-                  ElevatedButton(
-                    onPressed:
-                        (selectedType == null ||
-                                selectedClassId == null ||
-                                selectedTeacherId == null ||
-                                isLoading)
-                            ? null
-                            : () async {
-                              setState(() => isLoading = true);
-                              try {
-                                final token = _token();
-                                final response = await http.post(
-                                  Uri.parse('${ApiConfig.baseUrl}/subjects'),
-                                  headers: _authHeaders(token),
-                                  body: jsonEncode({
-                                    'type': selectedType,
-                                    'classId': selectedClassId,
-                                    'teacherId': selectedTeacherId,
-                                  }),
-                                );
-
-                                if (!context.mounted) return;
-
-                                if (response.statusCode == 201 ||
-                                    response.statusCode == 200) {
-                                  Navigator.of(context).pop();
-                                  await _fetchSubjects();
-                                  if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Matéria "${_formatSubjectType(selectedType)}" criada com sucesso!',
-                                      ),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                } else {
-                                  final body = response.body.trim();
-                                  final error =
-                                      body.startsWith('{')
-                                          ? jsonDecode(body)['error']
-                                          : body;
-                                  throw Exception(error ?? 'Erro ao criar matéria');
-                                }
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Erro ao criar matéria: \${userErrorMessage(e)}'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              } finally {
-                                if (context.mounted) {
-                                  setState(() => isLoading = false);
-                                }
-                              }
-                            },
-                    child:
-                        isLoading
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Text('Criar Matéria'),
-                  ),
-                ],
-              );
-            },
-          ),
-    );
-  }
-
-  void _showEditSubjectDialog(Map<String, dynamic> subject) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              subject['name']?.toString() ?? 'Matéria',
-              overflow: TextOverflow.ellipsis,
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Turma: ${subject['className'] ?? '-'}'),
-                const SizedBox(height: 8),
-                Text('Tipo: ${_formatSubjectType(subject['type']?.toString())}'),
-                const SizedBox(height: 8),
-                Text(subject['description']?.toString() ?? ''),
-                const SizedBox(height: 12),
-                Text('Alunos na turma: ${subject['studentCount'] ?? 0}'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Fechar'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<void> _deleteSubject(Map<String, dynamic> subject) async {
-    final subjectName =
-        subject['name']?.toString() ??
-        _formatSubjectType(subject['type']?.toString());
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text('Confirmar Exclusão'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tem certeza que deseja excluir a matéria "$subjectName"?',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withAlpha(20),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withAlpha(80)),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '⚠️ Esta ação não pode ser desfeita!',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '• A matéria será removida do sistema',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      Text(
-                        '• Não afetará turmas existentes',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Excluir'),
-              ),
-            ],
-          ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final response = await http.delete(
-        Uri.parse('${ApiConfig.baseUrl}/subjects/${subject['id']}'),
-        headers: _authHeaders(_token()),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await _fetchSubjects();
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Matéria "$subjectName" excluída com sucesso!',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      } else {
-        throw Exception('Erro ao excluir matéria');
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao excluir matéria: \${userErrorMessage(e)}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
-  }
-
   String _formatSubjectType(String? type) {
-    if (type == null) return '';
     switch (type) {
       case 'LINGUA_INGLESA':
         return 'Língua Inglesa';
@@ -544,7 +91,693 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
       case 'CONTEUDO_INTERDISCIPLINAR':
         return 'Conteúdo Interdisciplinar';
       default:
-        return type;
+        return type ?? '';
+    }
+  }
+
+  Future<void> _fetchCatalog() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final token = _token();
+      if (token == null || token.isEmpty) {
+        throw Exception('Sessão expirada. Faça login novamente.');
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/school-subjects'),
+        headers: _authHeaders(token),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Erro ao carregar matérias (${response.statusCode})');
+      }
+
+      final List<dynamic> data = jsonDecode(response.body);
+      if (mounted) {
+        setState(() {
+          _catalog =
+              data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = userErrorMessage(e));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_searchController.text.isEmpty) return _catalog;
+    final search = _searchController.text.toLowerCase();
+    return _catalog.where((item) {
+      final name = (item['name'] ?? '').toString().toLowerCase();
+      final type = _formatSubjectType(item['type']?.toString()).toLowerCase();
+      return name.contains(search) || type.contains(search);
+    }).toList();
+  }
+
+  void _snack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _showCreateDialog() async {
+    String? selectedType;
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+    bool saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text('Nova Matéria'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo',
+                        border: OutlineInputBorder(),
+                      ),
+                      items:
+                          subjectTypes
+                              .map(
+                                (t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(_formatSubjectType(t)),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (v) {
+                        setLocal(() {
+                          selectedType = v;
+                          if (nameController.text.trim().isEmpty && v != null) {
+                            nameController.text = _formatSubjectType(v);
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição (opcional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      saving
+                          ? null
+                          : () async {
+                            if (selectedType == null) {
+                              _snack('Selecione o tipo da matéria', error: true);
+                              return;
+                            }
+                            setLocal(() => saving = true);
+                            try {
+                              final token = _token();
+                              final response = await http.post(
+                                Uri.parse(
+                                  '${ApiConfig.baseUrl}/school-subjects',
+                                ),
+                                headers: {
+                                  ..._authHeaders(token),
+                                  'Content-Type': 'application/json',
+                                },
+                                body: jsonEncode({
+                                  'type': selectedType,
+                                  'name':
+                                      nameController.text.trim().isEmpty
+                                          ? _formatSubjectType(selectedType)
+                                          : nameController.text.trim(),
+                                  'description':
+                                      descriptionController.text.trim(),
+                                }),
+                              );
+                              if (response.statusCode != 201) {
+                                final body = jsonDecode(response.body);
+                                throw Exception(
+                                  body['error'] ?? 'Erro ao criar matéria',
+                                );
+                              }
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                              _snack('Matéria criada no catálogo');
+                              await _fetchCatalog();
+                            } catch (e) {
+                              _snack(userErrorMessage(e), error: true);
+                            } finally {
+                              setLocal(() => saving = false);
+                            }
+                          },
+                  child:
+                      saving
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text('Criar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    descriptionController.dispose();
+  }
+
+  Future<void> _showEditDialog(Map<String, dynamic> item) async {
+    final offeringCount = item['offeringCount'] as int? ?? 0;
+    final nameController = TextEditingController(
+      text: item['name']?.toString() ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: item['description']?.toString() ?? '',
+    );
+    String selectedType = item['type']?.toString() ?? 'MATEMATICA';
+    bool saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text('Editar Matéria'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: selectedType,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo',
+                        border: OutlineInputBorder(),
+                        helperText:
+                            'Tipo só pode mudar se não houver turmas vinculadas',
+                      ),
+                      items:
+                          subjectTypes
+                              .map(
+                                (t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(_formatSubjectType(t)),
+                                ),
+                              )
+                              .toList(),
+                      onChanged:
+                          offeringCount > 0
+                              ? null
+                              : (v) {
+                                if (v != null) {
+                                  setLocal(() => selectedType = v);
+                                }
+                              },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Descrição (opcional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      saving
+                          ? null
+                          : () async {
+                            setLocal(() => saving = true);
+                            try {
+                              final token = _token();
+                              final response = await http.put(
+                                Uri.parse(
+                                  '${ApiConfig.baseUrl}/school-subjects/${item['id']}',
+                                ),
+                                headers: {
+                                  ..._authHeaders(token),
+                                  'Content-Type': 'application/json',
+                                },
+                                body: jsonEncode({
+                                  'name': nameController.text.trim(),
+                                  'description':
+                                      descriptionController.text.trim(),
+                                  if (offeringCount == 0) 'type': selectedType,
+                                }),
+                              );
+                              if (response.statusCode != 200) {
+                                final body = jsonDecode(response.body);
+                                throw Exception(
+                                  body['error'] ?? 'Erro ao salvar',
+                                );
+                              }
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
+                              _snack('Matéria atualizada');
+                              await _fetchCatalog();
+                            } catch (e) {
+                              _snack(userErrorMessage(e), error: true);
+                            } finally {
+                              setLocal(() => saving = false);
+                            }
+                          },
+                  child:
+                      saving
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    descriptionController.dispose();
+  }
+
+  Future<void> _showOfferingsDialog(Map<String, dynamic> item) async {
+    List<Map<String, dynamic>> classes = [];
+    List<Map<String, dynamic>> teachers = [];
+    List<Map<String, dynamic>> offerings = List<Map<String, dynamic>>.from(
+      (item['offerings'] as List?) ?? const [],
+    );
+    String? selectedClassId;
+    String? selectedTeacherId;
+    bool loading = true;
+    bool saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            Future<void> loadOptions() async {
+              final token = _token();
+              if (token == null) return;
+              final headers = _authHeaders(token);
+              final results = await Future.wait([
+                http.get(
+                  Uri.parse('${ApiConfig.baseUrl}/classes'),
+                  headers: headers,
+                ),
+                http.get(
+                  Uri.parse('${ApiConfig.baseUrl}/teachers'),
+                  headers: headers,
+                ),
+                http.get(
+                  Uri.parse(
+                    '${ApiConfig.baseUrl}/school-subjects/${item['id']}',
+                  ),
+                  headers: headers,
+                ),
+              ]);
+              if (results[0].statusCode == 200) {
+                classes =
+                    (jsonDecode(results[0].body) as List)
+                        .map((e) => Map<String, dynamic>.from(e as Map))
+                        .toList();
+              }
+              if (results[1].statusCode == 200) {
+                teachers =
+                    (jsonDecode(results[1].body) as List)
+                        .map((e) => Map<String, dynamic>.from(e as Map))
+                        .toList();
+              }
+              if (results[2].statusCode == 200) {
+                final detail = jsonDecode(results[2].body) as Map;
+                offerings = List<Map<String, dynamic>>.from(
+                  (detail['offerings'] as List?) ?? const [],
+                );
+              }
+              setLocal(() => loading = false);
+            }
+
+            if (loading) {
+              Future.microtask(loadOptions);
+            }
+
+            final linkedClassIds =
+                offerings.map((o) => o['classId']?.toString()).toSet();
+            final availableClasses =
+                classes
+                    .where((c) => !linkedClassIds.contains(c['id']?.toString()))
+                    .toList();
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                'Turmas — ${item['name'] ?? _formatSubjectType(item['type']?.toString())}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              content: SizedBox(
+                width: 420,
+                child:
+                    loading
+                        ? const SizedBox(
+                          height: 120,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                        : SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'Vincular turma',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Turma',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items:
+                                    availableClasses
+                                        .map(
+                                          (c) => DropdownMenuItem(
+                                            value: c['id']?.toString(),
+                                            child: Text(
+                                              c['name']?.toString() ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                onChanged:
+                                    (v) => setLocal(() => selectedClassId = v),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Professor',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items:
+                                    teachers
+                                        .map(
+                                          (t) => DropdownMenuItem(
+                                            value: t['id']?.toString(),
+                                            child: Text(
+                                              t['name']?.toString() ?? '',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                onChanged:
+                                    (v) =>
+                                        setLocal(() => selectedTeacherId = v),
+                              ),
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                onPressed:
+                                    saving
+                                        ? null
+                                        : () async {
+                                          if (selectedClassId == null ||
+                                              selectedTeacherId == null) {
+                                            _snack(
+                                              'Selecione turma e professor',
+                                              error: true,
+                                            );
+                                            return;
+                                          }
+                                          setLocal(() => saving = true);
+                                          try {
+                                            final token = _token();
+                                            final response = await http.post(
+                                              Uri.parse(
+                                                '${ApiConfig.baseUrl}/school-subjects/${item['id']}/offerings',
+                                              ),
+                                              headers: {
+                                                ..._authHeaders(token),
+                                                'Content-Type':
+                                                    'application/json',
+                                              },
+                                              body: jsonEncode({
+                                                'classId': selectedClassId,
+                                                'teacherId': selectedTeacherId,
+                                              }),
+                                            );
+                                            if (response.statusCode != 201) {
+                                              final body = jsonDecode(
+                                                response.body,
+                                              );
+                                              throw Exception(
+                                                body['error'] ??
+                                                    'Erro ao vincular',
+                                              );
+                                            }
+                                            selectedClassId = null;
+                                            selectedTeacherId = null;
+                                            setLocal(() => loading = true);
+                                            await loadOptions();
+                                            await _fetchCatalog();
+                                            _snack('Turma vinculada');
+                                          } catch (e) {
+                                            _snack(
+                                              userErrorMessage(e),
+                                              error: true,
+                                            );
+                                          } finally {
+                                            setLocal(() => saving = false);
+                                          }
+                                        },
+                                child: const Text('Vincular'),
+                              ),
+                              const Divider(height: 24),
+                              const Text(
+                                'Turmas vinculadas',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              if (offerings.isEmpty)
+                                const Text('Nenhuma turma vinculada ainda.')
+                              else
+                                ...offerings.map((o) {
+                                  final className =
+                                      o['class']?['name']?.toString() ??
+                                      'Turma';
+                                  final teacherName =
+                                      o['teacher']?['name']?.toString() ??
+                                      'Professor';
+                                  return ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(className),
+                                    subtitle: Text(teacherName),
+                                    trailing: IconButton(
+                                      icon: const Icon(
+                                        Icons.link_off,
+                                        color: Colors.red,
+                                      ),
+                                      tooltip: 'Remover vínculo',
+                                      onPressed: () async {
+                                        final ok = await showDialog<bool>(
+                                          context: context,
+                                          builder:
+                                              (ctx) => AlertDialog(
+                                                title: const Text(
+                                                  'Remover vínculo',
+                                                ),
+                                                content: Text(
+                                                  'Remover $className desta matéria?',
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed:
+                                                        () => Navigator.pop(
+                                                          ctx,
+                                                          false,
+                                                        ),
+                                                    child: const Text(
+                                                      'Cancelar',
+                                                    ),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed:
+                                                        () => Navigator.pop(
+                                                          ctx,
+                                                          true,
+                                                        ),
+                                                    child: const Text(
+                                                      'Remover',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                        );
+                                        if (ok != true) return;
+                                        try {
+                                          final token = _token();
+                                          final response = await http.delete(
+                                            Uri.parse(
+                                              '${ApiConfig.baseUrl}/school-subjects/offerings/${o['id']}',
+                                            ),
+                                            headers: _authHeaders(token),
+                                          );
+                                          if (response.statusCode != 204 &&
+                                              response.statusCode != 200) {
+                                            final body =
+                                                response.body.isNotEmpty
+                                                    ? jsonDecode(response.body)
+                                                    : {};
+                                            throw Exception(
+                                              body['error'] ??
+                                                  'Erro ao remover',
+                                            );
+                                          }
+                                          setLocal(() => loading = true);
+                                          await loadOptions();
+                                          await _fetchCatalog();
+                                          _snack('Vínculo removido');
+                                        } catch (e) {
+                                          _snack(
+                                            userErrorMessage(e),
+                                            error: true,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  );
+                                }),
+                            ],
+                          ),
+                        ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Fechar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteCatalogItem(Map<String, dynamic> item) async {
+    final name =
+        item['name']?.toString() ??
+        _formatSubjectType(item['type']?.toString());
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Excluir matéria'),
+            content: Text(
+              'Excluir "$name" do catálogo?\n\nSó é permitido se não houver turmas vinculadas.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Excluir'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final token = _token();
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/school-subjects/${item['id']}'),
+        headers: _authHeaders(token),
+      );
+      if (response.statusCode != 204 && response.statusCode != 200) {
+        final body =
+            response.body.isNotEmpty ? jsonDecode(response.body) : {};
+        throw Exception(body['error'] ?? 'Erro ao excluir');
+      }
+      _snack('Matéria removida do catálogo');
+      await _fetchCatalog();
+    } catch (e) {
+      _snack(userErrorMessage(e), error: true);
     }
   }
 
@@ -553,188 +786,50 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Cabeçalho
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isSmall = constraints.maxWidth < 600;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isSmall) ...[
-                  // Layout para telas pequenas
-                  const Text(
-                    'Gerenciar Matérias',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2953A5),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Gerencie todas as matérias do sistema, suas propriedades e configurações',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _showAddSubjectDialog,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2953A5),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Nova Matéria'),
-                    ),
-                  ),
-                ] else ...[
-                  // Layout para telas grandes
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Gerenciar Matérias',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2953A5),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Gerencie todas as matérias do sistema, suas propriedades e configurações',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: _showAddSubjectDialog,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2953A5),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Nova Matéria'),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            );
-          },
+        const Text(
+          'Gerenciar Matérias',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 24),
-
-        // Barra de pesquisa e filtros
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isSmall = constraints.maxWidth < 600;
-            return Column(
-              children: [
-                if (isSmall) ...[
-                  // Layout para telas pequenas
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Buscar matérias...',
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 0,
-                        horizontal: 16,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _fetchSubjects,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[100],
-                            foregroundColor: Colors.grey[700],
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                          child: const Text('Atualizar'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  // Layout para telas grandes
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (_) => setState(() {}),
-                          decoration: InputDecoration(
-                            hintText: 'Buscar matérias...',
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 0,
-                              horizontal: 16,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _fetchSubjects,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[100],
-                          foregroundColor: Colors.grey[700],
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        child: const Text('Atualizar'),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            );
-          },
+        const SizedBox(height: 4),
+        const Text(
+          'Catálogo da escola: uma matéria (ex.: Matemática) serve para várias turmas.',
+          style: TextStyle(color: Colors.grey),
         ),
-        const SizedBox(height: 24),
-
-        // Conteúdo principal
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _showCreateDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Nova Matéria'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2953A5),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            IconButton(
+              onPressed: _fetchCatalog,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Atualizar',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Buscar matérias...',
+            prefixIcon: const Icon(Icons.search),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 16),
         Expanded(
           child:
               _loading
@@ -742,60 +837,19 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                   : _error != null
                   ? Center(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'Erro ao carregar matérias',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
                         ElevatedButton(
-                          onPressed: _fetchSubjects,
-                          child: const Text('Tentar Novamente'),
+                          onPressed: _fetchCatalog,
+                          child: const Text('Tentar novamente'),
                         ),
                       ],
                     ),
                   )
-                  : _filteredSubjects.isEmpty
-                  ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _searchController.text.isEmpty
-                              ? 'Nenhuma matéria cadastrada'
-                              : 'Nenhuma matéria encontrada',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _searchController.text.isEmpty
-                              ? 'Clique em "Nova Matéria" para começar'
-                              : 'Tente ajustar os termos de busca',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
+                  : _filtered.isEmpty
+                  ? const Center(child: Text('Nenhuma matéria no catálogo'))
                   : LayoutBuilder(
                     builder: (context, constraints) {
                       final crossAxisCount =
@@ -815,14 +869,18 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
                           spacing: spacing,
                           runSpacing: spacing,
                           children:
-                              _filteredSubjects.map((subject) {
+                              _filtered.map((item) {
                                 return SizedBox(
                                   width: cardWidth,
-                                  child: _SubjectCard(
-                                    subject: subject,
-                                    onEdit:
-                                        () => _showEditSubjectDialog(subject),
-                                    onDelete: () => _deleteSubject(subject),
+                                  child: _CatalogCard(
+                                    item: item,
+                                    typeLabel: _formatSubjectType(
+                                      item['type']?.toString(),
+                                    ),
+                                    onEdit: () => _showEditDialog(item),
+                                    onManageOfferings:
+                                        () => _showOfferingsDialog(item),
+                                    onDelete: () => _deleteCatalogItem(item),
                                   ),
                                 );
                               }).toList(),
@@ -836,61 +894,28 @@ class _SubjectsManagementTabState extends State<SubjectsManagementTab> {
   }
 }
 
-class _SubjectCard extends StatelessWidget {
-  final Map<String, dynamic> subject;
+class _CatalogCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final String typeLabel;
   final VoidCallback onEdit;
+  final VoidCallback onManageOfferings;
   final VoidCallback onDelete;
 
-  const _SubjectCard({
-    required this.subject,
+  const _CatalogCard({
+    required this.item,
+    required this.typeLabel,
     required this.onEdit,
+    required this.onManageOfferings,
     required this.onDelete,
   });
 
-  String _formatSubjectType(String? type) {
-    if (type == null) return '';
-    switch (type) {
-      case 'LINGUA_INGLESA':
-        return 'Língua Inglesa';
-      case 'ARTE':
-        return 'Arte';
-      case 'EDUCACAO_FISICA':
-        return 'Educação Física';
-      case 'MATEMATICA':
-        return 'Matemática';
-      case 'CIENCIAS':
-        return 'Ciências';
-      case 'HISTORIA':
-        return 'História';
-      case 'GEOGRAFIA':
-        return 'Geografia';
-      case 'ENSINO_RELIGIOSO':
-        return 'Ensino Religioso';
-      case 'BIOLOGIA':
-        return 'Biologia';
-      case 'FISICA':
-        return 'Física';
-      case 'QUIMICA':
-        return 'Química';
-      case 'FILOSOFIA':
-        return 'Filosofia';
-      case 'SOCIOLOGIA':
-        return 'Sociologia';
-      case 'CONTEUDO_INTERDISCIPLINAR':
-        return 'Conteúdo Interdisciplinar';
-      default:
-        return type;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final description = subject['description'] ?? '';
-    final className = subject['className'] ?? '';
-    final title = subject['name']?.toString() ?? _formatSubjectType(subject['type']);
-    final classCount = subject['classCount'] ?? 0;
-    final teacherCount = subject['teacherCount'] ?? 0;
-    final studentCount = subject['studentCount'] ?? 0;
+    final name = item['name']?.toString() ?? typeLabel;
+    final description = item['description']?.toString() ?? '';
+    final classCount = item['classCount'] ?? 0;
+    final teacherCount = item['teacherCount'] ?? 0;
+    final studentCount = item['studentCount'] ?? 0;
 
     return Card(
       elevation: 2,
@@ -898,96 +923,55 @@ class _SubjectCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Text(
+              name,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tipo: $typeLabel',
+              style: TextStyle(color: Colors.grey[700], fontSize: 13),
+            ),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (className.isNotEmpty)
-                  Text(
-                    className,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (description.isNotEmpty)
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                _meta(Icons.class_, '$classCount turmas'),
+                _meta(Icons.school, '$teacherCount professores'),
+                _meta(Icons.groups, '$studentCount alunos'),
               ],
             ),
             const SizedBox(height: 12),
-
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: _StatItem(
-                    label: 'Turmas',
-                    value: classCount.toString(),
-                    color: Colors.blue,
-                  ),
+                OutlinedButton(
+                  onPressed: onEdit,
+                  child: const Text('Editar'),
                 ),
-                Expanded(
-                  child: _StatItem(
-                    label: 'Professores',
-                    value: teacherCount.toString(),
-                    color: Colors.orange,
-                  ),
+                OutlinedButton(
+                  onPressed: onManageOfferings,
+                  child: const Text('Turmas'),
                 ),
-                Expanded(
-                  child: _StatItem(
-                    label: 'Alunos',
-                    value: studentCount.toString(),
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onEdit,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue,
-                      side: const BorderSide(color: Colors.blue),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    child: const Text('Editar'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onDelete,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    child: const Text('Excluir'),
-                  ),
+                OutlinedButton(
+                  onPressed: onDelete,
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Excluir'),
                 ),
               ],
             ),
@@ -996,45 +980,15 @@ class _SubjectCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatItem({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 100;
-        return Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: isSmall ? 14 : 16,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: isSmall ? 8 : 10,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        );
-      },
+  Widget _meta(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[700]),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+      ],
     );
   }
 }

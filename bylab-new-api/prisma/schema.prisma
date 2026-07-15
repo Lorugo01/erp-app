@@ -24,6 +24,7 @@ model School {
   teachers        Teacher[]
   classes         Class[]
   subjects        Subject[]
+  schoolSubjects  SchoolSubject[]
   events          Event[]
   chats           chat[]
   configs         Config[]
@@ -167,23 +168,40 @@ model Teacher {
   school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
-model Subject {
-  id          String       @id @default(uuid())
+model SchoolSubject {
+  id          String      @id @default(uuid())
   name        String
-  classId     String
-  teacherId   String
-  createdAt   DateTime     @default(now())
+  description String?
   type        SubjectType
-  updatedAt   DateTime     @updatedAt
-  assignments Assignment[]
-  grades      Grade[]
-  lessons     Lesson[]
-  class       Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
-  teacher     Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   schoolId    String
-  
-  // Relacionamentos
-  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  school      School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  offerings   Subject[]
+
+  @@unique([schoolId, type])
+  @@map("school_subjects")
+}
+
+model Subject {
+  id              String         @id @default(uuid())
+  name            String
+  classId         String
+  teacherId       String
+  createdAt       DateTime       @default(now())
+  type            SubjectType
+  updatedAt       DateTime       @updatedAt
+  schoolSubjectId String?
+  assignments     Assignment[]
+  grades          Grade[]
+  lessons         Lesson[]
+  class           Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher         Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  schoolId        String
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolSubject   SchoolSubject? @relation(fields: [schoolSubjectId], references: [id], onDelete: SetNull)
+
+  @@unique([classId, type])
 }
 
 model Lesson {

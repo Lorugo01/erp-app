@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as ClassService from '../services/class.service';
 import * as EventService from '../services/event.service';
+import * as SubjectService from '../services/subject.service';
 import prisma from '../prisma/client';
 
 export const getAll = async (req: Request, res: Response) => {
@@ -183,18 +184,38 @@ export const remove = async (req: Request, res: Response) => {
 export const addTeacherToClass = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const classId = req.params.id;
-    const { teacherId } = req.body;
-    // Cria um Subject genérico para vincular o professor à turma
-    const subject = await prisma.subject.create({
-      data: {
-        name: 'GENERICA',
-        type: 'CONTEUDO_INTERDISCIPLINAR',
+    const { teacherId, type } = req.body;
+    const user = (req as any).user;
+
+    // Cria offering via catálogo SchoolSubject (não duplica "Matemática" por turma)
+    const subject = await SubjectService.createSubject(
+      {
+        type: type || 'CONTEUDO_INTERDISCIPLINAR',
         classId,
         teacherId,
-      }
-    });
+      },
+      user?.schoolId,
+      user?.role,
+    );
     res.status(201).json(subject);
   } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message === 'Turma não encontrada' ||
+        error.message === 'Professor não encontrado'
+      ) {
+        res.status(404).json({ error: error.message });
+        return;
+      }
+      if (
+        error.message.includes('mesma escola') ||
+        error.message.includes('já está vinculada') ||
+        error.message.includes('escola diferente')
+      ) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+    }
     next(error);
   }
 };

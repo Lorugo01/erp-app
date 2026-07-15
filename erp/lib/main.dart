@@ -25,10 +25,7 @@ void main() async {
   // Carregar variáveis do arquivo .env
   await EnvironmentConfig.load();
 
-  // Imprimir configurações atuais para debug
-  AppConfig.printCurrentConfig();
-
-  // Validar configurações
+  // Validar configurações (só loga erros)
   final configErrors = AppConfig.validateConfig();
   if (configErrors.isNotEmpty) {
     debugPrint('❌ ERROS DE CONFIGURAÇÃO:');

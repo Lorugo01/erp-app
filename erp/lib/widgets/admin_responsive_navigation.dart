@@ -22,15 +22,51 @@ class AdminResponsiveNavigation extends StatelessWidget {
         onSelect: onSelect,
         onLogout: onLogout,
       );
-    } else {
-      return _AdminBottomNavBar(
-        selectedIndex: selectedIndex,
-        onSelect: onSelect,
-        onLogout: onLogout,
-      );
     }
+    return _AdminBottomNavBar(
+      selectedIndex: selectedIndex,
+      onSelect: onSelect,
+      onLogout: onLogout,
+    );
   }
 }
+
+class _NavItem {
+  final int index;
+  final IconData icon;
+  final String label;
+
+  const _NavItem(this.index, this.icon, this.label);
+}
+
+const _primaryNavItems = <_NavItem>[
+  _NavItem(0, Icons.dashboard, 'Início'),
+  _NavItem(4, Icons.class_, 'Turmas'),
+  _NavItem(3, Icons.groups, 'Alunos'),
+  _NavItem(2, Icons.school, 'Profs'),
+];
+
+const _moreNavItems = <_NavItem>[
+  _NavItem(1, Icons.people, 'Usuários'),
+  _NavItem(5, Icons.computer, 'Armários'),
+  _NavItem(6, Icons.bar_chart, 'Relatórios'),
+  _NavItem(7, Icons.grade, 'Gestão de Notas'),
+  _NavItem(8, Icons.book, 'Gerenciar Matérias'),
+  _NavItem(9, Icons.settings, 'Configurações'),
+];
+
+const _sidebarNavItems = <_NavItem>[
+  _NavItem(0, Icons.dashboard, 'Dashboard'),
+  _NavItem(1, Icons.people, 'Usuários'),
+  _NavItem(2, Icons.school, 'Professores'),
+  _NavItem(3, Icons.groups, 'Alunos'),
+  _NavItem(4, Icons.class_, 'Turmas'),
+  _NavItem(5, Icons.computer, 'Armários'),
+  _NavItem(6, Icons.bar_chart, 'Relatórios'),
+  _NavItem(7, Icons.grade, 'Gestão de Notas'),
+  _NavItem(8, Icons.book, 'Gerenciar Matérias'),
+  _NavItem(9, Icons.settings, 'Configurações'),
+];
 
 class _AdminSidebar extends StatelessWidget {
   final int selectedIndex;
@@ -48,91 +84,44 @@ class _AdminSidebar extends StatelessWidget {
     return Container(
       width: 220,
       color: const Color(0xFF2953A5),
-      child: Column(
-        children: [
-          const SizedBox(height: 16),
-          const CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person, size: 48, color: Color(0xFF2953A5)),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _SidebarButton(
-                  icon: Icons.dashboard,
-                  label: 'Dashboard',
-                  selected: selectedIndex == 0,
-                  onTap: () => onSelect(0),
-                ),
-                _SidebarButton(
-                  icon: Icons.people,
-                  label: 'Usuários',
-                  selected: selectedIndex == 1,
-                  onTap: () => onSelect(1),
-                ),
-                _SidebarButton(
-                  icon: Icons.school,
-                  label: 'Professores',
-                  selected: selectedIndex == 2,
-                  onTap: () => onSelect(2),
-                ),
-                _SidebarButton(
-                  icon: Icons.groups,
-                  label: 'Alunos',
-                  selected: selectedIndex == 3,
-                  onTap: () => onSelect(3),
-                ),
-                _SidebarButton(
-                  icon: Icons.class_,
-                  label: 'Turmas',
-                  selected: selectedIndex == 4,
-                  onTap: () => onSelect(4),
-                ),
-                _SidebarButton(
-                  icon: Icons.computer,
-                  label: 'Armários',
-                  selected: selectedIndex == 5,
-                  onTap: () => onSelect(5),
-                ),
-                _SidebarButton(
-                  icon: Icons.bar_chart,
-                  label: 'Relatórios',
-                  selected: selectedIndex == 6,
-                  onTap: () => onSelect(6),
-                ),
-                _SidebarButton(
-                  icon: Icons.grade,
-                  label: 'Gestão de Notas',
-                  selected: selectedIndex == 7,
-                  onTap: () => onSelect(7),
-                ),
-                _SidebarButton(
-                  icon: Icons.book,
-                  label: 'Gerenciar Matérias',
-                  selected: selectedIndex == 8,
-                  onTap: () => onSelect(8),
-                ),
-              ],
+      child: SafeArea(
+        right: false,
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            const CircleAvatar(
+              radius: 28,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person, size: 40, color: Color(0xFF2953A5)),
             ),
-          ),
-          const Divider(color: Colors.white54, indent: 16, endIndent: 16),
-          _SidebarButton(
-            icon: Icons.settings,
-            label: 'Configurações',
-            selected: selectedIndex == 9,
-            onTap: () => onSelect(9),
-          ),
-          _SidebarButton(
-            icon: Icons.logout,
-            label: 'Sair',
-            selected: false,
-            onTap: onLogout,
-          ),
-          const SizedBox(height: 12),
-        ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  for (final item in _sidebarNavItems)
+                    _SidebarButton(
+                      icon: item.icon,
+                      label: item.label,
+                      selected: selectedIndex == item.index,
+                      onTap: () => onSelect(item.index),
+                    ),
+                  const Divider(
+                    color: Colors.white54,
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+                  _SidebarButton(
+                    icon: Icons.logout,
+                    label: 'Sair',
+                    selected: false,
+                    onTap: onLogout,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -149,32 +138,126 @@ class _AdminBottomNavBar extends StatelessWidget {
     this.onLogout,
   });
 
+  bool get _isMoreSelected =>
+      _moreNavItems.any((item) => item.index == selectedIndex);
+
+  int get _currentPrimaryIndex {
+    final idx = _primaryNavItems.indexWhere((i) => i.index == selectedIndex);
+    return idx >= 0 ? idx : 0;
+  }
+
+  Future<void> _openMoreSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text(
+                  'Mais opções',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              for (final item in _moreNavItems)
+                ListTile(
+                  leading: Icon(
+                    item.icon,
+                    color:
+                        selectedIndex == item.index
+                            ? const Color(0xFF2953A5)
+                            : null,
+                  ),
+                  title: Text(
+                    item.label,
+                    style: TextStyle(
+                      fontWeight:
+                          selectedIndex == item.index
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                      color:
+                          selectedIndex == item.index
+                              ? const Color(0xFF2953A5)
+                              : null,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onSelect(item.index);
+                  },
+                ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.orange),
+                title: const Text('Sair'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  onLogout?.call();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: const Color(0xFF2953A5),
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Colors.white70,
-      currentIndex: selectedIndex > 5 ? 0 : selectedIndex,
-      onTap: (index) {
-        onSelect(index);
-      },
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+    final isLandscape =
+        MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF2953A5),
+          indicatorColor: Colors.white.withAlpha(40),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+              fontSize: 12,
+              color: selected ? Colors.white : Colors.white70,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            );
+          }),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return IconThemeData(
+              color: selected ? Colors.white : Colors.white70,
+            );
+          }),
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Usuários'),
-        BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Professores'),
-        BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Alunos'),
-        BottomNavigationBarItem(icon: Icon(Icons.class_), label: 'Turmas'),
-        BottomNavigationBarItem(icon: Icon(Icons.computer), label: 'Armários'),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart),
-          label: 'Relatórios',
-        ),
-      ],
+      ),
+      child: NavigationBar(
+        height: isLandscape ? 56 : 68,
+        labelBehavior:
+            isLandscape
+                ? NavigationDestinationLabelBehavior.alwaysHide
+                : NavigationDestinationLabelBehavior.alwaysShow,
+        selectedIndex: _isMoreSelected ? 4 : _currentPrimaryIndex,
+        onDestinationSelected: (index) {
+          if (index == 4) {
+            _openMoreSheet(context);
+            return;
+          }
+          onSelect(_primaryNavItems[index].index);
+        },
+        destinations: [
+          for (final item in _primaryNavItems)
+            NavigationDestination(icon: Icon(item.icon), label: item.label),
+          const NavigationDestination(
+            icon: Icon(Icons.more_horiz),
+            label: 'Mais',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -184,6 +267,7 @@ class _SidebarButton extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+
   const _SidebarButton({
     required this.icon,
     required this.label,

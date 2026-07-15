@@ -401,44 +401,27 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   widget.teacher['email'] ?? '',
                   style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
                   children: [
-                    Icon(Icons.class_, color: Colors.white70, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
+                    _statChip(
+                      Icons.class_,
                       '$classesCount turmas ($_selectedYear)',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
                     ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.book, color: Colors.white70, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$subjectsCount disciplinas',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.schedule, color: Colors.white70, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      '$lessonsCount aulas',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
+                    _statChip(Icons.book, '$subjectsCount disciplinas'),
+                    _statChip(Icons.schedule, '$lessonsCount aulas'),
                   ],
                 ),
               ],
@@ -446,6 +429,20 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _statChip(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white70, size: 16),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+      ],
     );
   }
 

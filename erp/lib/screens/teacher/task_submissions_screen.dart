@@ -10,17 +10,11 @@ import 'dart:convert';
 class TaskSubmissionsLogger {
   static const String _prefix = '📝 [TaskSubmissions]';
 
-  static void info(String message) {
-    debugPrint('$_prefix ℹ️ $message');
-  }
+  static void info(String message) {}
 
-  static void success(String message) {
-    debugPrint('$_prefix ✅ $message');
-  }
+  static void success(String message) {}
 
-  static void warning(String message) {
-    debugPrint('$_prefix ⚠️ $message');
-  }
+  static void warning(String message) {}
 
   static void error(String message, [dynamic error, StackTrace? stackTrace]) {
     debugPrint('$_prefix ❌ $message');
@@ -32,37 +26,17 @@ class TaskSubmissionsLogger {
     }
   }
 
-  static void debug(String message, [Map<String, dynamic>? data]) {
-    debugPrint('$_prefix 🐛 $message');
-    if (data != null) {
-      debugPrint('$_prefix 📊 Dados: $data');
-    }
-  }
+  static void debug(String message, [Map<String, dynamic>? data]) {}
 
   static void api(
     String endpoint,
     String method, [
     Map<String, dynamic>? params,
-  ]) {
-    debugPrint('$_prefix 🌐 API: $method $endpoint');
-    if (params != null) {
-      debugPrint('$_prefix 📝 Parâmetros: $params');
-    }
-  }
+  ]) {}
 
-  static void state(String message, [Map<String, dynamic>? state]) {
-    debugPrint('$_prefix 🔄 Estado: $message');
-    if (state != null) {
-      debugPrint('$_prefix 📊 Estado atual: $state');
-    }
-  }
+  static void state(String message, [Map<String, dynamic>? state]) {}
 
-  static void submission(String message, [Map<String, dynamic>? data]) {
-    debugPrint('$_prefix 📤 [Submissão] $message');
-    if (data != null) {
-      debugPrint('$_prefix 📊 Dados da submissão: $data');
-    }
-  }
+  static void submission(String message, [Map<String, dynamic>? data]) {}
 }
 
 class TaskSubmissionsScreen extends StatefulWidget {

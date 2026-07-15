@@ -18,6 +18,7 @@ import 'grade_management_screen.dart';
 import 'armario.dart';
 import '../../widgets/admin_responsive_navigation.dart';
 import '../../widgets/bylab_safe_area.dart';
+import '../../utils/responsive.dart';
 import 'subjects_management_tab.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -728,15 +729,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             final screenWidth = constraints.maxWidth;
             final isSmall = screenWidth < 600;
 
-            // Calcular número de colunas baseado no tamanho da tela
-            int crossAxisCount;
-            if (screenWidth > 1200) {
-              crossAxisCount = 4;
-            } else if (screenWidth > 800) {
-              crossAxisCount = 3;
-            } else {
-              crossAxisCount = 2; // Sempre 2 colunas para mobile
-            }
+            // 2 colunas no mobile/tablet; 4 só quando os 4 cards cabem na mesma linha.
+            // Nunca 3 colunas — deixava "Turmas" sozinha com buraco vazio.
+            final crossAxisCount = screenWidth >= 1100 ? 4 : 2;
+            final aspectRatio =
+                screenWidth >= 1100
+                    ? 1.6
+                    : isSmall
+                    ? 1.15
+                    : 1.45;
 
             return SingleChildScrollView(
               child: Column(
@@ -756,7 +757,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: isSmall ? 12 : 16,
                     mainAxisSpacing: isSmall ? 12 : 16,
-                    childAspectRatio: isSmall ? 1.0 : 1.4,
+                    childAspectRatio: aspectRatio,
                     children: [
                       _DashboardInfoCard(
                         title: 'Usuários',
@@ -1324,7 +1325,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     Provider.of<AuthProvider>(context, listen: false);
-    final isWide = MediaQuery.of(context).size.width > 900;
+    final isWide = AppResponsive.useSideNav(context);
+    final contentPadding = AppResponsive.contentPadding(context);
     final content =
         isWide
             ? Row(
@@ -1341,7 +1343,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: contentPadding,
                     child: _buildTabContent(),
                   ),
                 ),
@@ -1351,7 +1353,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: contentPadding,
                     child: _buildTabContent(),
                   ),
                 ),
@@ -1385,7 +1387,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _selectedIndex == 5)
               ? Padding(
                 padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).size.width < 600 ? 80 : 24,
+                  bottom: AppResponsive.isCompact(context) ? 80 : 24,
                   right: 24,
                 ),
                 child: FloatingActionButton(

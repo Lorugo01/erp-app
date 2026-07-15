@@ -52,6 +52,73 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
     setState(() => _loading = false);
   }
 
+  /// Resolve o catálogo SchoolSubject e cria o offering (turma + professor).
+  Future<bool> _linkSubjectOffering({
+    required String token,
+    required String classId,
+    required String teacherId,
+    required String subjectType,
+  }) async {
+    final catalogRes = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/school-subjects'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (catalogRes.statusCode != 200) return false;
+
+    final catalogList = jsonDecode(catalogRes.body) as List<dynamic>;
+    Map<String, dynamic>? catalog;
+    for (final item in catalogList) {
+      if (item is Map && item['type'] == subjectType) {
+        catalog = Map<String, dynamic>.from(item);
+        break;
+      }
+    }
+
+    if (catalog == null) {
+      final createRes = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/school-subjects'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'type': subjectType}),
+      );
+      if (createRes.statusCode == 201 || createRes.statusCode == 200) {
+        catalog = Map<String, dynamic>.from(jsonDecode(createRes.body));
+      } else {
+        // Já existe (corrida) ou falha: relê o catálogo
+        final retry = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/school-subjects'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (retry.statusCode != 200) return false;
+        final retryList = jsonDecode(retry.body) as List<dynamic>;
+        for (final item in retryList) {
+          if (item is Map && item['type'] == subjectType) {
+            catalog = Map<String, dynamic>.from(item);
+            break;
+          }
+        }
+        if (catalog == null) return false;
+      }
+    }
+
+    final offeringRes = await http.post(
+      Uri.parse(
+        '${ApiConfig.baseUrl}/school-subjects/${catalog['id']}/offerings',
+      ),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'classId': classId,
+        'teacherId': teacherId,
+      }),
+    );
+    return offeringRes.statusCode == 201 || offeringRes.statusCode == 200;
+  }
+
   void _showAddTeacherToClassDialog() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.user?.token;
@@ -167,25 +234,14 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                 final classId = widget.classData['id'];
                                 int success = 0;
                                 for (final subjectType in selectedSubjects) {
-                                  final response = await http.post(
-                                    Uri.parse(
-                                      '${ApiConfig.baseUrl}/subjects',
-                                    ),
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'Authorization': 'Bearer $token',
-                                    },
-                                    body: jsonEncode({
-                                      'type': subjectType,
-                                      'classId': classId,
-                                      'teacherId': selectedTeacherId,
-                                    }),
+                                  final ok = await _linkSubjectOffering(
+                                    token: token,
+                                    classId: classId,
+                                    teacherId: selectedTeacherId!,
+                                    subjectType: subjectType,
                                   );
                                   if (!context.mounted) return;
-                                  if (response.statusCode == 201 ||
-                                      response.statusCode == 200) {
-                                    success++;
-                                  }
+                                  if (ok) success++;
                                 }
                                 if (!context.mounted) return;
                                 Navigator.of(context).pop();
@@ -531,26 +587,15 @@ class _ClassTeachersScreenState extends State<ClassTeachersScreen> {
                                     }
                                   }
 
-                                  // Adicionar novas matérias
+                                  // Adicionar novas matérias via catálogo + offering
                                   for (final subjectType in subjectsToAdd) {
-                                    final response = await http.post(
-                                      Uri.parse(
-                                        '${ApiConfig.baseUrl}/subjects',
-                                      ),
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': 'Bearer $token',
-                                      },
-                                      body: jsonEncode({
-                                        'type': subjectType,
-                                        'classId': classId,
-                                        'teacherId': teacherId,
-                                      }),
+                                    final ok = await _linkSubjectOffering(
+                                      token: token,
+                                      classId: classId,
+                                      teacherId: teacherId,
+                                      subjectType: subjectType,
                                     );
-                                    if (response.statusCode == 201 ||
-                                        response.statusCode == 200) {
-                                      addedCount++;
-                                    }
+                                    if (ok) addedCount++;
                                   }
 
                                   if (!context.mounted) return;

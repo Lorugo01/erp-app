@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../config/api_config.dart';
 import 'class_details_screen.dart';
 import '../../widgets/bylab_safe_area.dart';
+import '../../utils/responsive.dart';
 import 'student_calendar_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
@@ -18,7 +19,6 @@ class StudentDashboardScreen extends StatefulWidget {
 
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   int _selectedIndex = 0;
-  bool _isWide = false;
 
   // Dados do aluno
   Map<String, dynamic>? _studentData;
@@ -88,26 +88,18 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       final user = authProvider.user;
       final token = user?.token;
 
-      debugPrint('🔍 === CARREGANDO DADOS DO ALUNO ===');
-      debugPrint('🔍 User: ${user?.toJson()}');
-      debugPrint('🔍 Student ID: ${user?.student?.id}');
-      debugPrint('🔍 User ID: ${user?.id}');
 
       _hydrateStudentFromAuth(user);
 
       if (user?.student?.id != null) {
-        debugPrint('🔍 Usando student ID: ${user!.student!.id}');
         final response = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/students/${user.student!.id}'),
+          Uri.parse('${ApiConfig.baseUrl}/students/${user!.student!.id}'),
           headers: _authHeaders(token),
         );
 
-        debugPrint('🔍 Status da resposta: ${response.statusCode}');
-        debugPrint('🔍 Corpo da resposta: ${response.body}');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          debugPrint('🔍 Dados do aluno carregados: $data');
           setState(() {
             _studentData = data;
           });
@@ -118,18 +110,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         }
       } else if (user?.id != null) {
         // Fallback: usar o ID do usuário
-        debugPrint('🔍 Usando user ID como fallback: ${user!.id}');
         final response = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
           headers: _authHeaders(token),
         );
 
-        debugPrint('🔍 Status da resposta (fallback): ${response.statusCode}');
-        debugPrint('🔍 Corpo da resposta (fallback): ${response.body}');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          debugPrint('🔍 Dados do aluno carregados (fallback): $data');
           setState(() {
             _studentData = data;
           });
@@ -161,28 +149,21 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       final user = authProvider.user;
       final token = user?.token;
 
-      debugPrint('🔍 === CARREGANDO TURMAS ===');
-      debugPrint('🔍 User: ${user?.toJson()}');
-      debugPrint('🔍 Student ID: ${user?.student?.id}');
-      debugPrint('🔍 User ID: ${user?.id}');
 
       String? studentId;
 
       if (user?.student?.id != null) {
         studentId = user!.student!.id;
-        debugPrint('🔍 Usando student ID para buscar turmas: $studentId');
       } else if (user?.id != null) {
         // Se não temos student ID, buscar o student pelo user ID primeiro
-        debugPrint('🔍 Buscando student pelo user ID: ${user!.id}');
         final studentResponse = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
           headers: _authHeaders(token),
         );
 
         if (studentResponse.statusCode == 200) {
           final studentData = jsonDecode(studentResponse.body);
           studentId = studentData['id'];
-          debugPrint('🔍 Student ID encontrado: $studentId');
         } else {
           debugPrint('❌ Erro ao buscar student pelo user ID');
           return;
@@ -197,18 +178,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         headers: _authHeaders(token),
       );
 
-      debugPrint('🔍 Status da resposta das turmas: ${response.statusCode}');
-      debugPrint('🔍 Corpo da resposta das turmas: ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados das turmas: $data');
         final classes =
             data
                 .where((e) => e['current'] == true && e['class'] != null)
                 .map((e) => Map<String, dynamic>.from(e['class']))
                 .toList();
-        debugPrint('🔍 Turmas processadas: $classes');
         setState(() {
           _classes = classes;
         });
@@ -240,28 +217,21 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       final user = authProvider.user;
       final token = user?.token;
 
-      debugPrint('🔍 === CARREGANDO FREQUÊNCIA ===');
-      debugPrint('🔍 User: ${user?.toJson()}');
-      debugPrint('🔍 Student ID: ${user?.student?.id}');
-      debugPrint('🔍 User ID: ${user?.id}');
 
       String? studentId;
 
       if (user?.student?.id != null) {
         studentId = user!.student!.id;
-        debugPrint('🔍 Usando student ID para buscar frequência: $studentId');
       } else if (user?.id != null) {
         // Se não temos student ID, buscar o student pelo user ID primeiro
-        debugPrint('🔍 Buscando student pelo user ID: ${user!.id}');
         final studentResponse = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/students/user/${user.id}'),
+          Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
           headers: _authHeaders(token),
         );
 
         if (studentResponse.statusCode == 200) {
           final studentData = jsonDecode(studentResponse.body);
           studentId = studentData['id'];
-          debugPrint('🔍 Student ID encontrado: $studentId');
         } else {
           debugPrint('❌ Erro ao buscar student pelo user ID');
           return;
@@ -276,12 +246,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         headers: _authHeaders(token),
       );
 
-      debugPrint('🔍 Status da resposta da frequência: ${response.statusCode}');
-      debugPrint('🔍 Corpo da resposta da frequência: ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados da frequência: $data');
         setState(() {
           _attendanceData = List<Map<String, dynamic>>.from(data);
         });
@@ -303,7 +270,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO AULAS DO DIA ===');
 
       // Primeiro, buscar as turmas do aluno
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -337,9 +303,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       );
 
       if (enrollmentsResponse.statusCode != 200) {
-        debugPrint(
-          '❌ Erro ao carregar matrículas: ${enrollmentsResponse.statusCode}',
-        );
         return;
       }
 
@@ -360,7 +323,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
       for (final enrollment in currentEnrollments) {
         final classId = enrollment['class']['id'];
-        debugPrint('🔍 Buscando eventos da turma: $classId');
 
         final eventsResponse = await http.get(
           Uri.parse('${ApiConfig.baseUrl}/classes/$classId/events'),
@@ -399,7 +361,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         return timeA.compareTo(timeB);
       });
 
-      debugPrint('🔍 Aulas do dia encontradas: ${allTodayLessons.length}');
       setState(() {
         _todayLessons = allTodayLessons;
       });
@@ -675,28 +636,32 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Detectar se é tela larga
-    final screenWidth = MediaQuery.of(context).size.width;
-    _isWide = screenWidth > 600;
+    final isWide = AppResponsive.useSideNav(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: BylabSafeArea.withBottomNav(
-        child: Row(
-          children: [
-            if (_isWide) _buildSidebar(),
-            Expanded(child: _buildContent()),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _isWide ? null : _buildBottomNavBar(),
+      body:
+          isWide
+              ? BylabSafeArea(
+                child: Row(
+                  children: [
+                    _buildSidebar(),
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
+              )
+              : BylabSafeArea.withBottomNav(child: _buildContent()),
+      bottomNavigationBar: isWide ? null : _buildBottomNavBar(),
     );
   }
 
   Widget _buildSidebar() {
     final user = Provider.of<AuthProvider>(context).user;
     final studentName =
-        _studentData?['name'] ?? user?.student?.name ?? user?.displayName ?? 'Aluno';
+        _studentData?['name'] ??
+        user?.student?.name ??
+        user?.displayName ??
+        'Aluno';
     final registration =
         _studentData?['registrationNumber'] ??
         user?.student?.registrationNumber ??
@@ -705,103 +670,206 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     return Container(
       width: 220,
       color: const Color(0xFF2953A5),
-      child: Column(
-        children: [
-          const SizedBox(height: 24),
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: Colors.white,
-            backgroundImage:
-                _studentData?['profilePicture'] != null
-                    ? NetworkImage(_studentData!['profilePicture'])
-                    : null,
-            child:
-                _studentData?['profilePicture'] == null
-                    ? const Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Color(0xFF2953A5),
-                    )
-                    : null,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            studentName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+      child: SafeArea(
+        right: false,
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: Colors.white,
+                    backgroundImage:
+                        _studentData?['profilePicture'] != null
+                            ? NetworkImage(_studentData!['profilePicture'])
+                            : null,
+                    child:
+                        _studentData?['profilePicture'] == null
+                            ? const Icon(
+                              Icons.person,
+                              size: 48,
+                              color: Color(0xFF2953A5),
+                            )
+                            : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    studentName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Matrícula: $registration',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  _SidebarButton(
+                    icon: Icons.dashboard,
+                    label: 'Visão Geral',
+                    selected: _selectedIndex == 0,
+                    onTap: () => setState(() => _selectedIndex = 0),
+                  ),
+                  _SidebarButton(
+                    icon: Icons.class_,
+                    label: 'Turmas',
+                    selected: _selectedIndex == 1,
+                    onTap: () => setState(() => _selectedIndex = 1),
+                  ),
+                  _SidebarButton(
+                    icon: Icons.calendar_today,
+                    label: 'Calendário',
+                    selected: _selectedIndex == 2,
+                    onTap: () => setState(() => _selectedIndex = 2),
+                  ),
+                  const Divider(
+                    color: Colors.white54,
+                    indent: 8,
+                    endIndent: 8,
+                  ),
+                  _SidebarButton(
+                    icon: Icons.help_outline,
+                    label: 'Ajuda',
+                    selected: false,
+                    onTap: _showHelpDialog,
+                  ),
+                  _SidebarButton(
+                    icon: Icons.settings,
+                    label: 'Configurações',
+                    selected: false,
+                    onTap: _showSettingsDialog,
+                  ),
+                  _SidebarButton(
+                    icon: Icons.logout,
+                    label: 'Sair',
+                    selected: false,
+                    onTap: _showLogoutDialog,
+                  ),
+                ],
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Matrícula: $registration',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          _SidebarButton(
-            icon: Icons.dashboard,
-            label: 'Visão Geral',
-            selected: _selectedIndex == 0,
-            onTap: () => setState(() => _selectedIndex = 0),
-          ),
-          _SidebarButton(
-            icon: Icons.class_,
-            label: 'Turmas',
-            selected: _selectedIndex == 1,
-            onTap: () => setState(() => _selectedIndex = 1),
-          ),
-          _SidebarButton(
-            icon: Icons.calendar_today,
-            label: 'Calendário',
-            selected: _selectedIndex == 2,
-            onTap: () => setState(() => _selectedIndex = 2),
-          ),
-          const Spacer(),
-          const Divider(color: Colors.white54, indent: 16, endIndent: 16),
-          _SidebarButton(
-            icon: Icons.help_outline,
-            label: 'Ajuda',
-            selected: false,
-            onTap: _showHelpDialog,
-          ),
-          _SidebarButton(
-            icon: Icons.settings,
-            label: 'Configurações',
-            selected: false,
-            onTap: _showSettingsDialog,
-          ),
-          _SidebarButton(
-            icon: Icons.logout,
-            label: 'Sair',
-            selected: false,
-            onTap: _showLogoutDialog,
-          ),
-          const SizedBox(height: 24),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  Future<void> _openStudentMoreSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Mais opções',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Ajuda'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showHelpDialog();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('Configurações'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showSettingsDialog();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.orange),
+                title: const Text('Sair'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showLogoutDialog();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBottomNavBar() {
-    return BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      onTap: (index) => setState(() => _selectedIndex = index),
-      selectedItemColor: const Color(0xFF2953A5),
-      unselectedItemColor: Colors.grey,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard),
-          label: 'Visão Geral',
+    final isLandscape = AppResponsive.isLandscape(context);
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF2953A5),
+          indicatorColor: Colors.white.withAlpha(40),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+              fontSize: 12,
+              color: selected ? Colors.white : Colors.white70,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            );
+          }),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return IconThemeData(
+              color: selected ? Colors.white : Colors.white70,
+            );
+          }),
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.class_), label: 'Turmas'),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_today),
-          label: 'Calendário',
-        ),
-      ],
+      ),
+      child: NavigationBar(
+        height: isLandscape ? 56 : 68,
+        labelBehavior:
+            isLandscape
+                ? NavigationDestinationLabelBehavior.alwaysHide
+                : NavigationDestinationLabelBehavior.alwaysShow,
+        selectedIndex: _selectedIndex.clamp(0, 2),
+        onDestinationSelected: (index) {
+          if (index == 3) {
+            _openStudentMoreSheet();
+            return;
+          }
+          setState(() => _selectedIndex = index);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard),
+            label: 'Visão Geral',
+          ),
+          NavigationDestination(icon: Icon(Icons.class_), label: 'Turmas'),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today),
+            label: 'Calendário',
+          ),
+          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mais'),
+        ],
+      ),
     );
   }
 

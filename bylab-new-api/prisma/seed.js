@@ -176,18 +176,47 @@ async function upsertClass(schoolId, { name, grade, letter, shift, academicYear 
   return classRecord;
 }
 
+async function ensureSchoolSubject(schoolId, { type, name }) {
+  const existing = await prisma.schoolSubject.findUnique({
+    where: { schoolId_type: { schoolId, type } },
+  });
+  if (existing) {
+    return prisma.schoolSubject.update({
+      where: { id: existing.id },
+      data: { name },
+    });
+  }
+  return prisma.schoolSubject.create({
+    data: { schoolId, type, name },
+  });
+}
+
 async function ensureSubject(schoolId, classId, teacherId, { type, name }) {
+  const catalog = await ensureSchoolSubject(schoolId, { type, name });
+
   const existing = await prisma.subject.findFirst({
-    where: { classId, type, teacherId },
+    where: { classId, type },
   });
   if (existing) {
     return prisma.subject.update({
       where: { id: existing.id },
-      data: { name, schoolId },
+      data: {
+        name: catalog.name,
+        schoolId,
+        teacherId,
+        schoolSubjectId: catalog.id,
+      },
     });
   }
   return prisma.subject.create({
-    data: { name, type, classId, teacherId, schoolId },
+    data: {
+      name: catalog.name,
+      type,
+      classId,
+      teacherId,
+      schoolId,
+      schoolSubjectId: catalog.id,
+    },
   });
 }
 

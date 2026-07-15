@@ -452,14 +452,18 @@ class _ArmariosScreenState extends State<ArmariosScreen> {
           // Título da seção
           Row(
             children: [
-              Icon(Icons.computer, size: 32, color: Color(0xFF2953A5)),
-              SizedBox(width: 12),
-              Text(
-                'Gestão de Equipamentos - TecaAI',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2953A5),
+              const Icon(Icons.computer, size: 28, color: Color(0xFF2953A5)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Gestão de Equipamentos - TecaAI',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2953A5),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

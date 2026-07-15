@@ -335,25 +335,28 @@ export const getStudentSubjects = async (studentId: string) => {
   }
 
   // Extrai as disciplinas das turmas atuais do aluno
-  const subjects = student.enrollments
-    .flatMap(enrollment => enrollment.class?.subjects || [])
-    .filter(subject => subject != null)
-    .map(subject => ({
+  const subjects = student.enrollments.flatMap((enrollment) => {
+    const turma = enrollment.class;
+    if (!turma) return [];
+    return (turma.subjects || []).map((subject) => ({
       id: subject.id,
       name: subject.name,
       type: subject.type,
-      teacher: subject.teacher ? {
-        id: subject.teacher.id,
-        name: subject.teacher.name,
-        photoUrl: subject.teacher.photoUrl
-      } : null,
-      class: subject.class ? {
-        id: subject.class.id,
-        name: subject.class.name,
-        grade: subject.class.grade,
-        letter: subject.class.letter
-      } : null
+      teacher: subject.teacher
+        ? {
+            id: subject.teacher.id,
+            name: subject.teacher.name,
+            photoUrl: subject.teacher.photoUrl,
+          }
+        : null,
+      class: {
+        id: turma.id,
+        name: turma.name,
+        grade: turma.grade,
+        letter: turma.letter,
+      },
     }));
+  });
 
   return subjects;
 };

@@ -77,9 +77,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO DISCIPLINAS ===');
       final classId = widget.classData['id']?.toString();
-      debugPrint('🔍 Class ID: $classId');
 
       if (classId == null || classId.isEmpty) {
         setState(() {
@@ -94,14 +92,9 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
         headers: _authHeaders(token),
       );
 
-      debugPrint(
-        '🔍 Status da resposta das disciplinas: ${response.statusCode}',
-      );
-      debugPrint('🔍 Corpo da resposta das disciplinas: ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados das disciplinas: $data');
         setState(() {
           _subjects = List<Map<String, dynamic>>.from(data);
         });
@@ -130,19 +123,15 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO PERÍODOS ===');
       final token = _token();
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/grade-periods'),
         headers: _authHeaders(token),
       );
 
-      debugPrint('🔍 Status da resposta dos períodos: ${response.statusCode}');
-      debugPrint('🔍 Corpo da resposta dos períodos: ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados dos períodos: $data');
         setState(() {
           _gradePeriods = List<Map<String, dynamic>>.from(data);
           // Selecionar o primeiro período por padrão
@@ -175,9 +164,6 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO ATIVIDADES ===');
-      debugPrint('🔍 Subject ID: $subjectId');
-      debugPrint('🔍 Class ID: ${widget.classData['id']}');
 
       final token = _token();
       final response = await http.get(
@@ -187,14 +173,9 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
         headers: _authHeaders(token),
       );
 
-      debugPrint(
-        '🔍 Status da resposta das atividades: ${response.statusCode}',
-      );
-      debugPrint('🔍 Corpo da resposta das atividades: ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados das atividades: $data');
         setState(() {
           _assignments = List<Map<String, dynamic>>.from(data);
         });
@@ -223,9 +204,6 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO NOTAS ===');
-      debugPrint('🔍 Subject ID: $subjectId');
-      debugPrint('🔍 Period ID: ${_selectedPeriod?['id']}');
 
       // Buscar notas do aluno para esta disciplina
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -253,8 +231,6 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
           headers: _authHeaders(token),
         );
 
-        debugPrint('🔍 Status da resposta das notas: ${response.statusCode}');
-        debugPrint('🔍 Corpo da resposta das notas: ${response.body}');
 
         if (response.statusCode == 200) {
           final List data = jsonDecode(response.body);
@@ -271,7 +247,6 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen>
                 return isSubjectMatch && isPeriodMatch;
               }).toList();
 
-          debugPrint('🔍 Dados das notas filtradas: $filteredGrades');
           setState(() {
             _grades = List<Map<String, dynamic>>.from(filteredGrades);
           });

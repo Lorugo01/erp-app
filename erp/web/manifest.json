@@ -3,7 +3,7 @@
     "short_name": "ByLAB ERP",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#2953A5",
+    "background_color": "#FFFFFF",
     "theme_color": "#2953A5",
     "description": "Sistema de gestão escolar GlobalTEC",
     "orientation": "any",

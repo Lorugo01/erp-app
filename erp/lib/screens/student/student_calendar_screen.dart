@@ -61,7 +61,6 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO TURMAS DO ALUNO ===');
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.user;
       String? studentId;
@@ -92,12 +91,9 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
           },
         );
 
-        debugPrint('🔍 Status da resposta das turmas: ${response.statusCode}');
-        debugPrint('🔍 Corpo da resposta das turmas: ${response.body}');
 
         if (response.statusCode == 200) {
           final List data = jsonDecode(response.body);
-          debugPrint('🔍 Dados das turmas: $data');
 
           // Filtrar apenas matrículas atuais
           final currentEnrollments =
@@ -145,8 +141,6 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
     });
 
     try {
-      debugPrint('🔍 === CARREGANDO EVENTOS DA TURMA ===');
-      debugPrint('🔍 Class ID: $_selectedClassId');
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final response = await http.get(
@@ -157,12 +151,9 @@ class _StudentCalendarScreenState extends State<StudentCalendarScreen> {
         },
       );
 
-      debugPrint('🔍 Status da resposta dos eventos: ${response.statusCode}');
-      debugPrint('🔍 Corpo da resposta dos eventos: ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        debugPrint('🔍 Dados dos eventos: $data');
 
         // Filtrar apenas eventos recorrentes (sem data específica)
         final recurringEvents =
