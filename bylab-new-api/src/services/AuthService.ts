@@ -4,6 +4,28 @@ import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// Sessão longa o bastante para reabrir o app sem precisar entrar de novo todo dia.
+const JWT_EXPIRES_IN = '30d' as const;
+
+function signAccessToken(user: {
+  id: string;
+  email: string;
+  role: Role;
+  schoolId: string | null;
+}) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      schoolId: user.schoolId,
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN },
+  );
+}
+
 interface CreateUserDTO {
   email: string;
   password: string;
@@ -93,17 +115,7 @@ export class AuthService {
 
     const { password, ...userWithoutPassword } = updatedUser;
     
-    // Gerar token JWT para o novo usuário
-    const token = jwt.sign(
-      { 
-        userId: userWithoutPassword.id, 
-        email: userWithoutPassword.email, 
-        role: userWithoutPassword.role,
-        schoolId: userWithoutPassword.schoolId 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = signAccessToken(userWithoutPassword);
 
     return {
       ...userWithoutPassword,
@@ -128,17 +140,7 @@ export class AuthService {
 
     const { password, ...userWithoutPassword } = user;
     
-    // Gerar token JWT para o novo admin
-    const token = jwt.sign(
-      { 
-        userId: userWithoutPassword.id, 
-        email: userWithoutPassword.email, 
-        role: userWithoutPassword.role,
-        schoolId: userWithoutPassword.schoolId 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = signAccessToken(userWithoutPassword);
 
     return {
       ...userWithoutPassword,
@@ -177,22 +179,22 @@ export class AuthService {
       throw new Error('Senha inválida');
     }
 
-    // Gerar token JWT
-    const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email, 
-        role: user.role,
-        schoolId: user.schoolId 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = signAccessToken(user);
 
     const { password, ...userWithoutPassword } = user;
     return {
       ...userWithoutPassword,
       token,
     };
+  }
+
+  // Renova o acesso de quem ainda tem sessão válida ao reabrir o app.
+  issueToken(user: { id: string; email: string; role: string; schoolId: string | null }) {
+    return signAccessToken({
+      id: user.id,
+      email: user.email,
+      role: user.role as Role,
+      schoolId: user.schoolId,
+    });
   }
 } 

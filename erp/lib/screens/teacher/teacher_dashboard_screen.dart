@@ -7,7 +7,9 @@ import '../../widgets/bylab_safe_area.dart';
 import '../../widgets/data_refresh_widget.dart';
 import '../../utils/responsive.dart';
 import '../../services/teacher_service.dart';
-import '../../services/tecaai_service.dart';
+import '../../services/armarios_local_service.dart';
+import '../../services/teca_erp_service.dart';
+import '../../config/armarios_local_config.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -74,11 +76,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   String? _errorStudents;
   Timer? _debounce;
 
-  // Variáveis para controle dos armários
+  // Variáveis para controle dos armários (API Teca + LED LAN)
   bool _isLoadingArmarios = false;
   bool _isConnected = false;
-  List<TecaAIItem> _armarioItems = [];
-  List<TecaAIItem> _filteredArmarioItems = [];
+  List<TecaItem> _armarioItems = [];
+  List<TecaItem> _filteredArmarioItems = [];
   String? _selectedArmario;
   final TextEditingController _armarioSearchController =
       TextEditingController();
@@ -182,10 +184,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
 
   Future<void> _checkArmarioConnection() async {
     try {
-      final connected = await TecaAIService.checkConnection();
+      final connected = await TecaErpService.checkConnection();
       if (mounted) {
         setState(() {
-          _isConnected = connected;
+          _isConnected = connected.success;
         });
       }
     } catch (e) {
@@ -202,42 +204,24 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       setState(() => _isLoadingArmarios = true);
     }
     try {
-      final items = await TecaAIService.getAllItems();
+      final conn = await TecaErpService.checkConnection();
+      final result = await TecaErpService.listItens(
+        armario: _selectedArmarioFilter,
+        q: _armarioSearchController.text.trim().isEmpty
+            ? null
+            : _armarioSearchController.text.trim(),
+      );
+      // Descoberta ESP em paralelo para LED (não bloqueia lista se falhar)
+      try {
+        await ArmariosLocalService.discover();
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
-          _armarioItems = items;
-          _filteredArmarioItems = items;
-
-          // Debug dos itens carregados
-          TeacherDashboardLogger.info('Itens carregados');
-          TeacherDashboardLogger.debug('Total de itens', {
-            'total': items.length,
-          });
-          TeacherDashboardLogger.debug('selectedArmario', {
-            'selectedArmario': _selectedArmario,
-          });
-
-          if (items.isNotEmpty) {
-            TeacherDashboardLogger.debug('Primeiro item', {
-              'nome': items.first.nome,
-              'posicao': items.first.posicao,
-              'espIp': items.first.espIp,
-              'espIpOriginal': items.first.espIpOriginal,
-            });
-
-            if (items.length > 1) {
-              TeacherDashboardLogger.debug('Segundo item', {
-                'nome': items[1].nome,
-                'posicao': items[1].posicao,
-                'espIp': items[1].espIp,
-                'espIpOriginal': items[1].espIpOriginal,
-              });
-            }
-          }
-          TeacherDashboardLogger.info('========================');
+          _isConnected = conn.success;
+          _armarioItems = result.data ?? [];
+          _filteredArmarioItems = _armarioItems;
         });
-
-        // Aplicar filtros após carregar os itens
         _applyFilters();
       }
     } catch (e) {
@@ -250,57 +234,38 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   }
 
   void _filterArmarioItems(String query) {
-    TeacherDashboardLogger.info('Filtrando itens');
-    TeacherDashboardLogger.debug('Query', {'query': query});
-    TeacherDashboardLogger.debug('Filtro de armário', {
-      'selectedArmarioFilter': _selectedArmarioFilter,
-    });
-    TeacherDashboardLogger.debug('selectedArmario', {
-      'selectedArmario': _selectedArmario,
-    });
-
     setState(() {
-      // Primeiro aplicar filtro de armário
-      List<TecaAIItem> armarioFiltered;
+      List<TecaItem> armarioFiltered;
       if (_selectedArmarioFilter == null) {
         armarioFiltered = _armarioItems;
       } else {
-        armarioFiltered =
-            _armarioItems.where((item) {
-              // Usar o campo esp_ip que já vem traduzido da API
-              return item.espIp == _selectedArmarioFilter;
-            }).toList();
+        armarioFiltered = _armarioItems
+            .where((item) => item.alocacao?.armario == _selectedArmarioFilter)
+            .toList();
       }
 
-      // Depois aplicar filtro de texto
       if (query.isEmpty) {
         _filteredArmarioItems = armarioFiltered;
       } else {
-        _filteredArmarioItems =
-            armarioFiltered.where((item) {
-              return item.nome.toLowerCase().contains(query.toLowerCase()) ||
-                  item.posicao.toLowerCase().contains(query.toLowerCase());
-            }).toList();
+        final q = query.toLowerCase();
+        _filteredArmarioItems = armarioFiltered.where((item) {
+          return item.nome.toLowerCase().contains(q) ||
+              (item.codigo?.toLowerCase().contains(q) ?? false) ||
+              (item.alocacao?.label.toLowerCase().contains(q) ?? false);
+        }).toList();
       }
     });
-
-    TeacherDashboardLogger.info('Itens filtrados');
-    TeacherDashboardLogger.debug('Total de itens filtrados', {
-      'total': _filteredArmarioItems.length,
-    });
-    TeacherDashboardLogger.info('========================');
   }
 
   void _filterArmarioItemsByArmario(String? armario) {
     setState(() {
-      _selectedArmario = armario;
+      _selectedArmarioFilter = armario;
       if (armario == null) {
         _filteredArmarioItems = _armarioItems;
       } else {
-        _filteredArmarioItems =
-            _armarioItems.where((item) {
-              return item.posicao.startsWith(armario);
-            }).toList();
+        _filteredArmarioItems = _armarioItems
+            .where((item) => item.alocacao?.armario == armario)
+            .toList();
       }
     });
   }
@@ -1596,16 +1561,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.signal_wifi_off, size: 64, color: Colors.red),
+            const Icon(Icons.cloud_off, size: 64, color: Colors.orange),
             const SizedBox(height: 16),
-            Text(
-              'Não foi possível conectar ao armário.',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            const Text(
+              'API de locação Teca indisponível.',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Verifique sua conexão com a internet e tente novamente.',
-              style: const TextStyle(color: Colors.red),
+            const Text(
+              'Verifique TECA_ERP_BASE_URL e a rede (teca.lan…).',
+              style: TextStyle(color: Colors.orange),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -1629,7 +1594,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
               Icon(Icons.computer, size: 32, color: Color(0xFF2953A5)),
               SizedBox(width: 12),
               Text(
-                'Controle dos Armários - TecaAI',
+                'Armários — locação Teca',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -1652,7 +1617,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _isConnected ? 'TecaAI Conectado' : 'TecaAI Desconectado',
+                    _isConnected
+                        ? 'API Teca conectada'
+                        : 'API Teca offline',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1788,7 +1755,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                           final item = _filteredArmarioItems[index];
 
                           // Criar um identificador único para cada item
-                          final itemId = '${item.nome}_${item.posicao}';
+                          final itemId = '${item.nome}_${item.id}';
 
                           // Debug simplificado
                           TeacherDashboardLogger.debug('Item', {
@@ -1866,7 +1833,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                                     ),
                                   ),
                                   subtitle: Text(
-                                    '${item.posicao} - Armário ${item.espIp}',
+                                    '${item.alocacao?.label ?? 'Sem local'} · ${item.statusLabel}',
                                   ),
                                   selected:
                                       false, // Sempre false para evitar conflitos
@@ -1919,27 +1886,28 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                           const SizedBox(height: 12),
                           Builder(
                             builder: (context) {
-                              final selectedItem = _filteredArmarioItems
-                                  .firstWhere(
+                              TecaItem? selectedItem;
+                              try {
+                                selectedItem = _filteredArmarioItems.firstWhere(
+                                  (item) =>
+                                      '${item.nome}_${item.id}' ==
+                                      _selectedArmario,
+                                );
+                              } catch (_) {
+                                try {
+                                  selectedItem = _armarioItems.firstWhere(
                                     (item) =>
-                                        '${item.nome}_${item.posicao}' ==
+                                        '${item.nome}_${item.id}' ==
                                         _selectedArmario,
-                                    orElse:
-                                        () => _armarioItems.firstWhere(
-                                          (item) =>
-                                              '${item.nome}_${item.posicao}' ==
-                                              _selectedArmario,
-                                          orElse:
-                                              () => TecaAIItem(
-                                                id: null,
-                                                nome: 'Item não encontrado',
-                                                posicao: '',
-                                                posicaoOriginal: '',
-                                                espIp: '',
-                                                espIpOriginal: '',
-                                              ),
-                                        ),
                                   );
+                                } catch (_) {
+                                  selectedItem = null;
+                                }
+                              }
+
+                              if (selectedItem == null) {
+                                return const Text('Item não encontrado');
+                              }
 
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1950,12 +1918,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Posição: ${selectedItem.posicao}',
+                                    'Local: ${selectedItem.alocacao?.label ?? 'Sem alocação'}',
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Armário: ${selectedItem.espIp}',
+                                    'Status: ${selectedItem.statusLabel}',
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                 ],
@@ -2134,11 +2102,33 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
     }
 
     try {
-      final user = Provider.of<AuthProvider>(context, listen: false).user!;
-      final response = await TecaAIService.executePredefinedCommand(
-        commandKey: commandKey,
-        user: user,
-      );
+      late final List<ArmarioCmdResult> results;
+      switch (commandKey) {
+        case 'ligar_luz':
+          results = await ArmariosLocalService.broadcastToOnline(
+            action: (a) => ArmariosLocalService.setLuzes(a.ip, true),
+          );
+          break;
+        case 'desligar_luz':
+          results = await ArmariosLocalService.broadcastToOnline(
+            action: (a) => ArmariosLocalService.setLuzes(a.ip, false),
+          );
+          break;
+        case 'modo_festa_on':
+          results = await ArmariosLocalService.broadcastToOnline(
+            action: (a) => ArmariosLocalService.setApresentacao(a.ip, true),
+          );
+          break;
+        case 'modo_festa_off':
+          results = await ArmariosLocalService.broadcastToOnline(
+            action: (a) => ArmariosLocalService.setApresentacao(a.ip, false),
+          );
+          break;
+        default:
+          results = [
+            const ArmarioCmdResult(success: false, message: 'Comando desconhecido'),
+          ];
+      }
 
       if (mounted) {
         setState(() {
@@ -2146,21 +2136,18 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
         });
       }
 
-      if (response.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Comando executado com sucesso!'),
-            backgroundColor: Colors.green,
+      final ok = results.where((r) => r.success).length;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok > 0
+                ? 'Comando enviado a $ok armário(s)'
+                : (results.isNotEmpty ? results.first.message : 'Falha'),
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: ${response.error}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+          backgroundColor: ok > 0 ? Colors.green : Colors.red,
+        ),
+      );
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -2169,7 +2156,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao executar comando: \${userErrorMessage(e)}'),
+          content: Text('Erro ao executar comando: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -2179,59 +2166,45 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   Future<void> _locateSelectedItem() async {
     if (_selectedArmario == null) return;
 
-    // Extrair o nome do item do ID único
-    final itemName = _selectedArmario!.split('_')[0];
+    TecaItem? selectedItem;
+    try {
+      selectedItem = _filteredArmarioItems.firstWhere(
+        (item) => '${item.nome}_${item.id}' == _selectedArmario,
+      );
+    } catch (_) {
+      try {
+        selectedItem = _armarioItems.firstWhere(
+          (item) => '${item.nome}_${item.id}' == _selectedArmario,
+        );
+      } catch (_) {
+        selectedItem = null;
+      }
+    }
 
-    final selectedItem = _filteredArmarioItems.firstWhere(
-      (item) => '${item.nome}_${item.posicao}' == _selectedArmario,
-      orElse:
-          () => _armarioItems.firstWhere(
-            (item) => '${item.nome}_${item.posicao}' == _selectedArmario,
-            orElse:
-                () => TecaAIItem(
-                  id: null,
-                  nome: itemName,
-                  posicao: '',
-                  posicaoOriginal: '',
-                  espIp: '',
-                  espIpOriginal: '',
-                ),
-          ),
-    );
-
-    TeacherDashboardLogger.info(
-      'Item selecionado para localização: ${selectedItem.nome}',
-    );
-    TeacherDashboardLogger.debug('ID único', {
-      'selectedArmario': _selectedArmario,
-    });
+    if (selectedItem == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Item não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     try {
-      final user = Provider.of<AuthProvider>(context, listen: false).user!;
-      final response = await TecaAIService.locateItem(
-        item: selectedItem.nome,
-        user: user,
-      );
+      final msg = await TecaErpService.localizeOnEsp(selectedItem);
 
-      if (response.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Item localizado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao localizar item: ${response.error}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: msg.startsWith('LED') ? Colors.green : Colors.orange,
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao localizar item: \${userErrorMessage(e)}'),
+          content: Text('Erro ao localizar item: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -2241,18 +2214,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
   List<String> _getAvailableArmarios() {
     final uniqueArmarios = <String>{};
     for (final item in _armarioItems) {
-      // Usar o campo esp_ip que já vem traduzido da API (ex: "A", "B", "C")
-      if (item.espIp.isNotEmpty) {
-        uniqueArmarios.add(item.espIp);
+      final letra = item.alocacao?.armario;
+      if (letra != null && letra.isNotEmpty) {
+        uniqueArmarios.add(letra);
       }
     }
-
-    TeacherDashboardLogger.info('Armários disponíveis');
-    TeacherDashboardLogger.debug('Armários encontrados', {
-      'armarios': uniqueArmarios.toList(),
-    });
-    TeacherDashboardLogger.info('========================');
-
+    for (final a in ArmariosLocalConfig.catalog) {
+      uniqueArmarios.add(a.id);
+    }
     return uniqueArmarios.toList()..sort();
   }
 
@@ -2261,22 +2230,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       if (_selectedArmarioFilter == null) {
         _filteredArmarioItems = _armarioItems;
       } else {
-        _filteredArmarioItems =
-            _armarioItems.where((item) {
-              // Usar o campo esp_ip que já vem traduzido da API
-              return item.espIp == _selectedArmarioFilter;
-            }).toList();
+        _filteredArmarioItems = _armarioItems
+            .where((item) => item.alocacao?.armario == _selectedArmarioFilter)
+            .toList();
       }
     });
-
-    TeacherDashboardLogger.info('Filtros aplicados');
-    TeacherDashboardLogger.debug('Filtro de armário', {
-      'selectedArmarioFilter': _selectedArmarioFilter,
-    });
-    TeacherDashboardLogger.debug('Itens filtrados', {
-      'total': _filteredArmarioItems.length,
-    });
-    TeacherDashboardLogger.info('========================');
   }
 
   void _clearFilters() {
@@ -2285,13 +2243,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen>
       _armarioSearchController.clear();
       _filteredArmarioItems = _armarioItems;
     });
-
-    TeacherDashboardLogger.info('Filtros limpos');
-    TeacherDashboardLogger.info('Filtros resetados para valores padrão');
-    TeacherDashboardLogger.debug('Itens filtrados', {
-      'total': _filteredArmarioItems.length,
-    });
-    TeacherDashboardLogger.info('========================');
   }
 }
 

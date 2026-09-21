@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/api_error.dart';
 import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
@@ -27,9 +28,8 @@ class UserService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => User.fromJson(json)).toList();
-      } else {
-        throw Exception('Erro ao buscar usuários: ${response.statusCode}');
       }
+      throwApiResponseError(response, fallback: 'Erro ao buscar usuários');
     } catch (e) {
       throw Exception(userErrorMessage(e));
     }

@@ -9,10 +9,12 @@ import '../utils/user_friendly_error.dart';
 class AuthProvider extends ChangeNotifier {
   User? _user;
   bool _isLoading = false;
+  bool _isRestoring = true;
   String? _error;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
+  bool get isRestoring => _isRestoring;
   String? get error => _error;
   bool get isAuthenticated => _user != null;
 
@@ -82,14 +84,21 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Atualizar dados do usuário atual do backend
+  // Atualizar dados do usuário atual do backend sem apagar o token da sessão.
   Future<void> refreshUserData() async {
     if (_user == null) return;
 
     try {
-      final updatedUser = await UserService.getUserById(_user!.id);
-      _user = updatedUser;
-      await _saveUserToStorage(updatedUser);
+      final current = _user!;
+      final updatedUser = await UserService.getUserById(
+        current.id,
+        token: current.token,
+      );
+      _user = updatedUser.withSession(
+        token: updatedUser.token ?? current.token,
+        schoolId: updatedUser.schoolId ?? current.schoolId,
+      );
+      await _saveUserToStorage(_user!);
       notifyListeners();
     } catch (e) {
       _setError(userErrorMessage(e, fallback: 'Não foi possível atualizar seus dados.'));
@@ -98,26 +107,69 @@ class AuthProvider extends ChangeNotifier {
 
   // Atualizar dados do usuário após edição
   Future<void> updateUserData(User updatedUser) async {
-    _user = updatedUser;
-    await _saveUserToStorage(updatedUser);
+    final current = _user;
+    _user = updatedUser.withSession(
+      token: updatedUser.token ?? current?.token,
+      schoolId: updatedUser.schoolId ?? current?.schoolId,
+    );
+    await _saveUserToStorage(_user!);
     notifyListeners();
   }
 
-  // Carregar usuário do storage
+  /// Encerra a sessão local quando a API recusa o token.
+  Future<void> expireSession() async {
+    _user = null;
+    _error = 'Sua sessão expirou. Entre novamente.';
+    await _clearUserFromStorage();
+    notifyListeners();
+  }
+
+  // Carregar usuário do storage e só então liberar o painel.
   Future<void> loadUserFromStorage() async {
+    _isRestoring = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final userJson = prefs.getString('user');
-      if (userJson != null) {
-        final userData = jsonDecode(userJson);
-        _user = User.fromJson(userData);
-        notifyListeners();
+      if (userJson == null) {
+        _user = null;
+        return;
       }
+
+      final user = User.fromJson(jsonDecode(userJson));
+      final token = user.token;
+      if (token == null || token.isEmpty || User.isTokenExpired(token)) {
+        await _clearUserFromStorage();
+        _user = null;
+        _error = 'Sua sessão expirou. Entre novamente.';
+        return;
+      }
+
+      _user = user;
+      await _renewSession(user);
     } catch (e) {
-      // Se houver erro ao carregar usuário do storage, limpar dados corrompidos
       await _clearUserFromStorage();
       _user = null;
+    } finally {
+      _isRestoring = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _renewSession(User user) async {
+    final token = user.token;
+    if (token == null || token.isEmpty) return;
+
+    try {
+      final newToken = await AuthService.refreshSession(token);
+      _user = user.withSession(token: newToken);
+      await _saveUserToStorage(_user!);
+    } on AuthSessionException {
+      await _clearUserFromStorage();
+      _user = null;
+      _error = 'Sua sessão expirou. Entre novamente.';
+    } catch (e) {
+      // Sem rede ou API antiga: mantém o token que ainda não venceu.
+      debugPrint('Sessão não renovada: $e');
     }
   }
 

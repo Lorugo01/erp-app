@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum Role { developer, admin, student, teacher }
 
 class Student {
@@ -120,4 +122,48 @@ class User {
   bool get isAdmin => role == Role.admin;
   bool get isStudent => role == Role.student;
   bool get isTeacher => role == Role.teacher;
+
+  /// Mantém token e escola quando a API devolve o usuário sem a sessão.
+  User withSession({String? token, String? schoolId}) {
+    return User(
+      id: id,
+      email: email,
+      role: role,
+      photoUrl: photoUrl,
+      student: student,
+      teacher: teacher,
+      createdAt: createdAt,
+      token: token ?? this.token,
+      schoolId: schoolId ?? this.schoolId,
+    );
+  }
+
+  /// O JWT salvo expira; sem isso o app abre logado e a API recusa os dados.
+  static bool isTokenExpired(String token, {Duration leeway = const Duration(seconds: 30)}) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      var payload = parts[1];
+      final remainder = payload.length % 4;
+      if (remainder > 0) {
+        payload += '=' * (4 - remainder);
+      }
+
+      final decoded = utf8.decode(base64Url.decode(payload));
+      final map = jsonDecode(decoded);
+      if (map is! Map) return true;
+
+      final exp = map['exp'];
+      if (exp is! num) return true;
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch(
+        exp.toInt() * 1000,
+        isUtc: true,
+      );
+      return DateTime.now().toUtc().isAfter(expiry.subtract(leeway));
+    } catch (_) {
+      return true;
+    }
+  }
 }

@@ -42,12 +42,21 @@ class EnvironmentConfig {
   static String get tecaaiBaseUrl =>
       _env('TECAAI_BASE_URL', 'http://localhost:5010');
 
+  /// API de locação de itens nos armários (Teca ERP).
+  static String get tecaErpBaseUrl => _env(
+        'TECA_ERP_BASE_URL',
+        'http://teca.lan.alenxandriaglobaltec.com/erp',
+      );
+
   static String get uploadsBaseUrl =>
       _env('UPLOADS_BASE_URL', apiBaseUrl);
 
   static int get apiRequestTimeout => _envInt('API_REQUEST_TIMEOUT', 30);
 
   static int get tecaaiRequestTimeout => _envInt('TECAAI_REQUEST_TIMEOUT', 30);
+
+  static int get tecaErpRequestTimeout =>
+      _envInt('TECA_ERP_REQUEST_TIMEOUT', 15);
 
   static int get maxFileSize => _envInt('MAX_FILE_SIZE', 10 * 1024 * 1024);
 
@@ -82,5 +91,11 @@ class EnvironmentConfig {
   static String getTecaAIUrl(String endpoint) {
     final path = endpoint.startsWith('/') ? endpoint : '/$endpoint';
     return '$tecaaiBaseUrl$path';
+  }
+
+  static String getTecaErpUrl(String endpoint) {
+    final base = tecaErpBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    final path = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+    return '$base$path';
   }
 }

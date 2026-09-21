@@ -5,6 +5,14 @@ import '../config/api_config.dart';
 import '../utils/api_error.dart';
 import 'package:flutter/material.dart';
 
+class AuthSessionException implements Exception {
+  final String message;
+  AuthSessionException([this.message = 'Sessão expirada. Faça login novamente.']);
+
+  @override
+  String toString() => message;
+}
+
 class AuthService {
   static Future<User> login(String email, String password) async {
     try {
@@ -98,6 +106,48 @@ class AuthService {
         response,
         fallback: 'Não foi possível criar o administrador.',
       );
+    } on Exception {
+      rethrow;
+    } catch (e) {
+      rethrowServiceError(
+        e,
+        fallback: 'Não foi possível conectar. Verifique sua internet.',
+      );
+    }
+  }
+
+  /// Pede um token novo enquanto o atual ainda é aceito pela API.
+  static Future<String> refreshSession(String token) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}${ApiConfig.authEndpoint}/refresh'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(Duration(seconds: ApiConfig.requestTimeout));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final newToken = data is Map ? data['token']?.toString() : null;
+        if (newToken == null || newToken.isEmpty) {
+          throw Exception('Resposta de sessão inválida');
+        }
+        return newToken;
+      }
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw AuthSessionException();
+      }
+
+      throwApiResponseError(
+        response,
+        fallback: 'Não foi possível renovar a sessão.',
+      );
+    } on AuthSessionException {
+      rethrow;
     } on Exception {
       rethrow;
     } catch (e) {

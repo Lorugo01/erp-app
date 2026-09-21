@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/api_error.dart';
 import '../utils/user_friendly_error.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
@@ -26,9 +27,8 @@ class ClassService {
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return List<Map<String, dynamic>>.from(data);
-    } else {
-      throw Exception('Erro ao buscar turmas');
     }
+    throwApiResponseError(response, fallback: 'Erro ao buscar turmas');
   }
 
   static Future<Map<String, dynamic>> getClassById(

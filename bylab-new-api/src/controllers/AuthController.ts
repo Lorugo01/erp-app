@@ -37,4 +37,23 @@ export class AuthController {
       return res.status(401).json({ error: error.message });
     }
   }
+
+  async refresh(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Token de acesso não fornecido' });
+      }
+
+      const token = this.authService.issueToken({
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
+        schoolId: req.user.schoolId ?? null,
+      });
+
+      return res.status(200).json({ token });
+    } catch (error) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+  }
 } 

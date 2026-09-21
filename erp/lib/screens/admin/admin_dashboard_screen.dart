@@ -57,6 +57,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _fetchUsers();
   }
 
+  bool _isSessionError(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains('sessão') ||
+        lower.contains('sessao') ||
+        lower.contains('token');
+  }
+
+  /// 401 não pode virar contador zero: a sessão local é encerrada.
+  Future<void> _reportLoadError(
+    Object error,
+    void Function(String message) assign,
+  ) async {
+    final message = userErrorMessage(error);
+    if (_isSessionError(message)) {
+      if (!mounted) return;
+      await Provider.of<AuthProvider>(context, listen: false).expireSession();
+      return;
+    }
+    if (mounted) {
+      setState(() => assign(message));
+    }
+  }
+
   Future<void> _fetchTeachers([String? name]) async {
     if (mounted) {
       setState(() {
@@ -79,11 +102,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorTeachers = userErrorMessage(e);
-        });
-      }
+      await _reportLoadError(e, (message) => _errorTeachers = message);
     } finally {
       if (mounted) {
         setState(() {
@@ -165,11 +184,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorStudents = userErrorMessage(e);
-        });
-      }
+      await _reportLoadError(e, (message) => _errorStudents = message);
     } finally {
       if (mounted) {
         setState(() {
@@ -247,11 +262,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorClasses = userErrorMessage(e);
-        });
-      }
+      await _reportLoadError(e, (message) => _errorClasses = message);
     } finally {
       if (mounted) {
         setState(() {
@@ -318,11 +329,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorUsers = userErrorMessage(e);
-        });
-      }
+      await _reportLoadError(e, (message) => _errorUsers = message);
     } finally {
       if (mounted) {
         setState(() {
@@ -750,6 +757,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  if (_errorUsers != null ||
+                      _errorTeachers != null ||
+                      _errorStudents != null ||
+                      _errorClasses != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _errorUsers ??
+                          _errorTeachers ??
+                          _errorStudents ??
+                          _errorClasses!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _fetchUsers();
+                        _fetchTeachers();
+                        _fetchStudents();
+                        _fetchClasses();
+                      },
+                      child: const Text('Tentar novamente'),
+                    ),
+                  ],
                   SizedBox(height: isSmall ? 16 : 24),
                   GridView.count(
                     shrinkWrap: true,
@@ -1383,8 +1412,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           (_selectedIndex == 1 ||
                   _selectedIndex == 2 ||
                   _selectedIndex == 3 ||
-                  _selectedIndex == 4 ||
-                  _selectedIndex == 5)
+                  _selectedIndex == 4)
               ? Padding(
                 padding: EdgeInsets.only(
                   bottom: AppResponsive.isCompact(context) ? 80 : 24,
@@ -1401,8 +1429,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       _showAddStudentDialog();
                     } else if (_selectedIndex == 4) {
                       _showAddClassDialog();
-                    } else if (_selectedIndex == 5) {
-                      // Funcionalidade de equipamentos em desenvolvimento
                     }
                   },
                   child: const Icon(Icons.add, size: 36, color: Colors.white),

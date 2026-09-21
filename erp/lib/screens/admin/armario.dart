@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../utils/user_friendly_error.dart';
-import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../services/tecaai_service.dart';
 
+import '../../config/armarios_local_config.dart';
+import '../../config/teca_erp_config.dart';
+import '../../services/armarios_local_service.dart';
+import '../../services/teca_erp_service.dart';
+import '../../utils/user_friendly_error.dart';
+
+/// Front da API de locação Teca (`/erp/itens`) + controle LED na LAN.
 class ArmariosScreen extends StatefulWidget {
   const ArmariosScreen({super.key});
 
@@ -12,1134 +15,988 @@ class ArmariosScreen extends StatefulWidget {
 }
 
 class _ArmariosScreenState extends State<ArmariosScreen> {
-  bool _isLoading = false;
-  bool _isConnected = false;
-  TecaAIResponse? _lastResponse;
-  List<TecaAICommandHistory> _history = [];
-  TecaAIStats? _stats;
-  List<TecaAIItem> _items = [];
-  List<TecaAIItem> _filteredItems = [];
-  TecaAIItem? _selectedItem;
-  String? _selectedArmario;
+  bool _loading = false;
+  bool _apiOk = false;
+  List<TecaItem> _items = [];
+  List<TecaItem> _filtered = [];
+  List<TecaArmarioResumo> _resumo = [];
+  List<ArmarioOnline> _esps = [];
+  TecaItem? _selected;
+  String? _filterArmario;
+  String? _filterStatus;
+  String _lastMsg = '';
+  final _searchCtrl = TextEditingController();
 
-  // Controllers para adicionar/editar itens
-  final TextEditingController _itemNameController = TextEditingController();
-  final TextEditingController _itemPositionController = TextEditingController();
-  final TextEditingController _itemEspIpController = TextEditingController();
-  final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _itemFileiraController = TextEditingController();
-  final TextEditingController _itemSegmentoController = TextEditingController();
+  static const _statusOptions = [
+    ('', 'Todos'),
+    ('disponivel', 'Disponível'),
+    ('locado', 'Locado'),
+    ('manutencao', 'Manutenção'),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _checkConnection();
-    _loadHistory();
-    _loadStats();
-    _loadItems();
+    _bootstrap();
   }
 
   @override
   void dispose() {
-    _itemNameController.dispose();
-    _itemPositionController.dispose();
-    _itemEspIpController.dispose();
-    _searchController.dispose();
-    _itemFileiraController.dispose();
-    _itemSegmentoController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _checkConnection() async {
-    final connected = await TecaAIService.checkConnection();
-    if (mounted) {
-      setState(() {
-        _isConnected = connected;
-      });
-    }
-  }
-
-  Future<void> _loadHistory() async {
-    final history = await TecaAIService.getCommandHistory(limit: 20);
-    if (mounted) {
-      setState(() {
-        _history = history;
-      });
-    }
-  }
-
-  Future<void> _loadStats() async {
-    final stats = await TecaAIService.getStats();
-    if (mounted) {
-      setState(() {
-        _stats = stats;
-      });
-    }
-  }
-
-  Future<void> _loadItems() async {
-    if (mounted) {
-      setState(() => _isLoading = true);
-    }
+  Future<void> _bootstrap() async {
+    setState(() => _loading = true);
     try {
-      final items = await TecaAIService.getAllItems();
-      if (mounted) {
-        setState(() {
-          _items = items;
-          _filteredItems = items;
-        });
+      final conn = await TecaErpService.checkConnection();
+      final itens = await TecaErpService.listItens(
+        armario: _filterArmario,
+        status: _filterStatus,
+        q: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
+      );
+      final armarios = await TecaErpService.listArmarios();
+      final esps = await ArmariosLocalService.discover();
+
+      if (!mounted) return;
+      setState(() {
+        _apiOk = conn.success;
+        _items = itens.data ?? [];
+        _resumo = armarios.data ?? [];
+        _esps = esps;
+        _applyLocalFilter();
+        _lastMsg = conn.success
+            ? 'API Teca OK · ${_items.length} item(ns)'
+            : (conn.error ?? 'API Teca indisponível');
+      });
+
+      if (!itens.success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(itens.error ?? 'Falha ao listar itens'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      // Ignorar erro silenciosamente
+      if (!mounted) return;
+      setState(() {
+        _apiOk = false;
+        _lastMsg = userErrorMessage(e);
+      });
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _filterItemsByArmario(String? armario) {
-    _selectedArmario = armario;
-    _applyFilters();
+  Future<void> _reloadItens() async {
+    final itens = await TecaErpService.listItens(
+      armario: _filterArmario,
+      status: _filterStatus,
+      q: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
+    );
+    final armarios = await TecaErpService.listArmarios();
+    if (!mounted) return;
+    setState(() {
+      if (itens.success) {
+        _items = itens.data ?? [];
+        _applyLocalFilter();
+      }
+      if (armarios.success) _resumo = armarios.data ?? [];
+    });
   }
 
-  void _filterItemsBySearch(String searchTerm) {
-    _applyFilters();
+  void _applyLocalFilter() {
+    // Filtros principais já vão na API; aqui só garante seleção válida.
+    _filtered = List<TecaItem>.from(_items);
   }
 
-  void _applyFilters() {
-    List<TecaAIItem> filtered = _items;
+  /// Categorias já usadas nos itens (ordenadas), para o dropdown de cadastro.
+  List<String> get _categoriasExistentes {
+    final set = <String>{};
+    for (final i in _items) {
+      final c = i.categoria?.trim();
+      if (c != null && c.isNotEmpty) set.add(c);
+    }
+    final list = set.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
 
-    // Filtro por armário
-    if (_selectedArmario != null) {
-      filtered =
-          filtered
-              .where((item) => item.espIpOriginal == _selectedArmario)
+  Future<void> _locate(TecaItem item) async {
+    setState(() => _loading = true);
+    final msg = await TecaErpService.localizeOnEsp(item);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _selected = item;
+      _lastMsg = msg;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: msg.startsWith('LED') ? Colors.green : Colors.orange,
+      ),
+    );
+  }
+
+  Future<void> _showCreateOrEdit({TecaItem? editing}) async {
+    final nomeCtrl = TextEditingController(text: editing?.nome ?? '');
+    final codigoCtrl = TextEditingController(text: editing?.codigo ?? '');
+    final descCtrl = TextEditingController(text: editing?.descricao ?? '');
+    final novaCatCtrl = TextEditingController();
+    var status = editing?.status ?? 'disponivel';
+
+    const nenhuma = '';
+    const outra = '__outra__';
+    final categorias = List<String>.from(_categoriasExistentes);
+    final atual = editing?.categoria?.trim() ?? '';
+    if (atual.isNotEmpty && !categorias.contains(atual)) {
+      categorias.add(atual);
+      categorias.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    }
+    var categoriaSel = atual.isNotEmpty ? atual : nenhuma;
+    var mostrarOutra = false;
+
+    String armarioId = editing?.alocacao?.armario ??
+        _filterArmario ??
+        ArmariosLocalConfig.catalog.first.id;
+    var def0 = ArmariosLocalConfig.byId(armarioId)!;
+    int fitaSel = editing?.alocacao?.fita ?? def0.fitasUteis.first;
+    if (!def0.fitasUteis.contains(fitaSel)) {
+      fitaSel = def0.fitasUteis.first;
+    }
+    int sessaoSel = editing?.alocacao?.sessao ?? 1;
+    if (sessaoSel < 1 || sessaoSel > def0.espacosDaFita(fitaSel)) {
+      sessaoSel = 1;
+    }
+    var alocarAgora = editing == null || editing.temLocal;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final def = ArmariosLocalConfig.byId(armarioId)!;
+          final fitas = def.fitasUteis;
+          if (!fitas.contains(fitaSel)) fitaSel = fitas.first;
+          final maxSessao = def.espacosDaFita(fitaSel);
+          if (sessaoSel < 1 || sessaoSel > maxSessao) sessaoSel = 1;
+          final espacosDaFita = def.espacos
+              .where((e) => e.fita == fitaSel)
               .toList();
-    }
 
-    // Filtro por busca
-    if (_searchController.text.isNotEmpty) {
-      final searchTerm = _searchController.text.toLowerCase();
-      filtered =
-          filtered.where((item) {
-            return item.nome.toLowerCase().contains(searchTerm) ||
-                item.posicao.toLowerCase().contains(searchTerm) ||
-                item.espIp.toLowerCase().contains(searchTerm);
-          }).toList();
-    }
-
-    if (mounted) {
-      setState(() {
-        _filteredItems = filtered;
-      });
-    }
-  }
-
-  List<String> get _availableArmarios {
-    final armarios = _items.map((item) => item.espIpOriginal).toSet().toList();
-    armarios.sort();
-    return armarios;
-  }
-
-  Future<void> _locateItem() async {
-    if (_selectedItem == null) {
-      _showSnackBar('Selecione um item');
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
-
-    try {
-      final user = Provider.of<AuthProvider>(context, listen: false).user!;
-      final response = await TecaAIService.locateItem(
-        item: _selectedItem!.nome,
-        user: user,
-      );
-
-      if (mounted) {
-        setState(() {
-          _lastResponse = response;
-          _isLoading = false;
-        });
-      }
-
-      if (response.success) {
-        _showSnackBar('Item localizado!');
-        _loadHistory();
-      } else {
-        _showSnackBar('Erro: ${response.error}');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-      _showSnackBar(userErrorMessage(e));
-    }
-  }
-
-  Future<void> _executePredefinedCommand(String commandKey) async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
-
-    try {
-      final user = Provider.of<AuthProvider>(context, listen: false).user!;
-      final response = await TecaAIService.executePredefinedCommand(
-        commandKey: commandKey,
-        user: user,
-      );
-
-      if (mounted) {
-        setState(() {
-          _lastResponse = response;
-          _isLoading = false;
-        });
-      }
-
-      if (response.success) {
-        _showSnackBar('Comando executado!');
-        _loadHistory();
-      } else {
-        _showSnackBar('Erro: ${response.error}');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-      _showSnackBar(userErrorMessage(e));
-    }
-  }
-
-  Future<void> _addItem() async {
-    // Limpar os controllers antes de usar
-    _itemNameController.clear();
-    _itemFileiraController.clear();
-    _itemSegmentoController.clear();
-    _itemEspIpController.clear();
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder:
-          (context) => _AddEditItemDialog(
-            title: 'Adicionar Item',
-            itemNameController: _itemNameController,
-            itemFileiraController: _itemFileiraController,
-            itemSegmentoController: _itemSegmentoController,
-            itemEspIpController: _itemEspIpController,
-            availableArmarios: _availableArmarios,
-          ),
-    );
-
-    if (result != null) {
-      if (mounted) {
-        setState(() => _isLoading = true);
-      }
-      try {
-        final response = await TecaAIService.addItem(
-          nome: result['nome']!,
-          posicao: result['posicao']!,
-          espIp: result['esp_ip']!,
-          user: context.read<AuthProvider>().user!,
-        );
-
-        if (mounted) {
-          setState(() {
-            _lastResponse = response;
-            _isLoading = false;
-          });
-        }
-
-        if (response.success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                response.response ?? 'Item adicionado com sucesso!',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _loadItems(); // Recarregar lista
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.error ?? 'Erro ao adicionar item'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userErrorMessage(e)), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _editItem(TecaAIItem item) async {
-    _itemNameController.text = item.nome;
-    _itemEspIpController.text = item.espIpOriginal;
-
-    // Extrair fileira e segmento da posição
-    final posicao = item.posicaoOriginal;
-    if (posicao.startsWith('f') && posicao.contains('s')) {
-      final partes = posicao.replaceAll('f', '').split('s');
-      if (partes.length == 2) {
-        _itemFileiraController.text = partes[0];
-        _itemSegmentoController.text = partes[1];
-      } else {
-        _itemFileiraController.text = '';
-        _itemSegmentoController.text = '';
-      }
-    } else {
-      _itemFileiraController.text = '';
-      _itemSegmentoController.text = '';
-    }
-
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder:
-          (context) => _AddEditItemDialog(
-            title: 'Editar Item',
-            itemNameController: _itemNameController,
-            itemFileiraController: _itemFileiraController,
-            itemSegmentoController: _itemSegmentoController,
-            itemEspIpController: _itemEspIpController,
-            availableArmarios: _availableArmarios,
-          ),
-    );
-
-    if (result != null && item.id != null) {
-      if (mounted) {
-        setState(() => _isLoading = true);
-      }
-      try {
-        final response = await TecaAIService.editItem(
-          itemId: item.id!,
-          nome: result['nome']!,
-          posicao: result['posicao']!,
-          espIp: result['esp_ip']!,
-          user: context.read<AuthProvider>().user!,
-        );
-
-        if (mounted) {
-          setState(() {
-            _lastResponse = response;
-            _isLoading = false;
-          });
-        }
-
-        if (response.success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.response ?? 'Item editado com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _loadItems(); // Recarregar lista
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.error ?? 'Erro ao editar item'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userErrorMessage(e)), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteItem(TecaAIItem item) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Confirmar Exclusão'),
-            content: Text(
-              'Tem certeza que deseja remover o item "${item.nome}"?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Remover'),
-              ),
-            ],
-          ),
-    );
-
-    if (confirm == true && item.id != null) {
-      if (mounted) {
-        setState(() => _isLoading = true);
-      }
-      try {
-        final response = await TecaAIService.deleteItem(
-          itemId: item.id!,
-          user: context.read<AuthProvider>().user!,
-        );
-
-        if (mounted) {
-          setState(() {
-            _lastResponse = response;
-            _isLoading = false;
-          });
-        }
-
-        if (response.success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.response ?? 'Item removido com sucesso!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _loadItems(); // Recarregar lista
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.error ?? 'Erro ao remover item'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userErrorMessage(e)), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Título da seção
-          Row(
-            children: [
-              const Icon(Icons.computer, size: 28, color: Color(0xFF2953A5)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Gestão de Equipamentos - TecaAI',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2953A5),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 24),
-
-          // Status de conexão
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    _isConnected ? Icons.check_circle : Icons.error,
-                    color: _isConnected ? Colors.green : Colors.red,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isConnected ? 'TecaAI Conectado' : 'TecaAI Desconectado',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Spacer(),
-                  IconButton(
-                    icon: Icon(_isConnected ? Icons.wifi : Icons.wifi_off),
-                    onPressed: _checkConnection,
-                    tooltip: _isConnected ? 'Conectado' : 'Desconectado',
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Estatísticas
-          if (_stats != null) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Estatísticas',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Total de comandos: ${_stats!.totalCommands}'),
-                    Text(
-                      'Taxa de sucesso: ${_stats!.successRate.toStringAsFixed(1)}%',
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Comandos por tipo:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    ..._stats!.commandsByType.entries.map(
-                      (entry) => Text('  ${entry.key}: ${entry.value}'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Seção: Localizar Item
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+          return AlertDialog(
+            title: Text(editing == null ? 'Novo item' : 'Editar item'),
+            content: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Localizar Item',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: _isLoading ? null : _addItem,
-                            icon: const Icon(Icons.add),
-                            tooltip: 'Adicionar Item',
-                          ),
-                          IconButton(
-                            onPressed: _isLoading ? null : () => _loadItems(),
-                            icon: const Icon(Icons.refresh),
-                            tooltip: 'Recarregar Itens',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Filtro por armário
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedArmario,
+                  TextField(
+                    controller: nomeCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Filtrar por Armário',
+                      labelText: 'Nome *',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: codigoCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Código (opcional, único)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: mostrarOutra ? outra : categoriaSel,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoria',
                       border: OutlineInputBorder(),
                     ),
                     items: [
                       const DropdownMenuItem(
-                        value: null,
-                        child: Text('Todos os Armários'),
+                        value: nenhuma,
+                        child: Text('Sem categoria'),
                       ),
-                      ..._availableArmarios.map((armario) {
-                        // Traduzir o IP para letra para exibição
-                        String displayText = armario;
-                        if (armario == '192.168.100.184') {
-                          displayText = 'A';
-                        } else if (armario == '192.168.100.185') {
-                          displayText = 'B';
-                        } else if (armario == '192.168.100.186') {
-                          displayText = 'C';
-                        }
-
-                        return DropdownMenuItem(
-                          value: armario,
-                          child: Text('Armário $displayText'),
-                        );
-                      }),
-                    ],
-                    onChanged: _filterItemsByArmario,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Campo de busca
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: 'Buscar Item',
-                      hintText: 'Digite o nome, posição ou armário...',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon:
-                          _searchController.text.isNotEmpty
-                              ? IconButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _filterItemsBySearch('');
-                                },
-                                icon: const Icon(Icons.clear),
-                              )
-                              : null,
-                    ),
-                    onChanged: _filterItemsBySearch,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Lista de itens
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_filteredItems.isEmpty)
-                    const Center(child: Text('Nenhum item encontrado'))
-                  else
-                    Container(
-                      height: 200,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ListView.builder(
-                        itemCount: _filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = _filteredItems[index];
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Colors.grey.shade700,
-                                width: 1.5,
-                              ),
-                              borderRadius: BorderRadius.circular(50),
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(50),
-                                onTap: () {
-                                  if (mounted) {
-                                    setState(() {
-                                      _selectedItem = item;
-                                    });
-                                  }
-                                },
-                                child: ListTile(
-                                  title: Text(item.nome),
-                                  subtitle: Text(
-                                    '${item.posicao} - Armário ${item.espIp}',
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        onPressed: () => _editItem(item),
-                                        icon: const Icon(Icons.edit, size: 20),
-                                        tooltip: 'Editar',
-                                      ),
-                                      IconButton(
-                                        onPressed: () => _deleteItem(item),
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          size: 20,
-                                          color: Colors.red,
-                                        ),
-                                        tooltip: 'Remover',
-                                      ),
-                                    ],
-                                  ),
-                                  selected: _selectedItem?.id == item.id,
-                                  selectedTileColor: Colors.transparent,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-
-                  // Item Selecionado
-                  if (_selectedItem != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Item Selecionado:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Nome: ${_selectedItem!.nome}',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Posição: ${_selectedItem!.posicao}',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Armário: ${_selectedItem!.espIp}',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => _editItem(_selectedItem!),
-                                icon: const Icon(
-                                  Icons.edit,
-                                  color: Colors.blue,
-                                ),
-                                tooltip: 'Editar Item Selecionado',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Botão de localizar
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _selectedItem == null || _isLoading
-                              ? null
-                              : _locateItem,
-                      icon: const Icon(Icons.search),
-                      label: const Text('Localizar Item Selecionado'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Comandos Pré-definidos
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Comandos Pré-definidos',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () => _executePredefinedCommand('ligar_luz'),
-                        child: const Text('Ligar Luz'),
-                      ),
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('desligar_luz'),
-                        child: const Text('Desligar Luz'),
-                      ),
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('modo_festa_on'),
-                        child: const Text('Modo Festa ON'),
-                      ),
-                      ElevatedButton(
-                        onPressed:
-                            _isLoading
-                                ? null
-                                : () =>
-                                    _executePredefinedCommand('modo_festa_off'),
-                        child: const Text('Modo Festa OFF'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Última Resposta
-          if (_lastResponse != null) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Última Resposta',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color:
-                            _lastResponse!.success
-                                ? Colors.green.shade50
-                                : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color:
-                              _lastResponse!.success
-                                  ? Colors.green
-                                  : Colors.red,
+                      ...categorias.map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c, overflow: TextOverflow.ellipsis),
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _lastResponse!.success ? 'Sucesso' : 'Erro',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  _lastResponse!.success
-                                      ? Colors.green
-                                      : Colors.red,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (_lastResponse!.response != null)
-                            Text('Resposta: ${_lastResponse!.response}'),
-                          if (_lastResponse!.error != null)
-                            Text('Erro: ${_lastResponse!.error}'),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Timestamp: ${_lastResponse!.timestamp}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
+                      const DropdownMenuItem(
+                        value: outra,
+                        child: Text('Outra…'),
+                      ),
+                    ],
+                    onChanged: (v) => setLocal(() {
+                      if (v == outra) {
+                        mostrarOutra = true;
+                        categoriaSel = nenhuma;
+                      } else {
+                        mostrarOutra = false;
+                        categoriaSel = v ?? nenhuma;
+                      }
+                    }),
+                  ),
+                  if (mostrarOutra) ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: novaCatCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nova categoria',
+                        border: OutlineInputBorder(),
                       ),
                     ),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Histórico
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Histórico Recente',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_history.isEmpty) const Text('Nenhum comando registrado'),
-                  if (_history.isNotEmpty)
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _history.length,
-                      itemBuilder: (context, index) {
-                        final item = _history[index];
-                        return ListTile(
-                          title: Text(item.parameter),
-                          subtitle: Text(
-                            '${item.commandType} - ${item.userRole}',
-                          ),
-                          trailing: Icon(
-                            item.success ? Icons.check_circle : Icons.error,
-                            color: item.success ? Colors.green : Colors.red,
-                          ),
-                        );
-                      },
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição',
+                      border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Local no armário',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Escolha armário → fita → espaço (firmware)',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: armarioId,
+                    decoration: const InputDecoration(
+                      labelText: 'Armário *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ArmariosLocalConfig.catalog
+                        .map(
+                          (a) => DropdownMenuItem(
+                            value: a.id,
+                            child: Text(
+                              '${a.name} (${a.espacos.length} espaços)',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setLocal(() {
+                      armarioId = v ?? 'A';
+                      final d = ArmariosLocalConfig.byId(armarioId)!;
+                      fitaSel = d.fitasUteis.first;
+                      sessaoSel = 1;
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Alocar ao salvar'),
+                    subtitle: const Text('Desligado = só cadastra o item'),
+                    value: alocarAgora,
+                    onChanged: (v) => setLocal(() => alocarAgora = v),
+                  ),
+                  if (alocarAgora) ...[
+                    DropdownButtonFormField<int>(
+                      initialValue: fitaSel,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Fita *',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: fitas
+                          .map(
+                            (f) => DropdownMenuItem(
+                              value: f,
+                              child: Text(
+                                def.labelDaFita(f),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setLocal(() {
+                        fitaSel = v ?? fitas.first;
+                        sessaoSel = 1;
+                      }),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<int>(
+                      initialValue: sessaoSel,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Espaço *',
+                        border: const OutlineInputBorder(),
+                        helperText:
+                            '${espacosDaFita.length} espaço(s) nesta fita',
+                      ),
+                      items: espacosDaFita
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e.sessao,
+                              child: Text(
+                                e.label.contains('·')
+                                    ? e.label.split('·').last.trim()
+                                    : e.label,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) =>
+                          setLocal(() => sessaoSel = v ?? 1),
+                    ),
+                  ],
+                  if (editing != null) ...[
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: status,
+                      decoration: const InputDecoration(
+                        labelText: 'Status',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'disponivel',
+                          child: Text('Disponível'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'locado',
+                          child: Text('Locado'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'manutencao',
+                          child: Text('Manutenção'),
+                        ),
+                      ],
+                      onChanged: (v) => setLocal(() => status = v ?? status),
+                    ),
+                  ],
                 ],
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (nomeCtrl.text.trim().isEmpty) return;
+                  Navigator.pop(ctx, true);
+                },
+                child: const Text('Salvar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (ok != true) return;
+
+    final categoriaSalvar = mostrarOutra
+        ? novaCatCtrl.text.trim()
+        : categoriaSel.trim();
+
+    final result = editing == null
+        ? await TecaErpService.createItem(
+            nome: nomeCtrl.text,
+            codigo: codigoCtrl.text,
+            descricao: descCtrl.text,
+            categoria: categoriaSalvar,
+          )
+        : await TecaErpService.updateItem(
+            id: editing.id,
+            nome: nomeCtrl.text,
+            codigo: codigoCtrl.text,
+            descricao: descCtrl.text,
+            categoria: categoriaSalvar,
+            status: status,
+          );
+
+    if (!result.success || result.data == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error ?? 'Erro ao salvar item'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    var item = result.data!;
+    String msg = editing == null ? 'Item criado' : 'Item atualizado';
+
+    if (alocarAgora) {
+      final aloc = await TecaErpService.setAlocacao(
+        id: item.id,
+        armario: armarioId,
+        fita: fitaSel,
+        sessao: sessaoSel,
+      );
+      if (aloc.success && aloc.data != null) {
+        item = aloc.data!;
+        msg =
+            '${editing == null ? 'Item criado' : 'Item atualizado'} em ${item.alocacao?.label}';
+      } else {
+        msg = 'Item salvo, mas falha na alocação: ${aloc.error ?? "erro"}';
+      }
+    } else if (editing != null && !alocarAgora && editing.temLocal) {
+      final cleared = await TecaErpService.clearAlocacao(editing.id);
+      if (cleared.success) {
+        msg = 'Item atualizado e retirado do armário';
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _selected = item);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: msg.contains('falha') ? Colors.orange : Colors.green,
+      ),
+    );
+    await _reloadItens();
+  }
+
+  Future<void> _showAlocacao(TecaItem item) async {
+    String armarioId = item.alocacao?.armario ??
+        _filterArmario ??
+        ArmariosLocalConfig.catalog.first.id;
+    var def0 = ArmariosLocalConfig.byId(armarioId)!;
+    int fitaSel = item.alocacao?.fita ?? def0.fitasUteis.first;
+    if (!def0.fitasUteis.contains(fitaSel)) {
+      fitaSel = def0.fitasUteis.first;
+    }
+    int sessaoSel = item.alocacao?.sessao ?? 1;
+    if (sessaoSel < 1 || sessaoSel > def0.espacosDaFita(fitaSel)) {
+      sessaoSel = 1;
+    }
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final def = ArmariosLocalConfig.byId(armarioId)!;
+          final fitas = def.fitasUteis;
+          if (!fitas.contains(fitaSel)) fitaSel = fitas.first;
+          final maxSessao = def.espacosDaFita(fitaSel);
+          if (sessaoSel < 1 || sessaoSel > maxSessao) sessaoSel = 1;
+          final espacosDaFita = def.espacos
+              .where((e) => e.fita == fitaSel)
+              .toList();
+
+          return AlertDialog(
+            title: Text('Alocar — ${item.nome}'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: armarioId,
+                    decoration: const InputDecoration(
+                      labelText: 'Armário',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ArmariosLocalConfig.catalog
+                        .map(
+                          (a) => DropdownMenuItem(
+                            value: a.id,
+                            child: Text(
+                              '${a.name} (${a.espacos.length} espaços)',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setLocal(() {
+                      armarioId = v ?? 'A';
+                      final d = ArmariosLocalConfig.byId(armarioId)!;
+                      fitaSel = d.fitasUteis.first;
+                      sessaoSel = 1;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: fitaSel,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Fita',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: fitas
+                        .map(
+                          (f) => DropdownMenuItem(
+                            value: f,
+                            child: Text(
+                              def.labelDaFita(f),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setLocal(() {
+                      fitaSel = v ?? fitas.first;
+                      sessaoSel = 1;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: sessaoSel,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Espaço',
+                      border: const OutlineInputBorder(),
+                      helperText: '${espacosDaFita.length} espaço(s) nesta fita',
+                    ),
+                    items: espacosDaFita
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e.sessao,
+                            child: Text(
+                              e.label.contains('·')
+                                  ? e.label.split('·').last.trim()
+                                  : e.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setLocal(() => sessaoSel = v ?? 1),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Salvar alocação'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (ok != true) return;
+
+    final result = await TecaErpService.setAlocacao(
+      id: item.id,
+      armario: armarioId,
+      fita: fitaSel,
+      sessao: sessaoSel,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success
+              ? 'Alocado em ${result.data?.alocacao?.label}'
+              : (result.error ?? 'Erro ao alocar'),
+        ),
+        backgroundColor: result.success ? Colors.green : Colors.red,
+      ),
+    );
+    if (result.success) {
+      setState(() => _selected = result.data);
+      await _reloadItens();
+    }
+  }
+
+  Future<void> _clearAlocacao(TecaItem item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Retirar alocação'),
+        content: Text('Remover "${item.nome}" do armário?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Retirar'),
           ),
         ],
       ),
     );
+    if (confirm != true) return;
+
+    final r = await TecaErpService.clearAlocacao(item.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(r.success ? 'Alocação removida' : (r.error ?? 'Erro')),
+        backgroundColor: r.success ? Colors.green : Colors.red,
+      ),
+    );
+    if (r.success) await _reloadItens();
   }
-}
 
-class _AddEditItemDialog extends StatefulWidget {
-  final String title;
-  final TextEditingController itemNameController;
-  final TextEditingController? itemFileiraController;
-  final TextEditingController? itemSegmentoController;
-  final TextEditingController itemEspIpController;
-  final List<String> availableArmarios;
+  Future<void> _deleteItem(TecaItem item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir item'),
+        content: Text('Excluir permanentemente "${item.nome}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
 
-  const _AddEditItemDialog({
-    required this.title,
-    required this.itemNameController,
-    this.itemFileiraController,
-    this.itemSegmentoController,
-    required this.itemEspIpController,
-    required this.availableArmarios,
-  });
-
-  @override
-  State<_AddEditItemDialog> createState() => _AddEditItemDialogState();
-}
-
-class _AddEditItemDialogState extends State<_AddEditItemDialog> {
-  final _formKey = GlobalKey<FormState>();
-  String? _selectedArmario;
-
-  @override
-  void initState() {
-    super.initState();
-    // Preencher o armário selecionado se já tiver um valor
-    if (widget.itemEspIpController.text.isNotEmpty) {
-      final espIp = widget.itemEspIpController.text;
-      // Verificar se o valor existe na lista de armários disponíveis
-      if (widget.availableArmarios.contains(espIp)) {
-        _selectedArmario = espIp;
-      } else {
-        _selectedArmario = null;
-      }
+    final r = await TecaErpService.deleteItem(item.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(r.success ? 'Item excluído' : (r.error ?? 'Erro')),
+        backgroundColor: r.success ? Colors.green : Colors.red,
+      ),
+    );
+    if (r.success) {
+      if (_selected?.id == item.id) _selected = null;
+      await _reloadItens();
     }
+  }
+
+  int _totalNoArmario(String letra) {
+    for (final r in _resumo) {
+      if (r.letra == letra) return r.totalItens;
+    }
+    return _items.where((i) => i.alocacao?.armario == letra).length;
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: widget.itemNameController,
-              decoration: const InputDecoration(
-                labelText: 'Nome do Item',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Nome é obrigatório';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
+    final onlineEsp = _esps.where((e) => e.online).length;
 
-            // Campos de fileira e segmento
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _bootstrap,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
             Row(
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller:
-                        widget.itemFileiraController ?? TextEditingController(),
-                    decoration: const InputDecoration(
-                      labelText: 'Fileira (f)',
-                      border: OutlineInputBorder(),
-                      helperText: 'Ex: 1, 2, 3...',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Fileira é obrigatória';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Digite um número';
-                      }
-                      return null;
-                    },
+                const Expanded(
+                  child: Text(
+                    'Locação de itens — Teca',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller:
-                        widget.itemSegmentoController ??
-                        TextEditingController(),
-                    decoration: const InputDecoration(
-                      labelText: 'Segmento (s)',
-                      border: OutlineInputBorder(),
-                      helperText: 'Ex: 1, 2, 3...',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Segmento é obrigatório';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Digite um número';
-                      }
-                      return null;
-                    },
-                  ),
+                IconButton(
+                  tooltip: 'Atualizar',
+                  onPressed: _loading ? null : _bootstrap,
+                  icon: const Icon(Icons.refresh),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            DropdownButtonFormField<String>(
-              initialValue: _selectedArmario,
-              decoration: const InputDecoration(
-                labelText: 'Armário',
-                border: OutlineInputBorder(),
+            Text(
+              _apiOk
+                  ? 'API online · $onlineEsp ESP(s) na LAN'
+                  : 'API offline — confira TECA_ERP_BASE_URL',
+              style: TextStyle(
+                color: _apiOk ? Colors.green[700] : Colors.red[700],
               ),
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text('Selecione um armário'),
-                ),
-                ...widget.availableArmarios.map((armario) {
-                  // Traduzir o IP para letra para exibição
-                  String displayText = armario;
-                  if (armario == '192.168.100.184') {
-                    displayText = 'A';
-                  } else if (armario == '192.168.100.185') {
-                    displayText = 'B';
-                  } else if (armario == '192.168.100.186') {
-                    displayText = 'C';
-                  }
+            ),
+            Text(
+              TecaErpConfig.baseUrl,
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+            if (_lastMsg.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(_lastMsg, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+            ],
+            const SizedBox(height: 12),
+            _buildArmarioChips(),
+            const SizedBox(height: 12),
+            _buildFilters(),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_filtered.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('Nenhum item. Toque em + para cadastrar.'),
+              )
+            else
+              ..._filtered.map(_buildItemCard),
+            if (_selected != null) ...[
+              const SizedBox(height: 12),
+              _buildDetail(_selected!),
+            ],
+            // Espaço para o botão "Novo item" não cobrir o último card.
+            const SizedBox(height: 88),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'armarios-novo-item',
+        onPressed: () => _showCreateOrEdit(),
+        icon: const Icon(Icons.add),
+        label: const Text('Novo item'),
+      ),
+    );
+  }
 
-                  return DropdownMenuItem(
-                    value: armario,
-                    child: Text('Armário $displayText'),
-                  );
-                }),
+  Widget _buildArmarioChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: ArmariosLocalConfig.catalog.map((a) {
+        final espOnline = _esps.any((e) => e.id == a.id && e.online);
+        final selected = _filterArmario == a.id;
+        final total = _totalNoArmario(a.id);
+        return FilterChip(
+          selected: selected,
+          label: Text('${a.id} ($total)${espOnline ? ' · LAN' : ''}'),
+          onSelected: (v) async {
+            setState(() => _filterArmario = v ? a.id : null);
+            setState(() => _loading = true);
+            await _reloadItens();
+            if (mounted) setState(() => _loading = false);
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildFilters() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: TextField(
+            controller: _searchCtrl,
+            decoration: InputDecoration(
+              hintText: 'Buscar nome ou código',
+              isDense: true,
+              prefixIcon: const Icon(Icons.search, size: 20),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.search),
+                onPressed: () async {
+                  setState(() => _loading = true);
+                  await _reloadItens();
+                  if (mounted) setState(() => _loading = false);
+                },
+              ),
+            ),
+            onSubmitted: (_) async {
+              setState(() => _loading = true);
+              await _reloadItens();
+              if (mounted) setState(() => _loading = false);
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            initialValue: _filterStatus ?? '',
+            decoration: const InputDecoration(
+              labelText: 'Status',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            items: _statusOptions
+                .map(
+                  (e) => DropdownMenuItem(value: e.$1, child: Text(e.$2)),
+                )
+                .toList(),
+            onChanged: (v) async {
+              setState(() {
+                _filterStatus = (v == null || v.isEmpty) ? null : v;
+                _loading = true;
+              });
+              await _reloadItens();
+              if (mounted) setState(() => _loading = false);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildItemCard(TecaItem item) {
+    final selected = _selected?.id == item.id;
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: selected
+          ? theme.colorScheme.primaryContainer.withAlpha(60)
+          : null,
+      child: InkWell(
+        onTap: () => setState(() => _selected = item),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 8, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    child: Text(
+                      item.alocacao?.armario ?? '—',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.nome,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        if (item.codigo != null && item.codigo!.isNotEmpty)
+                          Text(
+                            item.codigo!,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        Text(
+                          item.statusLabel,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        Text(
+                          item.alocacao?.label ?? 'Sem local',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Localizar LED',
+                      icon: const Icon(Icons.my_location),
+                      onPressed: item.temLocal && item.alocacao!.temSlot
+                          ? () => _locate(item)
+                          : null,
+                    ),
+                    IconButton(
+                      tooltip: 'Alocar',
+                      icon: const Icon(Icons.place_outlined),
+                      onPressed: () => _showAlocacao(item),
+                    ),
+                    PopupMenuButton<String>(
+                      onSelected: (v) {
+                        switch (v) {
+                          case 'edit':
+                            _showCreateOrEdit(editing: item);
+                          case 'clear':
+                            _clearAlocacao(item);
+                          case 'delete':
+                            _deleteItem(item);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Editar'),
+                        ),
+                        if (item.temLocal)
+                          const PopupMenuItem(
+                            value: 'clear',
+                            child: Text('Retirar do armário'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Excluir'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetail(TecaItem item) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.nome,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            if (item.codigo != null) Text('Código: ${item.codigo}'),
+            if (item.categoria != null) Text('Categoria: ${item.categoria}'),
+            Text('Status: ${item.statusLabel}'),
+            Text(item.alocacao?.label ?? 'Sem alocação'),
+            if (item.descricao != null && item.descricao!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(item.descricao!),
+              ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: item.temLocal && item.alocacao!.temSlot
+                      ? () => _locate(item)
+                      : null,
+                  icon: const Icon(Icons.my_location),
+                  label: const Text('Localizar LED'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _showAlocacao(item),
+                  icon: const Icon(Icons.place_outlined),
+                  label: const Text('Alocar / realocar'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _showCreateOrEdit(editing: item),
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Editar'),
+                ),
               ],
-              onChanged: (value) {
-                if (mounted) {
-                  setState(() {
-                    _selectedArmario = value;
-                    if (value != null) {
-                      widget.itemEspIpController.text = value;
-                    }
-                  });
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Armário é obrigatório';
-                }
-                return null;
-              },
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              final fileira = widget.itemFileiraController?.text ?? '';
-              final segmento = widget.itemSegmentoController?.text ?? '';
-              final posicao = 'f${fileira}s$segmento';
-
-              Navigator.of(context).pop({
-                'nome': widget.itemNameController.text,
-                'posicao': posicao,
-                'esp_ip': widget.itemEspIpController.text,
-              });
-            }
-          },
-          child: Text(
-            widget.title.contains('Adicionar') ? 'Adicionar' : 'Salvar',
-          ),
-        ),
-      ],
     );
   }
 }

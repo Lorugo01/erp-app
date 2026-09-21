@@ -80,6 +80,11 @@ class _AuthFlowState extends State<AuthFlow> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    if (authProvider.isRestoring) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     if (authProvider.isAuthenticated) {
       // Redireciona para dashboard conforme o tipo de usuário
       if (authProvider.user!.isDeveloper) {
