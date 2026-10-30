@@ -6,13 +6,21 @@ import '../config/api_config.dart';
 import 'package:flutter/material.dart';
 
 class SchoolService {
+  static Map<String, String> get _headers {
+    final token = ApiConfig.sessionToken;
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
   // Listar todas as escolas
   static Future<List<School>> getSchools() async {
     try {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.baseUrl}/schools'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
           )
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 
@@ -35,7 +43,7 @@ class SchoolService {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.baseUrl}/schools/$id'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
           )
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 
@@ -65,7 +73,7 @@ class SchoolService {
       final response = await http
           .post(
             Uri.parse('${ApiConfig.baseUrl}/schools'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
             body: jsonEncode({
               'name': name,
               'address': address,
@@ -105,7 +113,7 @@ class SchoolService {
       final response = await http
           .put(
             Uri.parse('${ApiConfig.baseUrl}/schools/$id'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
             body: jsonEncode({
               'name': name,
               'address': address,
@@ -140,7 +148,7 @@ class SchoolService {
               : Uri.parse('${ApiConfig.baseUrl}/schools/$id');
 
       final response = await http
-          .delete(uri, headers: {'Content-Type': 'application/json'})
+          .delete(uri, headers: _headers)
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 
       // 200 OK ou 204 No Content são sucesso para DELETE
@@ -161,7 +169,7 @@ class SchoolService {
       final response = await http
           .get(
             Uri.parse('${ApiConfig.baseUrl}/schools/$id/stats'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
           )
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 

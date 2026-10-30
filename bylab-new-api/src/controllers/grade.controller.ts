@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as GradeService from '../services/grade.service';
 
-export const getAll = async (_: Request, res: Response) => {
-  const grades = await GradeService.getAllGrades();
+export const getAll = async (req: Request, res: Response) => {
+  const schoolId = req.user?.role === 'DEVELOPER' ? undefined : req.user?.schoolId ?? '';
+  const grades = await GradeService.getAllGrades(schoolId);
   res.json(grades);
 };
 

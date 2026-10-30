@@ -27,6 +27,9 @@ export const createAssignment = async (classId: string, subjectId: string, data:
       description: data.description,
       dueDate: new Date(data.dueDate),
       fileUrl: data.fileUrl ?? null,
+      bookId: data.bookId ? String(data.bookId) : null,
+      bookTitle: data.bookId ? data.bookTitle ?? null : null,
+      bookCoverUrl: data.bookId ? data.bookCoverUrl ?? null : null,
     },
     include: { subject: true },
   });

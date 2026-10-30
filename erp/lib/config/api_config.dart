@@ -3,6 +3,10 @@ import 'environment.dart';
 class ApiConfig {
   // Configuração da URL da API - agora centralizada
   static String get baseUrl => EnvironmentConfig.apiBaseUrl;
+
+  /// Token da sessão atual, definido pelo AuthProvider.
+  static String? Function()? sessionTokenProvider;
+  static String? get sessionToken => sessionTokenProvider?.call();
   
   // URLs específicas
   static const String authEndpoint = '/auth';

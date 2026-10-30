@@ -1,7 +1,8 @@
 import prisma from '../prisma/client';
 
-export const getAllGrades = () => {
+export const getAllGrades = (schoolId?: string) => {
   return prisma.grade.findMany({
+    where: schoolId === undefined ? undefined : { student: { schoolId } },
     include: {
       student: true,
       subject: true,

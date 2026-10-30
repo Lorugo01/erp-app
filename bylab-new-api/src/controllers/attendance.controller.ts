@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as AttendanceService from '../services/attendance.service';
 
-export const getAll = async (_: Request, res: Response) => {
-  const attendances = await AttendanceService.getAllAttendances();
+export const getAll = async (req: Request, res: Response) => {
+  const schoolId = req.user?.role === 'DEVELOPER' ? undefined : req.user?.schoolId ?? '';
+  const attendances = await AttendanceService.getAllAttendances(schoolId);
   res.json(attendances);
 };
 

@@ -1,7 +1,8 @@
 import prisma from '../prisma/client';
 
-export const getAllAttendances = () => {
+export const getAllAttendances = (schoolId?: string) => {
   return prisma.attendance.findMany({
+    where: schoolId === undefined ? undefined : { student: { schoolId } },
     include: {
       student: true,
       lesson: {

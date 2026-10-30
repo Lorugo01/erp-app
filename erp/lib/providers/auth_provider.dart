@@ -1,12 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../utils/user_friendly_error.dart';
 
 class AuthProvider extends ChangeNotifier {
+  AuthProvider() {
+    ApiConfig.sessionTokenProvider = () => _user?.token;
+  }
+
   User? _user;
   bool _isLoading = false;
   bool _isRestoring = true;

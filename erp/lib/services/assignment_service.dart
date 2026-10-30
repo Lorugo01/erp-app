@@ -8,8 +8,9 @@ class AssignmentService {
 
   static Map<String, String> _getAuthHeaders([String? token]) {
     final headers = <String, String>{'Content-Type': 'application/json'};
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
+    final authToken = token ?? ApiConfig.sessionToken;
+    if (authToken != null && authToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $authToken';
     }
     return headers;
   }
@@ -94,6 +95,9 @@ class AssignmentService {
     required String description,
     required DateTime dueDate,
     String? fileUrl,
+    String? bookId,
+    String? bookTitle,
+    String? bookCoverUrl,
     String? token,
   }) async {
     final response = await http.post(
@@ -104,6 +108,9 @@ class AssignmentService {
         'description': description,
         'dueDate': dueDate.toIso8601String(),
         'fileUrl': fileUrl,
+        if (bookId != null) 'bookId': bookId,
+        if (bookId != null) 'bookTitle': bookTitle,
+        if (bookId != null) 'bookCoverUrl': bookCoverUrl,
       }),
     );
 

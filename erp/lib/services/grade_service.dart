@@ -9,8 +9,9 @@ class GradeService {
   // Helper para criar headers com autenticação
   static Map<String, String> _getAuthHeaders([String? token]) {
     final headers = <String, String>{'Content-Type': 'application/json'};
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
+    final authToken = token ?? ApiConfig.sessionToken;
+    if (authToken != null && authToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $authToken';
     }
     return headers;
   }
@@ -20,6 +21,7 @@ class GradeService {
   ) async {
     final response = await http.get(
       Uri.parse(ApiConfig.getGradesUrl('/student/$studentId')),
+      headers: _getAuthHeaders(),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);

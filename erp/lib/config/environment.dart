@@ -51,6 +51,12 @@ class EnvironmentConfig {
   static String get uploadsBaseUrl =>
       _env('UPLOADS_BASE_URL', apiBaseUrl);
 
+  /// Catálogo do Alexandria (painel ADM Libare, espelho do api.php).
+  static String get alexandriaApiUrl => _env(
+        'ALEXANDRIA_API_URL',
+        'https://admin.alenxandriaglobaltec.com/api.php',
+      );
+
   static int get apiRequestTimeout => _envInt('API_REQUEST_TIMEOUT', 30);
 
   static int get tecaaiRequestTimeout => _envInt('TECAAI_REQUEST_TIMEOUT', 30);

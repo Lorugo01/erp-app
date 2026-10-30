@@ -2619,7 +2619,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     try {
       final response = await http.put(
         Uri.parse('${ApiConfig.baseUrl}/attendances/$attendanceId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${ApiConfig.sessionToken ?? ''}',
+        },
         body: jsonEncode({
           'status': status,
           'justification': justification,
@@ -2655,6 +2658,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     try {
       final response = await http.delete(
         Uri.parse('${ApiConfig.baseUrl}/attendances/$attendanceId'),
+        headers: {'Authorization': 'Bearer ${ApiConfig.sessionToken ?? ''}'},
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {

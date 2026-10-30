@@ -1,7 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import * as ChatService from '../services/chat.service';
+import prisma from '../prisma/client';
 import path from 'path';
 import fs from 'fs';
+
+// Fora o developer, todos os participantes precisam ser da escola do chat
+const hasUsersOutsideSchool = async (req: Request, userIds: string[], schoolId?: string | null) => {
+  if (req.user?.role === 'DEVELOPER') return false;
+  const count = await prisma.user.count({
+    where: { id: { in: userIds }, schoolId: schoolId ?? undefined },
+  });
+  return count !== new Set(userIds).size;
+};
 
 // Chat Controllers
 export const getAllChats = async (_: Request, res: Response) => {
@@ -30,7 +40,22 @@ export const createChat = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Título do chat é obrigatório' });
     }
 
-    const chat = await ChatService.createChat({ title, participants, schoolId });
+    // Quem cria sempre participa, e o chat fica na escola de quem cria
+    const isDeveloper = req.user?.role === 'DEVELOPER';
+    const chatSchoolId = isDeveloper ? schoolId : req.user?.schoolId;
+    const chatParticipants: string[] = [
+      ...new Set<string>([req.user!.id, ...(Array.isArray(participants) ? participants : [])]),
+    ];
+
+    if (await hasUsersOutsideSchool(req, chatParticipants, chatSchoolId)) {
+      return res.status(403).json({ error: 'Acesso negado: participante de outra escola' });
+    }
+
+    const chat = await ChatService.createChat({
+      title,
+      participants: chatParticipants,
+      schoolId: chatSchoolId,
+    });
     res.status(201).json(chat);
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
@@ -78,6 +103,11 @@ export const addParticipant = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'ID do usuário é obrigatório' });
     }
 
+    const chat = await prisma.chat.findUnique({ where: { id }, select: { schoolId: true } });
+    if (await hasUsersOutsideSchool(req, [userId], chat?.schoolId)) {
+      return res.status(403).json({ error: 'Acesso negado: participante de outra escola' });
+    }
+
     const participant = await ChatService.addParticipant(id, userId);
     res.status(201).json(participant);
   } catch (error) {
@@ -108,15 +138,12 @@ export const getChatMessages = async (req: Request, res: Response) => {
 export const sendMessage = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { content, userId, isAI, personagem } = req.body;
-    
+    const { content, isAI, personagem } = req.body;
+    // O autor vem do token: ninguém escreve em nome de outro usuário
+    const userId = req.user?.id;
+
     if (!content) {
       return res.status(400).json({ error: 'Conteúdo é obrigatório' });
-    }
-
-    // Se não for mensagem da IA, userId é obrigatório
-    if (!isAI && !userId) {
-      return res.status(400).json({ error: 'ID do usuário é obrigatório para mensagens de usuário' });
     }
 
     // Só verifica participação se não for IA

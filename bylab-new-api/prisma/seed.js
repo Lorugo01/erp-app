@@ -488,9 +488,19 @@ async function seedAssignments(classRecord, subjects) {
 }
 
 async function seedAssignmentSubmissions(classRecord, students) {
+  // Só nas atividades do seed: o seed roda a cada subida do container e não
+  // pode criar entregas falsas em atividades reais dos professores.
   const assignments = await prisma.assignment.findMany({
-    where: { classId: classRecord.id },
-    take: 3,
+    where: {
+      classId: classRecord.id,
+      description: {
+        in: [
+          'Lista de exercícios — Equações do 1º grau (cap. 3)',
+          'Prova bimestral — Álgebra e funções',
+          'Redação dissertativa: "A importância da leitura"',
+        ],
+      },
+    },
   });
 
   for (let i = 0; i < Math.min(students.length, 6); i++) {

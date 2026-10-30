@@ -7,8 +7,9 @@ class AttendanceService {
 
   static Map<String, String> _getAuthHeaders([String? token]) {
     final headers = <String, String>{'Content-Type': 'application/json'};
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
+    final authToken = token ?? ApiConfig.sessionToken;
+    if (authToken != null && authToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $authToken';
     }
     return headers;
   }

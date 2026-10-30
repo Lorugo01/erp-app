@@ -6,6 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/api_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/alexandria_service.dart';
+import '../../utils/user_friendly_error.dart';
+import '../../widgets/alexandria_book_picker.dart';
 import 'package:provider/provider.dart';
 
 class AssignmentDetailsScreen extends StatefulWidget {
@@ -23,6 +26,11 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   String? _selectedFilePath;
   String? _selectedFileName;
   String? _description;
+
+  /// A entrega precisa de um texto (ex.: resumo da leitura) ou de um arquivo.
+  bool get _canSubmit =>
+      !_loading &&
+      (_selectedFilePath != null || (_description ?? '').trim().isNotEmpty);
 
   @override
   Widget build(BuildContext context) {
@@ -132,6 +140,10 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                 ),
               ),
             ),
+            if (assignment['bookId'] != null) ...[
+              const SizedBox(height: 16),
+              _buildBookCard(assignment),
+            ],
             const SizedBox(height: 24),
 
             // Seção de entrega
@@ -152,12 +164,18 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
 
                     // Campo de descrição
                     TextField(
-                      decoration: const InputDecoration(
-                        labelText: 'Descrição da entrega (opcional)',
-                        border: OutlineInputBorder(),
-                        hintText: 'Descreva sua entrega...',
+                      decoration: InputDecoration(
+                        labelText:
+                            assignment['bookId'] != null
+                                ? 'Resumo da leitura'
+                                : 'Descrição da entrega',
+                        border: const OutlineInputBorder(),
+                        hintText:
+                            assignment['bookId'] != null
+                                ? 'Escreva um resumo do que você leu...'
+                                : 'Descreva sua entrega...',
                       ),
-                      maxLines: 3,
+                      maxLines: assignment['bookId'] != null ? 6 : 3,
                       onChanged: (value) {
                         setState(() {
                           _description = value;
@@ -174,7 +192,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                             onPressed: _pickFile,
                             icon: const Icon(Icons.attach_file),
                             label: Text(
-                              _selectedFileName ?? 'Selecionar Arquivo',
+                              _selectedFileName ?? 'Anexar arquivo (opcional)',
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2953A5),
@@ -208,10 +226,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed:
-                            _selectedFilePath != null
-                                ? _submitAssignment
-                                : null,
+                        onPressed: _canSubmit ? _submitAssignment : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2953A5),
                           foregroundColor: Colors.white,
@@ -237,6 +252,69 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                     ),
                   ],
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Livro do Alexandria compartilhado pelo professor.
+  Widget _buildBookCard(Map<String, dynamic> assignment) {
+    final bookId = '${assignment['bookId']}';
+    final title = '${assignment['bookTitle'] ?? 'Livro'}';
+    final coverUrl = assignment['bookCoverUrl'] as String?;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            AlexandriaBookCover(url: coverUrl, width: 56, height: 80),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Livro para ler',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.menu_book, size: 18),
+                    label: const Text('Abrir no Alexandria'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2953A5),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final opened = await AlexandriaService.openBook(bookId);
+                      if (!opened && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Não foi possível abrir o Alexandria. '
+                              'Verifique se o app está instalado.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -304,10 +382,10 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   }
 
   Future<void> _submitAssignment() async {
-    if (_selectedFilePath == null) {
+    if (!_canSubmit) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selecione um arquivo para enviar'),
+          content: Text('Escreva sua entrega ou anexe um arquivo'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -364,21 +442,24 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
 
       // Adicionar campos
       request.fields['studentId'] = studentId;
-      if (_description != null && _description!.isNotEmpty) {
-        request.fields['description'] = _description!;
+      final description = _description?.trim() ?? '';
+      if (description.isNotEmpty) {
+        request.fields['description'] = description;
       }
 
-      // Adicionar arquivo
-      final file = File(_selectedFilePath!);
-      final stream = http.ByteStream(file.openRead());
-      final length = await file.length();
-      final multipartFile = http.MultipartFile(
-        'file',
-        stream,
-        length,
-        filename: _selectedFileName,
-      );
-      request.files.add(multipartFile);
+      // Adicionar arquivo (opcional)
+      if (_selectedFilePath != null) {
+        final file = File(_selectedFilePath!);
+        final stream = http.ByteStream(file.openRead());
+        final length = await file.length();
+        final multipartFile = http.MultipartFile(
+          'file',
+          stream,
+          length,
+          filename: _selectedFileName,
+        );
+        request.files.add(multipartFile);
+      }
 
       // Enviar request
       final response = await request.send();
@@ -401,7 +482,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao enviar entrega: \${userErrorMessage(e)}'),
+          content: Text('Erro ao enviar entrega: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );

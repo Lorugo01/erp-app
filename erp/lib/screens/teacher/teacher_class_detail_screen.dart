@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../utils/user_friendly_error.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/alexandria_service.dart';
 import '../../services/assignment_service.dart';
 import '../../services/grade_period_service.dart';
+import '../../widgets/alexandria_book_picker.dart';
 import '../../services/grade_service.dart';
 import '../../services/grade_type_service.dart';
 import '../../services/teacher_service.dart';
@@ -1131,7 +1133,10 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
 
       setState(() => _loadingAssignments = true);
       try {
-        await AssignmentService.deleteAssignment(assignmentId);
+        await AssignmentService.deleteAssignment(
+          assignmentId,
+          Provider.of<AuthProvider>(context, listen: false).user?.token,
+        );
 
         TeacherClassLogger.success('Atividade excluída com sucesso');
 
@@ -3294,12 +3299,18 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
   String? _error;
   String? _fileName;
   Uint8List? _fileBytes;
+  AlexandriaBook? _book;
 
   @override
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBook() async {
+    final book = await showAlexandriaBookPicker(context);
+    if (book != null && mounted) setState(() => _book = book);
   }
 
   Future<void> _pickFile() async {
@@ -3343,6 +3354,9 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
         description: '${_nameController.text}\n${_descController.text}',
         dueDate: _dueDate!,
         fileUrl: fileUrl,
+        bookId: _book?.id,
+        bookTitle: _book?.title,
+        bookCoverUrl: _book?.coverUrl,
         token: token,
       );
       if (dialogContext.mounted) Navigator.of(dialogContext).pop(true);
@@ -3424,6 +3438,46 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
                   ),
               ],
             ),
+            const SizedBox(height: 12),
+            if (_book == null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _loading ? null : _pickBook,
+                  icon: const Icon(Icons.menu_book),
+                  label: const Text('Compartilhar livro do Alexandria'),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  AlexandriaBookCover(url: _book!.coverUrl),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _book!.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const Text(
+                          'Livro do Alexandria',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remover livro',
+                    icon: const Icon(Icons.close),
+                    onPressed:
+                        _loading ? null : () => setState(() => _book = null),
+                  ),
+                ],
+              ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),

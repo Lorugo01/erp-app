@@ -309,6 +309,10 @@ model Assignment {
   dueDate     DateTime
   sentDate    DateTime               @default(now())
   fileUrl     String?
+  // Livro do Alexandria compartilhado na tarefa (id do livro no painel)
+  bookId       String?
+  bookTitle    String?
+  bookCoverUrl String?
   createdAt   DateTime               @default(now())
   subjectId   String
   class       Class                  @relation(fields: [classId], references: [id], onDelete: Cascade)

@@ -72,7 +72,22 @@ export const createSubmission = async (req: Request, res: Response, next: NextFu
   try {
     const assignmentId = req.params.id;
     const { studentId, description } = req.body;
-    
+
+    // Aluno só entrega em nome próprio
+    if (req.user?.role === 'STUDENT') {
+      const student = await prisma.student.findUnique({
+        where: { userId: req.user.id },
+        select: { id: true },
+      });
+      if (!student || student.id !== studentId) {
+        return res.status(403).json({ error: 'Acesso negado: entrega de outro aluno' });
+      }
+    }
+
+    if (!req.file && !description?.trim()) {
+      return res.status(400).json({ error: 'Envie um texto ou um arquivo' });
+    }
+
     let fileUrl = null;
     if (req.file) {
       const stored = await StorageService.registerFromMulterFile(

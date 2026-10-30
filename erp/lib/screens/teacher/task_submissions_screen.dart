@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../utils/user_friendly_error.dart';
 import '../../services/assignment_service.dart';
 import '../../config/api_config.dart';
+import '../../providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -97,6 +100,7 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     try {
       final submissions = await AssignmentService.getAssignmentSubmissions(
         widget.assignment['id'],
+        Provider.of<AuthProvider>(context, listen: false).user?.token,
       );
 
       TaskSubmissionsLogger.success('Submissões carregadas com sucesso');
@@ -256,6 +260,80 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     }
   }
 
+  Future<void> _openSubmissionFile(dynamic fileUrl) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}$fileUrl');
+    final opened =
+        await canLaunchUrl(uri) &&
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível abrir o arquivo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Data e hora do envio no fuso do aparelho (a API guarda em UTC).
+  String? _submittedAtLabel(Map<String, dynamic> sub) {
+    final submittedAt = DateTime.tryParse(
+      sub['submittedAt']?.toString() ?? '',
+    )?.toLocal();
+    if (submittedAt == null) return null;
+    return 'Enviada em ${DateFormat('dd/MM/yyyy HH:mm').format(submittedAt)}';
+  }
+
+  /// Entrega completa: resumos longos aparecem cortados na lista.
+  void _showSubmissionDetails(
+    Map<String, dynamic> aluno,
+    Map<String, dynamic> sub,
+  ) {
+    final text = sub['description']?.toString() ?? '';
+    final fileUrl = sub['fileUrl']?.toString() ?? '';
+    final submittedAt = _submittedAtLabel(sub);
+
+    showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(aluno['name']?.toString() ?? 'Entrega'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (submittedAt != null) ...[
+                    Text(
+                      submittedAt,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (text.isNotEmpty) SelectableText(text),
+                  if (text.isEmpty && fileUrl.isEmpty)
+                    const Text('Entrega sem texto nem arquivo.'),
+                  if (fileUrl.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      icon: const Icon(Icons.attach_file, size: 16),
+                      label: const Text('Baixar Arquivo'),
+                      onPressed: () => _openSubmissionFile(fileUrl),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Fechar'),
+              ),
+            ],
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final entregaramIds = _submissions.map((s) => s['studentId']).toSet();
@@ -348,46 +426,46 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                     ),
                                   ),
                                 ),
-                                // Botão para duplicar atividade
-                                ElevatedButton.icon(
-                                  onPressed:
-                                      _availableClasses.isNotEmpty
-                                          ? () =>
-                                              _showDuplicateAssignmentDialog()
-                                          : null,
-                                  icon: const Icon(Icons.copy),
-                                  label: const Text('Duplicar'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.purple,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                  ),
-                                ),
-                                if (_availableClasses.isEmpty &&
-                                    !_loadingClasses)
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 8),
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.withAlpha(50),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                        color: Colors.orange.withAlpha(100),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'Nenhuma turma disponível para duplicação',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                  ),
                               ],
                             ),
+                            const SizedBox(height: 12),
+                            // Botão para duplicar atividade
+                            ElevatedButton.icon(
+                              onPressed:
+                                  _availableClasses.isNotEmpty
+                                      ? () => _showDuplicateAssignmentDialog()
+                                      : null,
+                              icon: const Icon(Icons.copy),
+                              label: const Text('Duplicar'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                            if (_availableClasses.isEmpty && !_loadingClasses)
+                              Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(top: 8),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withAlpha(50),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: Colors.orange.withAlpha(100),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Nenhuma turma disponível para duplicação',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ),
                             if (widget.assignment['dueDate'] != null) ...[
                               const SizedBox(height: 8),
                               Row(
@@ -499,6 +577,10 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                           );
                           return Card(
                             child: ListTile(
+                              onTap:
+                                  sub.isEmpty
+                                      ? null
+                                      : () => _showSubmissionDetails(aluno, sub),
                               leading: CircleAvatar(
                                 backgroundColor: Colors.green,
                                 child: Text(
@@ -518,11 +600,23 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                       'Mat: ${aluno['registrationNumber']}',
                                       style: const TextStyle(fontSize: 12),
                                     ),
+                                  if (_submittedAtLabel(sub) != null)
+                                    Text(
+                                      _submittedAtLabel(sub)!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
                                   if (sub['description'] != null &&
                                       sub['description'].toString().isNotEmpty)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 4),
-                                      child: Text(sub['description']),
+                                      child: Text(
+                                        sub['description'],
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   if (sub['fileUrl'] != null &&
                                       sub['fileUrl'].toString().isNotEmpty)
@@ -538,26 +632,10 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                                           vertical: 0,
                                         ),
                                       ),
-                                      onPressed: () async {
-                                        final fileUrl = sub['fileUrl'];
-                                        final url =
-                                            '${ApiConfig.baseUrl}$fileUrl';
-                                        final uri = Uri.parse(url);
-                                        if (await canLaunchUrl(uri)) {
-                                          await launchUrl(uri);
-                                        } else {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Não foi possível abrir o arquivo',
-                                              ),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      },
+                                      onPressed:
+                                          () => _openSubmissionFile(
+                                            sub['fileUrl'],
+                                          ),
                                     ),
                                   if (sub.isEmpty)
                                     Padding(
