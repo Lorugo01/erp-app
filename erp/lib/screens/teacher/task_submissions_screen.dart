@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../../utils/user_friendly_error.dart';
 import '../../services/assignment_service.dart';
 import '../../config/api_config.dart';
+import '../../services/file_link_service.dart';
 import '../../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -124,6 +124,14 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     }
   }
 
+  Map<String, String> get _authHeaders {
+    final token = ApiConfig.sessionToken;
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
   // Buscar turmas disponíveis para duplicação
   Future<void> _fetchAvailableClasses() async {
     TaskSubmissionsLogger.info(
@@ -139,17 +147,16 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     });
 
     try {
-      // Buscar turmas onde o professor leciona a mesma disciplina
-      // Esta é uma implementação básica - você pode expandir conforme necessário
+      // Turmas da escola com a mesma disciplina (para professor, só as dele)
       final endpoint =
-          '/teachers/classes?subjectId=${widget.assignment['subjectId']}';
+          '/assignments/${widget.assignment['id']}/duplicate-targets';
       TaskSubmissionsLogger.api(endpoint, 'GET', {
         'subjectId': widget.assignment['subjectId'],
       });
 
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}$endpoint'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
       );
 
       if (response.statusCode == 200) {
@@ -224,11 +231,9 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     required DateTime targetDate,
   }) async {
     try {
-      // Aqui você implementará a lógica para duplicar a atividade
-      // Enviando para o backend
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/assignments/duplicate'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
         body: jsonEncode({
           'sourceAssignmentId': widget.assignment['id'],
           'targetClassIds': targetClassIds,
@@ -236,22 +241,29 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
         }),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Atividade duplicada com sucesso!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        final body = response.body.trim();
+        final message = body.startsWith('{') ? jsonDecode(body)['error'] : null;
+        throw Exception(message ?? 'Erro ${response.statusCode}');
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              targetClassIds.length == 1
+                  ? 'Atividade duplicada para 1 turma!'
+                  : 'Atividade duplicada para ${targetClassIds.length} turmas!',
             ),
-          );
-        }
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao duplicar atividade: \${userErrorMessage(e)}'),
+            content: Text('Erro ao duplicar atividade: ${userErrorMessage(e)}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -260,28 +272,21 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
     }
   }
 
-  Future<void> _openSubmissionFile(dynamic fileUrl) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$fileUrl');
-    final opened =
-        await canLaunchUrl(uri) &&
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível abrir o arquivo'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  Future<void> _openSubmissionFile(dynamic fileUrl) =>
+      FileLinkService.open(context, fileUrl?.toString());
 
   /// Data e hora do envio no fuso do aparelho (a API guarda em UTC).
   String? _submittedAtLabel(Map<String, dynamic> sub) {
-    final submittedAt = DateTime.tryParse(
-      sub['submittedAt']?.toString() ?? '',
-    )?.toLocal();
+    final submittedAt =
+        DateTime.tryParse(sub['submittedAt']?.toString() ?? '')?.toLocal();
     if (submittedAt == null) return null;
-    return 'Enviada em ${DateFormat('dd/MM/yyyy HH:mm').format(submittedAt)}';
+    final format = DateFormat('dd/MM/yyyy HH:mm');
+    final label = 'Enviada em ${format.format(submittedAt)}';
+    final updatedAt =
+        DateTime.tryParse(sub['updatedAt']?.toString() ?? '')?.toLocal();
+    return updatedAt == null
+        ? label
+        : '$label · editada em ${format.format(updatedAt)}';
   }
 
   /// Entrega completa: resumos longos aparecem cortados na lista.
@@ -488,23 +493,11 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                               TextButton.icon(
                                 icon: const Icon(Icons.attach_file),
                                 label: const Text('Baixar Anexo'),
-                                onPressed: () async {
-                                  final fileUrl = widget.assignment['fileUrl'];
-                                  final url = '${ApiConfig.baseUrl}$fileUrl';
-                                  final uri = Uri.parse(url);
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Não foi possível abrir o arquivo',
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                },
+                                onPressed:
+                                    () => FileLinkService.open(
+                                      context,
+                                      widget.assignment['fileUrl']?.toString(),
+                                    ),
                               ),
                             ],
                           ],
@@ -580,7 +573,8 @@ class _TaskSubmissionsScreenState extends State<TaskSubmissionsScreen> {
                               onTap:
                                   sub.isEmpty
                                       ? null
-                                      : () => _showSubmissionDetails(aluno, sub),
+                                      : () =>
+                                          _showSubmissionDetails(aluno, sub),
                               leading: CircleAvatar(
                                 backgroundColor: Colors.green,
                                 child: Text(
@@ -811,37 +805,35 @@ class _DuplicateAssignmentDialogState
 
   @override
   Widget build(BuildContext context) {
+    // ListView dentro de AlertDialog quebra o layout (o diálogo mede a largura
+    // intrínseca do conteúdo); com scrollable + Column o diálogo aparece.
     return AlertDialog(
+      scrollable: true,
       title: const Text('Duplicar Atividade'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Atividade: ${widget.assignment['description']}'),
+          Text(
+            'Atividade: ${widget.assignment['description']?.toString().split('\n').first ?? ''}',
+          ),
           const SizedBox(height: 16),
-          Text('Turmas disponíveis:'),
+          const Text('Turmas disponíveis:'),
           if (widget.availableClasses.isEmpty)
             const Text('Nenhuma turma disponível para duplicação.'),
-          if (widget.availableClasses.isNotEmpty)
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: widget.availableClasses.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final classInfo = widget.availableClasses[index];
-                return CheckboxListTile(
-                  title: Text(classInfo['name'] ?? 'Turma Desconhecida'),
-                  value: _selectedClasses.contains(classInfo['id']),
-                  onChanged: (bool? newValue) {
-                    setState(() {
-                      if (newValue!) {
-                        _selectedClasses.add(classInfo['id']);
-                      } else {
-                        _selectedClasses.remove(classInfo['id']);
-                      }
-                    });
-                  },
-                );
+          for (final classInfo in widget.availableClasses)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(classInfo['name'] ?? 'Turma Desconhecida'),
+              value: _selectedClasses.contains(classInfo['id']),
+              onChanged: (bool? newValue) {
+                setState(() {
+                  if (newValue!) {
+                    _selectedClasses.add(classInfo['id']);
+                  } else {
+                    _selectedClasses.remove(classInfo['id']);
+                  }
+                });
               },
             ),
           const SizedBox(height: 16),

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../services/alexandria_service.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
@@ -10,6 +11,7 @@ import '../utils/user_friendly_error.dart';
 class AuthProvider extends ChangeNotifier {
   AuthProvider() {
     ApiConfig.sessionTokenProvider = () => _user?.token;
+    AlexandriaService.schoolIdProvider = () => _user?.schoolId;
   }
 
   User? _user;
@@ -106,7 +108,9 @@ class AuthProvider extends ChangeNotifier {
       await _saveUserToStorage(_user!);
       notifyListeners();
     } catch (e) {
-      _setError(userErrorMessage(e, fallback: 'Não foi possível atualizar seus dados.'));
+      _setError(
+        userErrorMessage(e, fallback: 'Não foi possível atualizar seus dados.'),
+      );
     }
   }
 

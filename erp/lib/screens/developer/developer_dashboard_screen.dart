@@ -40,9 +40,11 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
         isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao carregar escolas: \${userErrorMessage(e)}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar escolas: \${userErrorMessage(e)}'),
+          ),
+        );
       }
     }
   }
@@ -88,164 +90,164 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
             ),
             // Header com informações do usuário
             Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2953A5).withAlpha(50),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2953A5).withAlpha(50),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
               ),
-            ),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: const Color(0xFF2953A5),
-                  child: Text(
-                    user?.displayName.substring(0, 1).toUpperCase() ?? 'D',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: const Color(0xFF2953A5),
+                    child: Text(
+                      user?.displayName.substring(0, 1).toUpperCase() ?? 'D',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Bem-vindo, ${user?.displayName ?? 'Desenvolvedor'}!',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 10),
+                  Text(
+                    'Bem-vindo, ${user?.displayName ?? 'Desenvolvedor'}!',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const Text(
-                  'Painel de Controle do Sistema',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-
-          // Estatísticas gerais
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    'Total de Escolas',
-                    schools.length.toString(),
-                    Icons.school,
-                    Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: _buildStatCard(
-                    'Escolas Ativas',
-                    schools.where((s) => s.isActive).length.toString(),
-                    Icons.check_circle,
-                    Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Lista de escolas
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Escolas do Sistema',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _showCreateSchoolDialog(context),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Nova Escola'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2953A5),
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  Expanded(
-                    child:
-                        isLoading
-                            ? const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  CircularProgressIndicator(
-                                    color: Color(0xFF2953A5),
-                                  ),
-                                  SizedBox(height: 16),
-                                  Text(
-                                    'Carregando escolas...',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                            : schools.isEmpty
-                            ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.school_outlined,
-                                    size: 64,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Nenhuma escola cadastrada',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Clique em "Nova Escola" para começar',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                            : ListView.builder(
-                              itemCount: schools.length,
-                              itemBuilder: (context, index) {
-                                final school = schools[index];
-                                return _buildSchoolCard(school);
-                              },
-                            ),
+                  const Text(
+                    'Painel de Controle do Sistema',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+
+            // Estatísticas gerais
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      'Total de Escolas',
+                      schools.length.toString(),
+                      Icons.school,
+                      Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Escolas Ativas',
+                      schools.where((s) => s.isActive).length.toString(),
+                      Icons.check_circle,
+                      Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Lista de escolas
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Escolas do Sistema',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => _showCreateSchoolDialog(context),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Nova Escola'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2953A5),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    Expanded(
+                      child:
+                          isLoading
+                              ? const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(
+                                      color: Color(0xFF2953A5),
+                                    ),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      'Carregando escolas...',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              : schools.isEmpty
+                              ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.school_outlined,
+                                      size: 64,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Nenhuma escola cadastrada',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Clique em "Nova Escola" para começar',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              : ListView.builder(
+                                itemCount: schools.length,
+                                itemBuilder: (context, index) {
+                                  final school = schools[index];
+                                  return _buildSchoolCard(school);
+                                },
+                              ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -547,7 +549,9 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao criar escola: \${userErrorMessage(e)}'),
+                        content: Text(
+                          'Erro ao criar escola: \${userErrorMessage(e)}',
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -575,6 +579,9 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
     );
     final TextEditingController websiteController = TextEditingController(
       text: school.website ?? '',
+    );
+    final TextEditingController acervoController = TextEditingController(
+      text: school.alexandriaAcervoId?.toString() ?? '',
     );
 
     showDialog(
@@ -629,6 +636,17 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                     ),
                     keyboardType: TextInputType.url,
                   ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: acervoController,
+                    decoration: const InputDecoration(
+                      labelText: 'Acervo do Alexandria',
+                      helperText:
+                          'Número do acervo dos tablets. Vazio mostra o catálogo inteiro.',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
                 ],
               ),
             ),
@@ -669,6 +687,10 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                           websiteController.text.trim().isEmpty
                               ? null
                               : websiteController.text.trim(),
+                      updateAlexandriaAcervo: true,
+                      alexandriaAcervoId: int.tryParse(
+                        acervoController.text.trim(),
+                      ),
                     );
 
                     Navigator.pop(context);
@@ -685,7 +707,9 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao atualizar escola: \${userErrorMessage(e)}'),
+                        content: Text(
+                          'Erro ao atualizar escola: \${userErrorMessage(e)}',
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -794,7 +818,9 @@ class _DeveloperDashboardScreenState extends State<DeveloperDashboardScreen> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao excluir escola: \${userErrorMessage(e)}'),
+                        content: Text(
+                          'Erro ao excluir escola: \${userErrorMessage(e)}',
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );

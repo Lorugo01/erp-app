@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../../config/api_config.dart';
+import '../../services/file_link_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/alexandria_service.dart';
 import '../../utils/user_friendly_error.dart';
@@ -25,12 +26,91 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
   bool _loading = false;
   String? _selectedFilePath;
   String? _selectedFileName;
-  String? _description;
+  final _descriptionController = TextEditingController();
+
+  // Entrega já feita pelo aluno (null enquanto não entregou)
+  Map<String, dynamic>? _mySubmission;
+  bool _loadingMine = true;
+  bool _canEdit = false;
+  DateTime? _deadline;
+  bool _editing = false;
+  bool _removeExistingFile = false;
+
+  static final _dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm');
+
+  bool get _hasExistingFile =>
+      _editing &&
+      !_removeExistingFile &&
+      (_mySubmission?['fileUrl']?.toString().isNotEmpty ?? false);
 
   /// A entrega precisa de um texto (ex.: resumo da leitura) ou de um arquivo.
   bool get _canSubmit =>
       !_loading &&
-      (_selectedFilePath != null || (_description ?? '').trim().isNotEmpty);
+      (_selectedFilePath != null ||
+          _descriptionController.text.trim().isNotEmpty ||
+          _hasExistingFile);
+
+  Map<String, String> get _authHeaders {
+    final token = ApiConfig.sessionToken;
+    return {
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  String get _mineUrl =>
+      '${ApiConfig.baseUrl}/assignments/${widget.assignment['id']}/submissions/mine';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMySubmission();
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMySubmission() async {
+    try {
+      final response = await http.get(
+        Uri.parse(_mineUrl),
+        headers: _authHeaders,
+      );
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        setState(() {
+          _mySubmission = data['submission'] as Map<String, dynamic>?;
+          _canEdit = data['canEdit'] == true;
+          _deadline = DateTime.tryParse('${data['deadline']}')?.toLocal();
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar a entrega do aluno: $e');
+    } finally {
+      if (mounted) setState(() => _loadingMine = false);
+    }
+  }
+
+  void _startEditing() {
+    setState(() {
+      _editing = true;
+      _removeExistingFile = false;
+      _selectedFilePath = null;
+      _selectedFileName = null;
+      _descriptionController.text =
+          _mySubmission?['description']?.toString() ?? '';
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editing = false;
+      _selectedFilePath = null;
+      _selectedFileName = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,22 +195,11 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
                                   vertical: 8,
                                 ),
                               ),
-                              onPressed: () async {
-                                final url = '${ApiConfig.baseUrl}$fileUrl';
-                                final uri = Uri.parse(url);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri);
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Não foi possível abrir o arquivo',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              },
+                              onPressed:
+                                  () => FileLinkService.open(
+                                    context,
+                                    fileUrl?.toString(),
+                                  ),
                             ),
                           ),
                         ],
@@ -147,113 +216,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
             const SizedBox(height: 24),
 
             // Seção de entrega
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Entrega',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Campo de descrição
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText:
-                            assignment['bookId'] != null
-                                ? 'Resumo da leitura'
-                                : 'Descrição da entrega',
-                        border: const OutlineInputBorder(),
-                        hintText:
-                            assignment['bookId'] != null
-                                ? 'Escreva um resumo do que você leu...'
-                                : 'Descreva sua entrega...',
-                      ),
-                      maxLines: assignment['bookId'] != null ? 6 : 3,
-                      onChanged: (value) {
-                        setState(() {
-                          _description = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Seleção de arquivo
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _pickFile,
-                            icon: const Icon(Icons.attach_file),
-                            label: Text(
-                              _selectedFileName ?? 'Anexar arquivo (opcional)',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2953A5),
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                        if (_selectedFilePath != null) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: _clearFile,
-                            icon: const Icon(Icons.clear, color: Colors.red),
-                            tooltip: 'Remover arquivo',
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (_selectedFileName != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Arquivo selecionado: $_selectedFileName',
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-
-                    // Botão de enviar
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _canSubmit ? _submitAssignment : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2953A5),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child:
-                            _loading
-                                ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                                : const Text(
-                                  'Enviar Entrega',
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildDeliveryCard(assignment),
           ],
         ),
       ),
@@ -367,7 +330,7 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao selecionar arquivo: \${userErrorMessage(e)}'),
+          content: Text('Erro ao selecionar arquivo: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -397,99 +360,306 @@ class _AssignmentDetailsScreenState extends State<AssignmentDetailsScreen> {
     });
 
     try {
-      // Buscar ID do aluno
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = authProvider.user;
-      final token = user?.token;
-      String? studentId;
-
-      if (user?.student?.id != null) {
-        studentId = user!.student!.id;
-      } else if (user?.id != null) {
-        final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
-        if (token != null && token.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $token';
-        }
-        final studentResponse = await http.get(
-          Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
-          headers: headers,
+      if (_editing) {
+        await _sendSubmission('PUT', Uri.parse(_mineUrl), {
+          'description': _descriptionController.text.trim(),
+          if (_removeExistingFile && _selectedFilePath == null)
+            'removeFile': 'true',
+        }, expectedStatus: 200);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entrega atualizada!'),
+            backgroundColor: Colors.green,
+          ),
         );
-
-        if (studentResponse.statusCode == 200) {
-          final studentData = jsonDecode(studentResponse.body);
-          studentId = studentData['id']?.toString();
-        }
+        _cancelEditing();
+        await _loadMySubmission();
+        return;
       }
 
+      final studentId = await _findStudentId();
       if (studentId == null) {
         throw Exception('ID do aluno não encontrado');
       }
-
-      // Criar request multipart
-      var request = http.MultipartRequest(
+      final description = _descriptionController.text.trim();
+      await _sendSubmission(
         'POST',
         Uri.parse(
           '${ApiConfig.baseUrl}/assignments/${widget.assignment['id']}/submissions',
         ),
+        {
+          'studentId': studentId,
+          if (description.isNotEmpty) 'description': description,
+        },
+        expectedStatus: 201,
       );
-
-      // Adicionar headers
-      final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-      request.headers.addAll(headers);
-
-      // Adicionar campos
-      request.fields['studentId'] = studentId;
-      final description = _description?.trim() ?? '';
-      if (description.isNotEmpty) {
-        request.fields['description'] = description;
-      }
-
-      // Adicionar arquivo (opcional)
-      if (_selectedFilePath != null) {
-        final file = File(_selectedFilePath!);
-        final stream = http.ByteStream(file.openRead());
-        final length = await file.length();
-        final multipartFile = http.MultipartFile(
-          'file',
-          stream,
-          length,
-          filename: _selectedFileName,
-        );
-        request.files.add(multipartFile);
-      }
-
-      // Enviar request
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Entrega enviada com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context, true); // Retorna true para indicar sucesso
-      } else {
-        throw Exception(
-          'Erro ao enviar entrega: ${response.statusCode} - $responseBody',
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Entrega enviada com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        _selectedFilePath = null;
+        _selectedFileName = null;
+      });
+      await _loadMySubmission();
     } catch (e) {
-      setState(() {});
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erro ao enviar entrega: ${userErrorMessage(e)}'),
           backgroundColor: Colors.red,
         ),
       );
+      // Ex.: já existia uma entrega (409); mostra a que está salva
+      await _loadMySubmission();
     } finally {
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
+  }
+
+  Future<String?> _findStudentId() async {
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    if (user?.student?.id != null) return user!.student!.id;
+    if (user?.id == null) return null;
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/students/user/${user!.id}'),
+      headers: {...ApiConfig.defaultHeaders, ..._authHeaders},
+    );
+    if (response.statusCode != 200) return null;
+    return jsonDecode(response.body)['id']?.toString();
+  }
+
+  Future<void> _sendSubmission(
+    String method,
+    Uri uri,
+    Map<String, String> fields, {
+    required int expectedStatus,
+  }) async {
+    final request =
+        http.MultipartRequest(method, uri)
+          ..headers.addAll(_authHeaders)
+          ..fields.addAll(fields);
+    if (_selectedFilePath != null) {
+      final file = File(_selectedFilePath!);
+      request.files.add(
+        http.MultipartFile(
+          'file',
+          http.ByteStream(file.openRead()),
+          await file.length(),
+          filename: _selectedFileName,
+        ),
+      );
+    }
+    final response = await request.send();
+    final body = await response.stream.bytesToString();
+    if (response.statusCode != expectedStatus) {
+      final message =
+          body.trim().startsWith('{') ? jsonDecode(body)['error'] : null;
+      throw Exception(message ?? 'Erro ${response.statusCode}');
+    }
+  }
+
+  /// Entrega: formulário enquanto não entregou; depois, o que foi enviado,
+  /// com edição liberada só dentro do prazo.
+  Widget _buildDeliveryCard(Map<String, dynamic> assignment) {
+    final showForm = _mySubmission == null || _editing;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _mySubmission == null ? 'Entrega' : 'Sua entrega',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            if (_loadingMine)
+              const Center(child: CircularProgressIndicator())
+            else if (showForm)
+              ..._buildSubmissionForm(assignment['bookId'] != null)
+            else
+              ..._buildSubmissionView(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildSubmissionView() {
+    final sub = _mySubmission!;
+    final text = sub['description']?.toString() ?? '';
+    final fileUrl = sub['fileUrl']?.toString() ?? '';
+    final submittedAt = DateTime.tryParse('${sub['submittedAt']}')?.toLocal();
+    final updatedAt = DateTime.tryParse('${sub['updatedAt']}')?.toLocal();
+    final deadline =
+        _deadline == null ? '' : _dateTimeFormat.format(_deadline!);
+    return [
+      if (submittedAt != null)
+        Text(
+          'Enviada em ${_dateTimeFormat.format(submittedAt)}'
+          '${updatedAt == null ? '' : ' · editada em ${_dateTimeFormat.format(updatedAt)}'}',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      if (text.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        SelectableText(text, style: const TextStyle(fontSize: 15)),
+      ],
+      if (fileUrl.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        TextButton.icon(
+          icon: const Icon(Icons.attach_file, size: 18),
+          label: const Text('Ver arquivo enviado'),
+          onPressed: () => FileLinkService.open(context, fileUrl),
+        ),
+      ],
+      const SizedBox(height: 16),
+      if (_canEdit) ...[
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _startEditing,
+            icon: const Icon(Icons.edit),
+            label: const Text('Editar entrega'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2953A5),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+        if (deadline.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Você pode editar até $deadline.',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ] else
+        Text(
+          deadline.isEmpty
+              ? 'O prazo terminou. A entrega não pode mais ser editada.'
+              : 'O prazo terminou em $deadline. A entrega não pode mais ser editada.',
+          style: const TextStyle(color: Colors.orange),
+        ),
+    ];
+  }
+
+  List<Widget> _buildSubmissionForm(bool isBook) {
+    final existingFile = _mySubmission?['fileUrl']?.toString() ?? '';
+    return [
+      TextField(
+        controller: _descriptionController,
+        decoration: InputDecoration(
+          labelText: isBook ? 'Resumo da leitura' : 'Descrição da entrega',
+          border: const OutlineInputBorder(),
+          hintText:
+              isBook
+                  ? 'Escreva um resumo do que você leu...'
+                  : 'Descreva sua entrega...',
+        ),
+        maxLines: isBook ? 6 : 3,
+        onChanged: (_) => setState(() {}),
+      ),
+      const SizedBox(height: 16),
+      if (_hasExistingFile && _selectedFilePath == null) ...[
+        Row(
+          children: [
+            Expanded(
+              child: TextButton.icon(
+                icon: const Icon(Icons.attach_file, size: 18),
+                label: const Text('Arquivo atual'),
+                onPressed: () => FileLinkService.open(context, existingFile),
+              ),
+            ),
+            IconButton(
+              onPressed: () => setState(() => _removeExistingFile = true),
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: 'Remover arquivo atual',
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
+      Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _pickFile,
+              icon: const Icon(Icons.attach_file),
+              label: Text(
+                _selectedFileName ??
+                    (_hasExistingFile
+                        ? 'Trocar arquivo (opcional)'
+                        : 'Anexar arquivo (opcional)'),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2953A5),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+          if (_selectedFilePath != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _clearFile,
+              icon: const Icon(Icons.clear, color: Colors.red),
+              tooltip: 'Remover arquivo',
+            ),
+          ],
+        ],
+      ),
+      if (_selectedFileName != null) ...[
+        const SizedBox(height: 8),
+        Text(
+          'Arquivo selecionado: $_selectedFileName',
+          style: const TextStyle(
+            color: Colors.green,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+      const SizedBox(height: 16),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _canSubmit ? _submitAssignment : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2953A5),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child:
+              _loading
+                  ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                  : Text(
+                    _editing ? 'Salvar alterações' : 'Enviar Entrega',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+        ),
+      ),
+      if (_editing)
+        Center(
+          child: TextButton(
+            onPressed: _loading ? null : _cancelEditing,
+            child: const Text('Cancelar'),
+          ),
+        ),
+    ];
   }
 }

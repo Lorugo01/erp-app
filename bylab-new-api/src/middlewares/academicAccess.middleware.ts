@@ -111,6 +111,72 @@ export const requireLessonDuplication = guard(async (req) => {
   return null;
 });
 
+// --- Disciplina do professor ---------------------------------------------
+// Admin e developer gerenciam qualquer disciplina da escola; o professor,
+// só as que ele leciona (notas, presença, aulas e atividades).
+
+const subjectSelect = { schoolId: true, teacher: { select: { userId: true } } };
+type SubjectOwner = { schoolId: string; teacher: { userId: string | null } };
+
+export const canManageSubject = (req: Request, subject: SubjectOwner) =>
+  canAccessSchool(req, subject.schoolId) &&
+  (req.user?.role !== 'TEACHER' || subject.teacher.userId === req.user.id);
+
+const denySubject = (req: Request, subject: SubjectOwner | null): Denial => {
+  if (!subject) return notFound('Disciplina não encontrada');
+  return canManageSubject(req, subject) ? null : forbidden('disciplina de outro professor');
+};
+
+const denySubjectById = async (req: Request, id: string): Promise<Denial> =>
+  denySubject(req, await prisma.subject.findUnique({ where: { id }, select: subjectSelect }));
+
+// subjectId no corpo é opcional em alguns PUTs; quando vier, precisa ser do professor
+export const requireBodySubjectOwner = guard(async (req) =>
+  req.body?.subjectId ? denySubjectById(req, req.body.subjectId) : null,
+);
+
+export const requireAssignmentSubjectOwner = guard(async (req) => {
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: req.params.id },
+    select: { subject: { select: subjectSelect } },
+  });
+  return assignment ? denySubject(req, assignment.subject) : notFound('Atividade não encontrada');
+});
+
+export const requireGradeSubjectOwner = guard(async (req) => {
+  const grade = await prisma.grade.findUnique({
+    where: { id: req.params.id },
+    select: { subject: { select: subjectSelect } },
+  });
+  return grade ? denySubject(req, grade.subject) : notFound('Nota não encontrada');
+});
+
+export const requireAttendanceSubjectOwner = guard(async (req) => {
+  const attendance = await prisma.attendance.findUnique({
+    where: { id: req.params.id },
+    select: { lesson: { select: { subject: { select: subjectSelect } } } },
+  });
+  return attendance ? denySubject(req, attendance.lesson.subject) : notFound('Frequência não encontrada');
+});
+
+const denyLessonSubject = async (req: Request, id: string): Promise<Denial> => {
+  const lesson = await prisma.lesson.findUnique({
+    where: { id },
+    select: { subject: { select: subjectSelect } },
+  });
+  return lesson ? denySubject(req, lesson.subject) : notFound('Aula não encontrada');
+};
+
+export const requireLessonSubjectOwner = guard((req) => denyLessonSubject(req, req.params.id));
+
+export const requireBodyLessonSubjectOwner = guard(async (req) =>
+  req.body?.lessonId ? denyLessonSubject(req, req.body.lessonId) : notFound('Aula não encontrada'),
+);
+
+export const requireSourceLessonSubjectOwner = guard(async (req) =>
+  req.body?.sourceLessonId ? denyLessonSubject(req, req.body.sourceLessonId) : null,
+);
+
 // Developer vê qualquer escola; admin e professor, só a própria
 export const requireOwnSchool = (req: Request, res: Response, next: NextFunction) => {
   if (!canAccessSchool(req, req.params.id)) {

@@ -14,5 +14,6 @@ router.get('/:id', requireOwnSchool, SchoolController.findById);
 router.put('/:id', requireDeveloper, SchoolController.update);
 router.delete('/:id', requireDeveloper, SchoolController.delete);
 router.get('/:id/stats', requireOwnSchool, SchoolController.getStats);
+router.get('/:id/integration', requireOwnSchool, SchoolController.getIntegration);
 
 export default router;

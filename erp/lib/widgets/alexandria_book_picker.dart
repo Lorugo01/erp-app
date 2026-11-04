@@ -30,6 +30,10 @@ class _AlexandriaBookPickerDialogState
   String? _error;
   int _searchGeneration = 0;
 
+  // Acervo da escola, buscado uma vez ao abrir o diálogo
+  late final Future<int?> _acervoId = AlexandriaService.schoolAcervoId()
+      .catchError((Object _) => null);
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -57,7 +61,10 @@ class _AlexandriaBookPickerDialogState
       _error = null;
     });
     try {
-      final results = await AlexandriaService.searchBooks(query);
+      final results = await AlexandriaService.searchBooks(
+        query,
+        acervoId: await _acervoId,
+      );
       if (!mounted || generation != _searchGeneration) return;
       setState(() => _results = results);
     } catch (e) {

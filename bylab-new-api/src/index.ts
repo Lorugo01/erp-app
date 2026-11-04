@@ -24,6 +24,7 @@ import assignmentRoutes from './routes/assignment.routes';
 import schoolRoutes from './routes/school.routes';
 import storageRoutes from './routes/storage.routes';
 import { storageConfig } from './config/storage.config';
+import { protectUploads } from './middlewares/uploadAccess.middleware';
 
 loadEnv();
 
@@ -47,7 +48,7 @@ if (!corsOrigin || corsOrigin === '*') {
 }
 app.use(express.json());
 
-app.use(storageConfig.publicPathPrefix, express.static(storageConfig.rootDir));
+app.use(storageConfig.publicPathPrefix, protectUploads, express.static(storageConfig.rootDir));
 
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);

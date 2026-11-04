@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/api_config.dart';
 import '../config/environment.dart';
 
 /// Livro do catálogo do Alexandria.
@@ -32,11 +33,19 @@ class AlexandriaBook {
 /// Integração com o app Alexandria: busca no catálogo e abertura do livro
 /// no app instalado no tablet (`alexandria://livro/<id>`).
 class AlexandriaService {
-  static Future<List<AlexandriaBook>> searchBooks(String query) async {
+  static Future<List<AlexandriaBook>> searchBooks(
+    String query, {
+    int? acervoId,
+  }) async {
     final text = query.trim();
     if (text.length < 2) return [];
     final uri = Uri.parse(EnvironmentConfig.alexandriaApiUrl).replace(
-      queryParameters: {'method_name': 'search_text', 'search_text': text},
+      queryParameters: {
+        'method_name': 'search_text',
+        'search_text': text,
+        // Mesmo filtro que o Alexandria usa a partir da conta do tablet
+        if (acervoId != null) 'acervo_id': '$acervoId',
+      },
     );
     final response = await http
         .get(uri)
@@ -53,6 +62,28 @@ class AlexandriaService {
         .where((book) => book.id.isNotEmpty && book.title.isNotEmpty)
         .toList();
   }
+
+  /// Acervo configurado para a escola do usuário (null = catálogo inteiro).
+  static Future<int?> schoolAcervoId() async {
+    final schoolId = _schoolIdProvider?.call();
+    if (schoolId == null || schoolId.isEmpty) return null;
+    final token = ApiConfig.sessionToken;
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/schools/$schoolId/integration'),
+      headers: {
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+    );
+    if (response.statusCode != 200) return null;
+    return int.tryParse(
+      '${jsonDecode(response.body)['alexandriaAcervoId'] ?? ''}',
+    );
+  }
+
+  /// Escola da sessão atual, definida pelo AuthProvider.
+  static String? Function()? _schoolIdProvider;
+  static set schoolIdProvider(String? Function() provider) =>
+      _schoolIdProvider = provider;
 
   static Uri bookLink(String bookId) => Uri.parse('alexandria://livro/$bookId');
 

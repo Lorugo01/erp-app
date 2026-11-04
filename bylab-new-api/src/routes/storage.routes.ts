@@ -9,6 +9,7 @@ router.use(authenticateToken);
 
 router.get('/', StorageController.listFiles);
 router.post('/upload', upload.single('file'), StorageController.uploadFile);
+router.post('/sign', StorageController.signFileUrl);
 router.get('/:id', StorageController.getFileById);
 router.delete('/:id', StorageController.deleteFile);
 

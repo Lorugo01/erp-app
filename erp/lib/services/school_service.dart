@@ -18,10 +18,7 @@ class SchoolService {
   static Future<List<School>> getSchools() async {
     try {
       final response = await http
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/schools'),
-            headers: _headers,
-          )
+          .get(Uri.parse('${ApiConfig.baseUrl}/schools'), headers: _headers)
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 
       if (response.statusCode == 200) {
@@ -41,10 +38,7 @@ class SchoolService {
   static Future<School> getSchoolById(String id) async {
     try {
       final response = await http
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/schools/$id'),
-            headers: _headers,
-          )
+          .get(Uri.parse('${ApiConfig.baseUrl}/schools/$id'), headers: _headers)
           .timeout(Duration(seconds: ApiConfig.requestTimeout));
 
       if (response.statusCode == 200) {
@@ -108,6 +102,8 @@ class SchoolService {
     String? email,
     String? website,
     String? logo,
+    bool updateAlexandriaAcervo = false,
+    int? alexandriaAcervoId,
   }) async {
     try {
       final response = await http
@@ -121,6 +117,8 @@ class SchoolService {
               'email': email,
               'website': website,
               'logo': logo,
+              if (updateAlexandriaAcervo)
+                'alexandriaAcervoId': alexandriaAcervoId,
             }),
           )
           .timeout(Duration(seconds: ApiConfig.requestTimeout));

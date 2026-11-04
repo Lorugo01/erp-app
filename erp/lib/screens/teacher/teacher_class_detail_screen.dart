@@ -11,9 +11,9 @@ import '../../services/grade_type_service.dart';
 import '../../services/teacher_service.dart';
 import '../../services/attendance_service.dart';
 import '../../config/api_config.dart';
+import '../../services/file_link_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:typed_data';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'task_submissions_screen.dart';
@@ -392,6 +392,12 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
               // Carregar alunos também (já temos os dados, mas precisamos inicializar mapas)
               _fetchStudents();
 
+              // A primeira disciplina já vem selecionada: carrega os dados dela
+              _fetchAssignments();
+              if (_tabController.index == 1) {
+                _loadAttendance();
+              }
+
               return; // Sucesso, não precisa continuar
             }
           }
@@ -453,7 +459,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar disciplinas: \${userErrorMessage(e)}'),
+            content: Text(
+              'Erro ao carregar disciplinas: \${userErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -773,11 +781,12 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final token = authProvider.user?.token;
 
-      final assignments = await AssignmentService.getAssignmentsByClassAndSubject(
-        widget.classData['id'],
-        _selectedSubjectId!,
-        token,
-      );
+      final assignments =
+          await AssignmentService.getAssignmentsByClassAndSubject(
+            widget.classData['id'],
+            _selectedSubjectId!,
+            token,
+          );
 
       setState(() {
         _assignments = assignments;
@@ -1415,6 +1424,33 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                 ),
                               ),
                             ),
+                          if (assignment['bookId'] != null)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                top: isMobile ? 8.0 : 12.0,
+                              ),
+                              child: Row(
+                                children: [
+                                  AlexandriaBookCover(
+                                    url: assignment['bookCoverUrl'] as String?,
+                                    width: 32,
+                                    height: 46,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Livro: ${assignment['bookTitle'] ?? 'Alexandria'}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 12 : 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           if (assignment['fileUrl'] != null &&
                               assignment['fileUrl'].toString().isNotEmpty)
                             Padding(
@@ -1432,23 +1468,11 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                     fontSize: isMobile ? 12 : 14,
                                   ),
                                 ),
-                                onPressed: () async {
-                                  final fileUrl = assignment['fileUrl'];
-                                  final url = '${ApiConfig.baseUrl}$fileUrl';
-                                  final uri = Uri.parse(url);
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Não foi possível abrir o arquivo',
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                },
+                                onPressed:
+                                    () => FileLinkService.open(
+                                      context,
+                                      assignment['fileUrl']?.toString(),
+                                    ),
                               ),
                             ),
                         ],
@@ -1960,8 +1984,7 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
                                           setState(() {
                                             _attendanceMap[studentId] = value;
                                             if (value != 'JUSTIFIED_ABSENT') {
-                                              _justificationMap[studentId] =
-                                                  '';
+                                              _justificationMap[studentId] = '';
                                             }
                                           });
                                           if (value == 'JUSTIFIED_ABSENT') {
@@ -2913,7 +2936,9 @@ class _TeacherClassDetailScreenState extends State<TeacherClassDetailScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Nenhum período disponível. Cadastre um período primeiro.'),
+              content: Text(
+                'Nenhum período disponível. Cadastre um período primeiro.',
+              ),
               backgroundColor: Colors.orange,
             ),
           );

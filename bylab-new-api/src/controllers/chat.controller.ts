@@ -165,7 +165,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     }
 
     // userId deve ser null para IA
-    const realUserId = isAI ? null : userId;
+    const realUserId = isAI ? null : userId ?? null;
 
     const message = await ChatService.sendMessage(id, realUserId, content, fileData, personagem);
     res.status(201).json(message);

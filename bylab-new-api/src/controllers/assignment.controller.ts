@@ -2,6 +2,18 @@ import { Request, Response, NextFunction } from 'express';
 import * as AssignmentService from '../services/assignment.service';
 import { StorageService } from '../services/storage.service';
 import prisma from '../prisma/client';
+import { canManageSubject } from '../middlewares/academicAccess.middleware';
+
+// O prazo vai até o fim do dia de entrega no horário de Brasília (UTC-3).
+// dueDate é gravado como meia-noite do dia escolhido.
+export const submissionDeadline = (dueDate: Date) =>
+  new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate() + 1, 3));
+
+const isWithinDeadline = (dueDate: Date) => Date.now() < submissionDeadline(dueDate).getTime();
+
+// Aluno logado (null para staff)
+const findOwnStudent = (req: Request) =>
+  prisma.student.findUnique({ where: { userId: req.user!.id }, select: { id: true } });
 
 // Listar assignments de uma turma
 export const getAssignmentsByClass = async (req: Request, res: Response, next: NextFunction) => {
@@ -32,7 +44,12 @@ export const createAssignment = async (req: Request, res: Response, next: NextFu
     if (!subjectId) {
       return res.status(400).json({ error: 'subjectId é obrigatório' });
     }
-    
+
+    const subject = await prisma.subject.findUnique({ where: { id: subjectId }, select: { classId: true } });
+    if (subject?.classId !== classId) {
+      return res.status(400).json({ error: 'A disciplina não pertence a esta turma' });
+    }
+
     const assignment = await AssignmentService.createAssignment(classId, subjectId, assignmentData);
     res.status(201).json(assignment);
   } catch (error) {
@@ -88,6 +105,15 @@ export const createSubmission = async (req: Request, res: Response, next: NextFu
       return res.status(400).json({ error: 'Envie um texto ou um arquivo' });
     }
 
+    // Uma entrega por aluno; depois disso, o aluno edita a existente
+    const existing = await prisma.assignmentSubmission.findFirst({
+      where: { assignmentId, studentId },
+      select: { id: true },
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'Você já entregou esta atividade. Edite a entrega existente.' });
+    }
+
     let fileUrl = null;
     if (req.file) {
       const stored = await StorageService.registerFromMulterFile(
@@ -107,6 +133,161 @@ export const createSubmission = async (req: Request, res: Response, next: NextFu
     res.status(201).json(submission);
   } catch (error) {
     console.error('Erro ao criar submission:', error);
+    next(error);
+  }
+};
+
+// Entrega do aluno logado, com o prazo de edição
+export const getMySubmission = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const student = await findOwnStudent(req);
+    if (!student) {
+      return res.status(403).json({ error: 'Acesso negado: apenas alunos têm entrega própria' });
+    }
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: req.params.id },
+      select: { dueDate: true },
+    });
+    const submission = await prisma.assignmentSubmission.findFirst({
+      where: { assignmentId: req.params.id, studentId: student.id },
+    });
+    res.json({
+      submission,
+      deadline: submissionDeadline(assignment!.dueDate),
+      canEdit: isWithinDeadline(assignment!.dueDate),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Aluno edita a própria entrega enquanto estiver no prazo
+export const updateMySubmission = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const student = await findOwnStudent(req);
+    if (!student) {
+      return res.status(403).json({ error: 'Acesso negado: apenas alunos editam a própria entrega' });
+    }
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: req.params.id },
+      select: { dueDate: true },
+    });
+    if (!isWithinDeadline(assignment!.dueDate)) {
+      return res.status(403).json({ error: 'O prazo de entrega terminou; a entrega não pode mais ser editada' });
+    }
+    const submission = await prisma.assignmentSubmission.findFirst({
+      where: { assignmentId: req.params.id, studentId: student.id },
+    });
+    if (!submission) {
+      return res.status(404).json({ error: 'Entrega não encontrada' });
+    }
+
+    const description = typeof req.body?.description === 'string' ? req.body.description.trim() : undefined;
+    const removeFile = req.body?.removeFile === 'true' || req.body?.removeFile === true;
+
+    let fileUrl = submission.fileUrl;
+    if (req.file) {
+      const stored = await StorageService.registerFromMulterFile(req.file, 'submissions', req.user?.id);
+      fileUrl = stored.fileUrl;
+    } else if (removeFile) {
+      fileUrl = null;
+    }
+
+    const finalDescription = description ?? submission.description;
+    if (!fileUrl && !finalDescription?.trim()) {
+      return res.status(400).json({ error: 'A entrega precisa de um texto ou um arquivo' });
+    }
+
+    const updated = await prisma.assignmentSubmission.update({
+      where: { id: submission.id },
+      data: { description: finalDescription, fileUrl, updatedAt: new Date() },
+    });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Turmas para onde a atividade pode ser duplicada: mesma disciplina (tipo),
+// mesma escola e, para professor, disciplinas que ele leciona
+const findDuplicateTargets = async (req: Request, sourceAssignmentId: string) => {
+  const source = await prisma.assignment.findUnique({
+    where: { id: sourceAssignmentId },
+    include: { subject: { select: { type: true, schoolId: true } } },
+  });
+  if (!source) return null;
+
+  const subjects = await prisma.subject.findMany({
+    where: {
+      type: source.subject.type,
+      schoolId: source.subject.schoolId,
+      classId: { not: source.classId },
+      ...(req.user?.role === 'TEACHER' ? { teacher: { userId: req.user.id } } : {}),
+    },
+    include: { class: { select: { id: true, name: true } } },
+    orderBy: { class: { name: 'asc' } },
+  });
+  return { source, subjects };
+};
+
+export const getDuplicateTargets = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await findDuplicateTargets(req, req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: 'Atividade não encontrada' });
+    }
+    res.json(result.subjects.map((s) => ({ id: s.class.id, name: s.class.name, subjectId: s.id })));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const duplicateAssignment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sourceAssignmentId, targetClassIds, targetDate } = req.body ?? {};
+    if (!sourceAssignmentId || !Array.isArray(targetClassIds) || targetClassIds.length === 0 || !targetDate) {
+      return res.status(400).json({
+        error: 'Campos obrigatórios: sourceAssignmentId, targetClassIds (array não vazio), targetDate',
+      });
+    }
+
+    const owner = await prisma.assignment.findUnique({
+      where: { id: sourceAssignmentId },
+      select: { subject: { select: { schoolId: true, teacher: { select: { userId: true } } } } },
+    });
+    if (!owner) {
+      return res.status(404).json({ error: 'Atividade não encontrada' });
+    }
+    if (!canManageSubject(req, owner.subject)) {
+      return res.status(403).json({ error: 'Acesso negado: disciplina de outro professor' });
+    }
+
+    const result = await findDuplicateTargets(req, sourceAssignmentId);
+    const byClass = new Map(result!.subjects.map((s) => [s.classId, s]));
+    const invalid = targetClassIds.filter((id: string) => !byClass.has(id));
+    if (invalid.length > 0) {
+      return res.status(403).json({ error: 'Acesso negado: turma sem a mesma disciplina para você', invalid });
+    }
+
+    const { source } = result!;
+    const created = await prisma.$transaction(
+      targetClassIds.map((classId: string) =>
+        prisma.assignment.create({
+          data: {
+            classId,
+            subjectId: byClass.get(classId)!.id,
+            description: source.description,
+            dueDate: new Date(targetDate),
+            fileUrl: source.fileUrl,
+            bookId: source.bookId,
+            bookTitle: source.bookTitle,
+            bookCoverUrl: source.bookCoverUrl,
+          },
+        }),
+      ),
+    );
+    res.status(201).json(created);
+  } catch (error) {
     next(error);
   }
 };

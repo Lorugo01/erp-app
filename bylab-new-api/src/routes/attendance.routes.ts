@@ -4,7 +4,9 @@ import { authenticateToken } from '../middlewares/auth.middleware';
 import { requireStaff } from '../middlewares/assignmentAccess.middleware';
 import {
   requireAttendanceAccess,
+  requireAttendanceSubjectOwner,
   requireBodyLesson,
+  requireBodyLessonSubjectOwner,
   requireLessonParam,
   requireStudentParam,
 } from '../middlewares/academicAccess.middleware';
@@ -17,9 +19,9 @@ router.get('/', requireStaff, AttendanceController.getAll);
 router.get('/student/:studentId', requireStudentParam, AttendanceController.getByStudent); // Nova rota
 router.get('/lesson/:lessonId', requireStaff, requireLessonParam('lessonId'), AttendanceController.getByLesson);
 router.get('/:id', requireAttendanceAccess, AttendanceController.getById);
-router.post('/', requireStaff, requireBodyLesson, AttendanceController.create);
-router.post('/bulk', requireStaff, requireBodyLesson, AttendanceController.createBulk);
-router.put('/:id', requireStaff, requireAttendanceAccess, AttendanceController.update);
-router.delete('/:id', requireStaff, requireAttendanceAccess, AttendanceController.remove);
+router.post('/', requireStaff, requireBodyLesson, requireBodyLessonSubjectOwner, AttendanceController.create);
+router.post('/bulk', requireStaff, requireBodyLesson, requireBodyLessonSubjectOwner, AttendanceController.createBulk);
+router.put('/:id', requireStaff, requireAttendanceAccess, requireAttendanceSubjectOwner, AttendanceController.update);
+router.delete('/:id', requireStaff, requireAttendanceAccess, requireAttendanceSubjectOwner, AttendanceController.remove);
 
 export default router;

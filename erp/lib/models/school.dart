@@ -6,6 +6,9 @@ class School {
   final String? email;
   final String? website;
   final String? logo;
+
+  /// Acervo do Alexandria dos tablets desta escola (filtra a busca de livros).
+  final int? alexandriaAcervoId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
@@ -18,6 +21,7 @@ class School {
     this.email,
     this.website,
     this.logo,
+    this.alexandriaAcervoId,
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
@@ -32,12 +36,15 @@ class School {
       email: json['email'],
       website: json['website'],
       logo: json['logo'],
-      createdAt: json['createdAt'] != null 
-          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null 
-          ? DateTime.tryParse(json['updatedAt']) ?? DateTime.now()
-          : DateTime.now(),
+      alexandriaAcervoId: int.tryParse('${json['alexandriaAcervoId'] ?? ''}'),
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+              : DateTime.now(),
+      updatedAt:
+          json['updatedAt'] != null
+              ? DateTime.tryParse(json['updatedAt']) ?? DateTime.now()
+              : DateTime.now(),
       isActive: json['isActive'] ?? true,
     );
   }
@@ -51,6 +58,7 @@ class School {
       'email': email,
       'website': website,
       'logo': logo,
+      'alexandriaAcervoId': alexandriaAcervoId,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive,
@@ -65,6 +73,7 @@ class School {
     String? email,
     String? website,
     String? logo,
+    int? alexandriaAcervoId,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
@@ -77,6 +86,7 @@ class School {
       email: email ?? this.email,
       website: website ?? this.website,
       logo: logo ?? this.logo,
+      alexandriaAcervoId: alexandriaAcervoId ?? this.alexandriaAcervoId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,

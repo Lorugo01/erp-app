@@ -4,7 +4,9 @@ import { authenticateToken } from '../middlewares/auth.middleware';
 import { requireStaff } from '../middlewares/assignmentAccess.middleware';
 import {
   requireBodyStudent,
+  requireBodySubjectOwner,
   requireGradeAccess,
+  requireGradeSubjectOwner,
   requireStudentParam,
   requireSubjectParam,
 } from '../middlewares/academicAccess.middleware';
@@ -18,9 +20,17 @@ router.get('/boletim/:studentId', requireStudentParam, GradeController.getBoleti
 
 router.get('/', requireStaff, GradeController.getAll);
 router.get('/:id', requireGradeAccess, GradeController.getById);
-router.post('/', requireStaff, requireBodyStudent, GradeController.create);
-router.put('/:id', requireStaff, requireGradeAccess, requireBodyStudent, GradeController.update);
-router.delete('/:id', requireStaff, requireGradeAccess, GradeController.remove);
+router.post('/', requireStaff, requireBodyStudent, requireBodySubjectOwner, GradeController.create);
+router.put(
+  '/:id',
+  requireStaff,
+  requireGradeAccess,
+  requireGradeSubjectOwner,
+  requireBodyStudent,
+  requireBodySubjectOwner,
+  GradeController.update,
+);
+router.delete('/:id', requireStaff, requireGradeAccess, requireGradeSubjectOwner, GradeController.remove);
 router.get('/student/:studentId', requireStudentParam, GradeController.getByStudent);
 router.get('/subject/:subjectId', requireStaff, requireSubjectParam, GradeController.getBySubject);
 

@@ -52,7 +52,9 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar estatísticas: \${userErrorMessage(e)}'),
+            content: Text(
+              'Erro ao carregar estatísticas: \${userErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -972,6 +974,9 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
     final TextEditingController websiteController = TextEditingController(
       text: widget.school.website ?? '',
     );
+    final TextEditingController acervoController = TextEditingController(
+      text: widget.school.alexandriaAcervoId?.toString() ?? '',
+    );
 
     showDialog(
       context: context,
@@ -1025,6 +1030,17 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                     ),
                     keyboardType: TextInputType.url,
                   ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: acervoController,
+                    decoration: const InputDecoration(
+                      labelText: 'Acervo do Alexandria',
+                      helperText:
+                          'Número do acervo dos tablets. Vazio mostra o catálogo inteiro.',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
                 ],
               ),
             ),
@@ -1065,6 +1081,10 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                           websiteController.text.trim().isEmpty
                               ? null
                               : websiteController.text.trim(),
+                      updateAlexandriaAcervo: true,
+                      alexandriaAcervoId: int.tryParse(
+                        acervoController.text.trim(),
+                      ),
                     );
 
                     Navigator.pop(context);
@@ -1088,7 +1108,9 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao criar usuário: \${userErrorMessage(e)}'),
+                        content: Text(
+                          'Erro ao criar usuário: \${userErrorMessage(e)}',
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1269,7 +1291,9 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen>
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Erro ao criar usuário: \${userErrorMessage(e)}'),
+                        content: Text(
+                          'Erro ao criar usuário: \${userErrorMessage(e)}',
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );

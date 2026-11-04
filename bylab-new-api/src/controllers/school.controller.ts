@@ -3,6 +3,15 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// null limpa o acervo; ausente mantém o valor atual
+const parseAcervoId = (body: any): number | null | 'absent' | 'invalid' => {
+  if (!body || !('alexandriaAcervoId' in body)) return 'absent';
+  const value = body.alexandriaAcervoId;
+  if (value === null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 'invalid';
+};
+
 export class SchoolController {
   // Criar uma nova escola
   static async create(req: Request, res: Response) {
@@ -110,6 +119,12 @@ export class SchoolController {
         return res.status(400).json({ error: 'Nome da escola é obrigatório' });
       }
 
+      // Só altera o acervo quando o campo vem na requisição
+      const acervo = parseAcervoId(req.body);
+      if (acervo === 'invalid') {
+        return res.status(400).json({ error: 'alexandriaAcervoId deve ser um número inteiro positivo' });
+      }
+
       const school = await prisma.school.update({
         where: { id },
         data: {
@@ -119,6 +134,7 @@ export class SchoolController {
           email,
           website,
           logo,
+          ...(acervo === 'absent' ? {} : { alexandriaAcervoId: acervo }),
           updatedAt: new Date(),
         },
       });
@@ -126,6 +142,22 @@ export class SchoolController {
       res.json(school);
     } catch (error) {
       console.error('Erro ao atualizar escola:', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+  }
+
+  // Configuração das integrações da escola (leve, para professor e aluno)
+  static async getIntegration(req: Request, res: Response) {
+    try {
+      const school = await prisma.school.findUnique({
+        where: { id: req.params.id },
+        select: { alexandriaAcervoId: true },
+      });
+      if (!school) {
+        return res.status(404).json({ error: 'Escola não encontrada' });
+      }
+      res.json(school);
+    } catch (error) {
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   }
